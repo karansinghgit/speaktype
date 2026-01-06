@@ -1,0 +1,126 @@
+# SwiftLint Configuration for SpeakType
+
+# Paths to include during linting
+included:
+  - speaktype
+
+# Paths to ignore during linting
+excluded:
+  - Carthage
+  - Pods
+  - .build
+  - DerivedData
+
+# Rules to disable
+disabled_rules:
+  - trailing_whitespace
+  - todo
+
+# Rules to enable (opt-in rules)
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - explicit_init
+  - first_where
+  - sorted_imports
+  - closure_spacing
+  - contains_over_first_not_nil
+  - discouraged_optional_boolean
+  - empty_xctest_method
+  - explicit_self
+  - fallthrough
+  - fatal_error_message
+  - file_header
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - joined_default_parameter
+  - let_var_whitespace
+  - literal_expression_end_indentation
+  - multiline_arguments
+  - multiline_function_chains
+  - multiline_parameters
+  - operator_usage_whitespace
+  - overridden_super_call
+  - pattern_matching_keywords
+  - private_action
+  - private_outlet
+  - prohibited_super_call
+  - redundant_nil_coalescing
+  - redundant_type_annotation
+  - single_test_class
+  - sorted_first_last
+  - toggle_bool
+  - unneeded_parentheses_in_closure_argument
+  - vertical_parameter_alignment_on_call
+  - yoda_condition
+
+# Configurable rules
+line_length:
+  warning: 120
+  error: 150
+  ignores_comments: true
+  ignores_urls: true
+
+file_length:
+  warning: 400
+  error: 600
+
+function_body_length:
+  warning: 50
+  error: 100
+
+function_parameter_count:
+  warning: 5
+  error: 8
+
+type_body_length:
+  warning: 300
+  error: 500
+
+type_name:
+  min_length: 3
+  max_length: 40
+
+identifier_name:
+  min_length: 2
+  max_length: 40
+  excluded:
+    - id
+    - x
+    - y
+    - z
+
+cyclomatic_complexity:
+  warning: 10
+  error: 20
+
+nesting:
+  type_level:
+    warning: 2
+    error: 3
+
+# Custom rules
+custom_rules:
+  double_space:
+    include: "*.swift"
+    name: "Double space"
+    regex: '([a-z,A-Z] \s+)'
+    message: "Double space between keywords"
+    match_kinds: keyword
+    severity: warning
+
+  comments_space:
+    name: "Space After Comment"
+    regex: '(^ *//\w+)'
+    message: "There should be a space after //"
+    severity: warning
+
+  empty_line_after_guard:
+    name: "Empty Line After Guard"
+    regex: '(^ *guard[ a-zA-Z0-9=?.\(\),><!]*\{[ a-zA-Z0-9=?.\(\),><!]*\}\n *(?!(?:return|guard)))'
+    message: "There should be an empty line after a guard"
+    severity: warning
+
+# Reporter type
+reporter: "xcode"
+

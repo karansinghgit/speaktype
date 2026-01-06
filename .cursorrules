@@ -1,0 +1,398 @@
+# Cursor Rules for SpeakType
+
+## Project Overview
+SpeakType is a macOS application built with SwiftUI following the MVVM architecture pattern.
+
+## Architecture
+
+### MVVM Pattern
+- **Models** (`Models/`): Data structures, Codable conformance, validation logic
+- **Views** (`Views/`): SwiftUI components, UI layout, user interaction
+- **ViewModels** (`ViewModels/`): Business logic, state management, ObservableObject
+- **Services** (`Services/`): Network requests, data persistence, external APIs
+
+### Folder Structure
+```
+speaktype/
+├── App/                    # App entry point
+├── Views/
+│   ├── Screens/           # Full-screen views
+│   └── Components/        # Reusable UI components
+├── ViewModels/            # View models
+├── Models/                # Data models
+├── Services/
+│   ├── Network/          # Networking layer
+│   └── Storage/          # Data persistence
+├── Utilities/
+│   ├── Extensions/       # Swift extensions
+│   ├── Helpers/          # Helper functions
+│   └── Constants.swift   # App constants
+└── Resources/            # Assets, localizations
+```
+
+## Code Style Guidelines
+
+### Swift Style
+- Use 4 spaces for indentation (no tabs)
+- Maximum line length: 120 characters
+- Follow Swift API Design Guidelines
+- Prefer `let` over `var`
+- Use type inference where appropriate
+- Use meaningful, descriptive names
+
+### Naming Conventions
+- **Types**: UpperCamelCase (e.g., `UserProfile`, `NetworkManager`)
+- **Functions/Variables**: lowerCamelCase (e.g., `fetchUserData`, `isLoggedIn`)
+- **Constants**: lowerCamelCase (e.g., `maxRetryCount`)
+- **Enums**: UpperCamelCase for enum, lowerCamelCase for cases
+- **Files**: Match primary type name (e.g., `UserProfile.swift`)
+- **ViewModels**: ViewName + "ViewModel" (e.g., `HomeViewModel.swift`)
+- **Extensions**: TypeName + "+Extensions" (e.g., `View+Extensions.swift`)
+
+### SwiftUI Best Practices
+- Break down complex views into smaller, reusable components
+- Use `@State` for view-local state
+- Use `@StateObject` for view-owned observable objects
+- Use `@ObservedObject` for passed-in observable objects
+- Use `@EnvironmentObject` for app-wide shared state
+- Prefer composition over inheritance
+- Keep views focused and under 200 lines
+
+### Code Organization
+- Use `// MARK: -` to organize code sections
+- Order: Properties → Initialization → Public Methods → Private Methods
+- Group related functionality together
+- Limit file length to ~400 lines
+
+Example:
+```swift
+class MyViewModel: ObservableObject {
+    // MARK: - Properties
+    @Published var data: [Item] = []
+    private let service: DataService
+    
+    // MARK: - Initialization
+    init(service: DataService = DataService()) {
+        self.service = service
+    }
+    
+    // MARK: - Public Methods
+    func loadData() {
+        // ...
+    }
+    
+    // MARK: - Private Methods
+    private func processData() {
+        // ...
+    }
+}
+```
+
+## Development Guidelines
+
+### When Adding New Features
+
+1. **Plan the structure**:
+   - Identify required Models
+   - Design View hierarchy
+   - Create ViewModel for business logic
+   - Determine Service needs
+
+2. **Create files in order**:
+   - Models first (data structures)
+   - Services (business logic)
+   - ViewModels (state management)
+   - Views (UI components)
+
+3. **Follow the folder structure**:
+   - Place files in appropriate directories
+   - Use consistent naming
+   - Add to Xcode project properly
+
+4. **Write tests**:
+   - Unit tests for ViewModels
+   - Unit tests for Services
+   - UI tests for critical flows
+
+### Dependency Injection
+
+Always use protocol-based dependency injection for testability:
+
+```swift
+// Define protocol
+protocol UserServiceProtocol {
+    func fetchUser() async throws -> User
+}
+
+// Implement service
+class UserService: UserServiceProtocol {
+    func fetchUser() async throws -> User { ... }
+}
+
+// Inject in ViewModel
+class UserViewModel: ObservableObject {
+    private let service: UserServiceProtocol
+    
+    init(service: UserServiceProtocol = UserService()) {
+        self.service = service
+    }
+}
+```
+
+### Async/Await
+
+Use modern Swift concurrency:
+
+```swift
+func loadData() {
+    Task {
+        do {
+            let result = try await service.fetchData()
+            await MainActor.run {
+                self.data = result
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = error.localizedDescription
+            }
+        }
+    }
+}
+```
+
+### Error Handling
+
+- Create custom error types conforming to `LocalizedError`
+- Handle errors at the ViewModel layer
+- Display user-friendly error messages
+- Log detailed errors for debugging
+
+```swift
+enum NetworkError: LocalizedError {
+    case invalidURL
+    case noData
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL: return "Invalid URL"
+        case .noData: return "No data received"
+        }
+    }
+}
+```
+
+## File Creation Rules
+
+### New View
+1. Create in `Views/Screens/` or `Views/Components/`
+2. Name: `FeatureName + View.swift` (e.g., `HomeView.swift`)
+3. Include: SwiftUI Preview
+
+### New ViewModel
+1. Create in `ViewModels/`
+2. Name: Match view name + `ViewModel` (e.g., `HomeViewModel.swift`)
+3. Conform to `ObservableObject`
+4. Use `@Published` for observable state
+
+### New Model
+1. Create in `Models/`
+2. Use singular nouns (e.g., `User.swift`, not `Users.swift`)
+3. Conform to `Codable` if serializable
+4. Conform to `Identifiable` if used in lists
+
+### New Service
+1. Create in `Services/Network/` or `Services/Storage/`
+2. Define protocol first
+3. Implement concrete class
+4. Use dependency injection
+
+### Extensions
+1. Create in `Utilities/Extensions/`
+2. Name: `TypeName+Extensions.swift`
+3. Use `// MARK:` to organize extension methods
+
+## Git Workflow
+
+### Commit Messages
+
+Follow Conventional Commits format:
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, no logic change)
+- `refactor`: Code refactoring
+- `test`: Adding or updating tests
+- `chore`: Build process, dependencies, tooling
+
+**Examples:**
+```
+feat(auth): add user authentication flow
+fix(home): resolve crash on data load
+docs: update README with setup instructions
+refactor(network): improve error handling
+test(viewmodel): add unit tests for HomeViewModel
+chore: update SwiftLint configuration
+```
+
+### Semantic Versioning
+
+Follow [SemVer](https://semver.org/): `MAJOR.MINOR.PATCH`
+
+- **MAJOR**: Breaking changes
+- **MINOR**: New features (backward compatible)
+- **PATCH**: Bug fixes (backward compatible)
+
+Example: `1.2.3` → `1.2.4` (bug fix) → `1.3.0` (new feature) → `2.0.0` (breaking change)
+
+### Branch Strategy
+
+- `main`: Production-ready code
+- `develop`: Development branch
+- `feature/*`: New features
+- `fix/*`: Bug fixes
+- `hotfix/*`: Urgent production fixes
+
+### Commit Frequency
+
+- Commit after completing a logical unit of work
+- Commit before switching contexts
+- Commit at least daily
+- Make atomic commits (one logical change per commit)
+
+## Testing Guidelines
+
+### Unit Tests
+
+- Test ViewModels with mocked services
+- Test business logic in Models
+- Test Services with mocked dependencies
+- Aim for 80%+ code coverage
+
+### UI Tests
+
+- Test critical user flows
+- Test navigation paths
+- Test error states
+- Keep tests independent
+
+### Test Naming
+
+Use descriptive names: `test_WhatIsBeingTested_Scenario_ExpectedResult`
+
+Example: `test_loadData_withValidResponse_updatesDataProperty()`
+
+## Code Review Checklist
+
+Before submitting code:
+
+- [ ] Code follows Swift style guidelines
+- [ ] SwiftLint shows no warnings/errors
+- [ ] All tests pass
+- [ ] New features have tests
+- [ ] Documentation is updated
+- [ ] Commit messages follow conventions
+- [ ] No commented-out code
+- [ ] No debug print statements
+- [ ] Proper error handling
+
+## Common Patterns
+
+### Loading States
+
+```swift
+@Published var isLoading = false
+@Published var errorMessage: String?
+
+func loadData() {
+    isLoading = true
+    errorMessage = nil
+    
+    Task {
+        do {
+            data = try await service.fetchData()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
+}
+```
+
+### Navigation
+
+Use NavigationStack for programmatic navigation:
+
+```swift
+@State private var path = NavigationPath()
+
+NavigationStack(path: $path) {
+    // Content
+}
+```
+
+### Alerts and Sheets
+
+```swift
+@State private var showingAlert = false
+@State private var showingSheet = false
+
+.alert("Title", isPresented: $showingAlert) {
+    Button("OK", role: .cancel) { }
+}
+.sheet(isPresented: $showingSheet) {
+    DetailView()
+}
+```
+
+## Performance Considerations
+
+- Use `@State` only for view-local state
+- Avoid expensive computations in view body
+- Use `.task` for async work tied to view lifecycle
+- Profile with Instruments for performance issues
+- Lazy load data when appropriate
+
+## Accessibility
+
+- Add accessibility labels to interactive elements
+- Support Dynamic Type
+- Test with VoiceOver
+- Ensure sufficient color contrast
+- Support keyboard navigation
+
+## Security
+
+- Never commit API keys or secrets
+- Use Keychain for sensitive data
+- Validate user input
+- Use HTTPS for network requests
+- Follow principle of least privilege
+
+## Resources
+
+- [Swift API Design Guidelines](https://swift.org/documentation/api-design-guidelines/)
+- [SwiftUI Documentation](https://developer.apple.com/documentation/swiftui/)
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Detailed architecture guide
+- [FOLDER_STRUCTURE.md](docs/FOLDER_STRUCTURE.md) - Folder organization
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
+
+## Questions?
+
+When in doubt:
+1. Check existing code for patterns
+2. Refer to documentation in `docs/`
+3. Follow Swift and SwiftUI best practices
+4. Ask for clarification
+
+Remember: Consistency is more important than perfection!
+

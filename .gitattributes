@@ -1,0 +1,57 @@
+# Git attributes for SpeakType
+
+# Auto detect text files and normalize line endings to LF
+* text=auto eol=lf
+
+# Swift source files
+*.swift text diff=swift
+
+# Xcode project files
+*.pbxproj text merge=union
+*.xcworkspacedata text merge=union
+*.xcscheme text
+
+# Documentation
+*.md text
+*.txt text
+
+# Configuration files
+*.json text
+*.yml text
+*.yaml text
+*.plist text
+*.strings text
+*.entitlements text
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.svg text
+
+# Archives
+*.zip binary
+*.tar binary
+*.gz binary
+
+# Fonts
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+
+# Audio/Video
+*.mp3 binary
+*.mp4 binary
+*.mov binary
+*.wav binary
+
+# Compiled files
+*.o binary
+*.a binary
+*.dylib binary
+*.framework binary
+

@@ -13,7 +13,7 @@
 	<key>com.apple.security.assets.music.read-write</key>
 	<false/>
 	<key>com.apple.security.network.client</key>
-	<false/>
+	<true/>
 </dict>
 </plist>
 

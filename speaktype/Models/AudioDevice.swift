@@ -120,27 +120,8 @@ enum AudioDeviceType: String, Codable, Equatable {
 // MARK: - Factory Methods
 
 extension AudioDevice {
-    /// Create device from AVAudioSessionPortDescription
-    static func from(portDescription: AVAudioSessionPortDescription) -> AudioDevice? {
-        let deviceType: AudioDeviceType
-        switch portDescription.portType {
-        case .builtInMic:
-            deviceType = .builtin
-        case .usbAudio:
-            deviceType = .usb
-        case .bluetoothA2DP, .bluetoothHFP, .bluetoothLE:
-            deviceType = .bluetooth
-        default:
-            deviceType = .unknown
-        }
-        
-        return AudioDevice(
-            id: portDescription.uid,
-            name: portDescription.portName,
-            channels: portDescription.channels?.count ?? 1,
-            deviceType: deviceType
-        )
-    }
+    // Factory method removed as AVAudioSessionPortDescription is unavailable on macOS
+
     
     /// System default device
     static var systemDefault: AudioDevice {

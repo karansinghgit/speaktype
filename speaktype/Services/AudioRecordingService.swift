@@ -4,7 +4,9 @@ import Combine
 
 class AudioRecordingService: NSObject, ObservableObject {
     private var audioRecorder: AVAudioRecorder?
+    private var timer: Timer?
     @Published var isRecording = false
+    @Published var audioLevel: Float = 0.0
     
     // Request microphone permission
     func requestPermission() {
@@ -12,7 +14,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         AVCaptureDevice.requestAccess(for: .audio) { _ in }
     }
     
-    // Start recording audio to a temporary file
+    // Start recording audio
     func startRecording() {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
         
@@ -49,16 +51,38 @@ class AudioRecordingService: NSObject, ObservableObject {
         
         do {
             audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
+            audioRecorder?.isMeteringEnabled = true // Enable metering
             audioRecorder?.record()
             isRecording = true
+            startMetering() // Start timer
             print("Recording started to \(audioFilename)")
         } catch {
             print("Could not start recording: \(error.localizedDescription)")
         }
     }
     
+    private func startMetering() {
+        timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            guard let self = self, let recorder = self.audioRecorder else { return }
+            recorder.updateMeters()
+            let power = recorder.averagePower(forChannel: 0) // -160 to 0 dB
+            // Normalize: -60dB to 0dB -> 0.0 to 1.0
+            let normalized = max(0.0, (power + 60) / 60)
+            DispatchQueue.main.async {
+                self.audioLevel = normalized
+            }
+        }
+    }
+    
+    private func stopMetering() {
+        timer?.invalidate()
+        timer = nil
+        audioLevel = 0.0
+    }
+    
     // Stop recording and return the file URL
     func stopRecording() -> URL? {
+        stopMetering()
         audioRecorder?.stop()
         isRecording = false
         print("Recording stopped")

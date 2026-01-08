@@ -87,7 +87,7 @@ struct ContentView: View {
         .padding()
         .frame(width: 400, height: 500)
         .onAppear {
-            _ = HotkeyService.shared // Initialize Hotkey Listener
+            // HotkeyService removed in favor of KeyboardShortcuts defined in App
         }
     }
 }

@@ -7,25 +7,41 @@ class WhisperService {
     var isInitialized = false
     var isTranscribing = false
     
+    var currentModelVariant: String = "openai_whisper-base" // Default
+    
     enum TranscriptionError: Error {
         case notInitialized
         case fileNotFound
     }
     
+    // Default initialization (loads default or saved model)
     func initialize() async throws {
-        // Initialize WhisperKit with the base model (good balance of speed/accuracy)
-        // We'll use "tiny.en" for MVP speed, can be configured later
-        print("Initializing WhisperKit...")
+        // You might want to pull from UserDefaults here if you want persistence in Service
+        // For now, allow the View to drive the variant selection via loadModel
+        try await loadModel(variant: currentModelVariant)
+    }
+    
+    // Dynamic model loading
+    func loadModel(variant: String) async throws {
+        if isInitialized && variant == currentModelVariant && pipe != nil {
+             return // Already loaded
+        }
+        
+        print("Initializing WhisperKit with model: \(variant)...")
+        isInitialized = false
+        
         do {
-            // "tiny.en" is a small, English-only model perfect for offline dictation
-           // Explicitly request the tiny English model to minimize download size (~39MB)
-           pipe = try await WhisperKit(model: "tiny.en") 
-           // Note: In a real app we might want to check for model availability or download it.
-           // For now, we rely on WhisperKit's default behavior or pre-downloaded models.
+            // WhisperKit.download(variant:) logic handles checking if consistent
+            // But here we want the PIPE, so we init WhisperKit(model: variant)
+            // Note: If model isn't downloaded, this might fail or trigger download depending on library version.
+            // Ideally, we ensure it's downloaded first via ModelDownloadService, but WhisperKit init often handles it.
+            
+            pipe = try await WhisperKit(model: variant)
+            currentModelVariant = variant
             isInitialized = true
-            print("WhisperKit initialized successfully")
+            print("WhisperKit initialized successfully with \(variant)")
         } catch {
-            print("Failed to initialize WhisperKit: \(error.localizedDescription)")
+            print("Failed to initialize WhisperKit with \(variant): \(error.localizedDescription)")
             throw error
         }
     }

@@ -43,6 +43,18 @@ class ClipboardService {
             cmdUp?.post(tap: .cghidEventTap)
             
             print("Simulated Cmd+V")
+            print("Simulated Cmd+V")
         }
+    }
+    
+    // Check if we have permission to send keystrokes
+    var isAccessibilityTrusted: Bool {
+        return AXIsProcessTrusted()
+    }
+    
+    // Request permission via system prompt
+    func requestAccessibilityPermission() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
     }
 }

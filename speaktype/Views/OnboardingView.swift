@@ -1,0 +1,310 @@
+import SwiftUI
+import AVFoundation
+
+struct OnboardingView: View {
+    @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
+    @State private var currentPage = 0
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Background - Solid Dark
+                Color.contentBackground
+                    .ignoresSafeArea()
+                
+                // Content ZStack
+                ScrollView {
+                    ZStack {
+                        if currentPage == 0 {
+                            WelcomePage(action: {
+                                withAnimation { currentPage = 1 }
+                            })
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+                        } else if currentPage == 1 {
+                            PermissionsPage(finishAction: {
+                                withAnimation { currentPage = 2 }
+                            })
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+                        } else {
+                            // Tutorial / Final Step
+                             WelcomePage(action: {
+                                completeOnboarding()
+                            })
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+                        }
+                    }
+                    .padding(40)
+                    .frame(maxWidth: .infinity, minHeight: 600) // Ensure layout has space but scrolls
+                }
+            }
+        }
+        .frame(minWidth: 600, minHeight: 500) // Lower minimum size
+        .fontDesign(.rounded) // Apply global rounded font for Onboarding
+    }
+    
+    func completeOnboarding() {
+        withAnimation {
+            hasCompletedOnboarding = true
+        }
+    }
+}
+
+struct WelcomePage: View {
+    let action: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 40) {
+            // Icon / Hero
+            Image(systemName: "mic.circle.fill")
+                .font(.system(size: 100))
+                .foregroundStyle(Color.appRed)
+                .shadow(color: Color.appRed.opacity(0.5), radius: 20, x: 0, y: 0)
+            
+            VStack(spacing: 16) {
+                Text("Welcome to SpeakType")
+                    .font(.system(size: 42, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                
+                Text("Experience the power of local AI transcription. Secure, fast, and completely offline.")
+                    .font(.title3)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.gray)
+                    .frame(maxWidth: 500)
+            }
+            
+            VStack(spacing: 24) {
+                FeatureCard(icon: "lock.shield.fill", title: "Private by Design", description: "Your audio never leaves your device.")
+                FeatureCard(icon: "bolt.fill", title: "Lightning Fast", description: "Optimized for Apple Silicon.")
+                FeatureCard(icon: "keyboard.fill", title: "Global Injection", description: "Type with your voice anywhere.")
+            }
+            
+            Button(action: action) {
+                Text("Get Started")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+                    .frame(width: 200, height: 50)
+                    .background(Color.appRed)
+                    .cornerRadius(25)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+struct PermissionsPage: View {
+    var finishAction: () -> Void
+    @State private var micStatus: AVAuthorizationStatus = .notDetermined
+    @State private var accessibilityStatus: Bool = false
+    @State private var timer: Timer?
+    
+    var body: some View {
+        VStack(spacing: 40) {
+            VStack(spacing: 10) {
+                Text("Permissions Setup")
+                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                Text("SpeakType needs access to your microphone and accessibility features to function.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.top, 20)
+            
+            VStack(spacing: 20) {
+                // Microphone
+                OnboardingPermissionRow(
+                    icon: "mic.fill",
+                    title: "Microphone Access",
+                    description: "Required to record your voice.",
+                    isGranted: micStatus == .authorized,
+                    action: requestMicPermission
+                )
+                
+                // Accessibility
+                OnboardingPermissionRow(
+                    icon: "hand.raised.fill",
+                    title: "Accessibility",
+                    description: "Required to type text into other apps.",
+                    isGranted: accessibilityStatus,
+                    action: requestAccessibilityPermission
+                )
+            }
+            .frame(maxWidth: 600) // Readability constraint
+            
+            Spacer()
+            
+            Button(action: finishAction) {
+                HStack {
+                    Text("Start Using SpeakType")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    if micStatus == .authorized && accessibilityStatus {
+                        Image(systemName: "checkmark")
+                    }
+                }
+                .foregroundColor(.white)
+                .frame(width: 300, height: 60)
+                .background(
+                    RoundedRectangle(cornerRadius: 30)
+                        .fill((micStatus == .authorized && accessibilityStatus) ? Color.appRed : Color.gray.opacity(0.3))
+                        .shadow(color: (micStatus == .authorized && accessibilityStatus) ? Color.appRed.opacity(0.4) : Color.clear, radius: 10, x: 0, y: 5)
+                )
+                .animation(.easeInOut, value: micStatus == .authorized && accessibilityStatus)
+            }
+            .buttonStyle(.plain)
+            .disabled(micStatus != .authorized || !accessibilityStatus)
+            .padding(.bottom, 40)
+        }
+        .onAppear {
+            checkPermissions()
+            startPolling()
+        }
+        .onDisappear {
+            timer?.invalidate()
+        }
+    }
+    
+    // ... Copy-paste existing helpers (checkPermissions, request, polling) ...
+    // Note: Re-implementing them inline for the tool call
+    
+    func startPolling() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            checkPermissions()
+        }
+    }
+    
+    func checkPermissions() {
+        micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        accessibilityStatus = AXIsProcessTrusted()
+    }
+    
+    func requestMicPermission() {
+        AVCaptureDevice.requestAccess(for: .audio) { _ in
+            DispatchQueue.main.async { checkPermissions() }
+        }
+        // Also open settings if denied?
+         if micStatus == .denied {
+            openSettings(for: "Privacy_Microphone")
+         }
+    }
+    
+    func requestAccessibilityPermission() {
+        print("DEBUG: Requesting Accessibility Permission")
+        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String : true]
+        let accessEnabled = AXIsProcessTrustedWithOptions(options)
+        accessibilityStatus = accessEnabled
+        
+        if !accessEnabled {
+             print("DEBUG: Access not enabled, opening settings")
+             openSettings(for: "Privacy_Accessibility")
+        }
+    }
+    
+    func openSettings(for pane: String) {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+}
+
+struct FeatureCard: View {
+    let icon: String
+    let title: String
+    let description: String
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title)
+                .foregroundStyle(Color.appRed)
+                .frame(width: 50, height: 50)
+                .background(Color.appRed.opacity(0.1))
+                .clipShape(Circle())
+            
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(.white)
+            
+            Text(description)
+                .font(.caption)
+                .foregroundStyle(.gray)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(width: 140, height: 160)
+        .padding()
+        .background(Color.white.opacity(0.03))
+        .cornerRadius(20)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.white.opacity(0.05), lineWidth: 1)
+        )
+    }
+}
+
+struct OnboardingPermissionRow: View {
+    let icon: String
+    let title: String
+    let description: String
+    let isGranted: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(Color.appRed)
+                .frame(width: 50, height: 50)
+                .background(Color.appRed.opacity(0.1))
+                .clipShape(Circle())
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundStyle(.gray)
+            }
+            
+            Spacer()
+            
+            if isGranted {
+                HStack {
+                    Text("Granted")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    Image(systemName: "checkmark.circle.fill")
+                }
+                .foregroundStyle(.green)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.green.opacity(0.1))
+                .clipShape(Capsule())
+            } else {
+                Button(action: action) {
+                    Text("Allow Access")
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.appRed)
+                        .foregroundStyle(.white)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(20)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(isGranted ? Color.green.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1)
+        )
+    }
+}
+
+#Preview {
+    OnboardingView()
+}

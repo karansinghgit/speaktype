@@ -7,6 +7,14 @@ struct HistoryItem: Identifiable, Codable, Hashable {
     let date: Date
     let transcript: String
     let duration: TimeInterval
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    static func == (lhs: HistoryItem, rhs: HistoryItem) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 class HistoryService: ObservableObject {

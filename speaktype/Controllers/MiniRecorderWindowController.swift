@@ -4,7 +4,7 @@ import SwiftUI
 
 class MiniRecorderWindowController: NSObject {
     private var panel: NSPanel?
-    private var hostingController: NSHostingController<MiniRecorderView>?
+    private var hostingController: NSHostingController<AnyView>?
     
     // Toggle visibility
     func toggle() {
@@ -41,6 +41,11 @@ class MiniRecorderWindowController: NSObject {
             // panel.orderFrontDuringApplicationMakeKey() // Does not exist
             // panel.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true) 
+            
+            // Trigger instant recording
+             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                NotificationCenter.default.post(name: .hotkeyTriggered, object: nil)
+            }
         }
     }
     
@@ -55,25 +60,31 @@ class MiniRecorderWindowController: NSObject {
             }
         )
         
-        hostingController = NSHostingController(rootView: recorderView)
+        // Initialize hosting controller with transparent background view
+        // Wrap in AnyView because .background() changes the type from MiniRecorderView to some View
+        hostingController = NSHostingController(rootView: AnyView(recorderView.background(Color.clear)))
         
         let p = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 300, height: 60),
-            styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView, .hudWindow], 
+            styleMask: [.nonactivatingPanel, .fullSizeContentView, .borderless],
             backing: .buffered,
             defer: false
         )
+        
+        p.isOpaque = false
+        p.backgroundColor = .clear
         
         p.contentViewController = hostingController
         p.titleVisibility = .hidden
         p.titlebarAppearsTransparent = true
         p.isMovableByWindowBackground = true
+        p.hasShadow = false // Remove shadow to kill "boundary" artifact
         
         // Window Behavior
         p.level = .floating
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         p.isReleasedWhenClosed = false
-        p.hidesOnDeactivate = false // Keep floating even if focus lost? Yes.
+        p.hidesOnDeactivate = false // Keep floating even if focus lost
         p.standardWindowButton(.closeButton)?.isHidden = true
         p.standardWindowButton(.miniaturizeButton)?.isHidden = true
         p.standardWindowButton(.zoomButton)?.isHidden = true
@@ -104,11 +115,17 @@ class MiniRecorderWindowController: NSObject {
                 ClipboardService.shared.paste()
                 print("Paste command sent.")
             } else {
-                print("⚠️ Accessibility Permission Missing! Cannot paste. Requesting system prompt...")
-                // Trigger native system prompt which is more reliable for re-association
-                await MainActor.run {
-                     ClipboardService.shared.requestAccessibilityPermission()
-                }
+                // Only request if we haven't asked recently or just warn once.
+                // If user says it's already given, maybe we just try anyway?
+                // But postEvent fails if not trusted.
+                // Let's just log it and NOT loop the prompt.
+                print("⚠️ Accessibility Permission might be missing, but proceeding to try paste (User claims granted).")
+                // ClipboardService.shared.requestAccessibilityPermission() // STOP LOOPING THIS
+                
+                // FORCE PASTE ATTEMPT
+                ClipboardService.shared.paste()
+                // FORCE PASTE ATTEMPT
+                ClipboardService.shared.paste()
             }
         }
     }

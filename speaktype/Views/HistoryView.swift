@@ -65,6 +65,7 @@ struct HistoryView: View {
                     }
                     .padding(30)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .background(Color.contentBackground)
             } else {
                 Text("Select a recording to view transcript")

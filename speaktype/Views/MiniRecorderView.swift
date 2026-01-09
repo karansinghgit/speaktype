@@ -43,8 +43,8 @@ struct MiniRecorderView: View {
                 ForEach(0..<12) { index in
                     RoundedRectangle(cornerRadius: 2)
                         .fill(isListening ? Color.appRed : Color.white.opacity(0.3)) // Red when active
-                        .frame(width: 4, height: 24) // Vertical bars instead of dots for better visibility
-                        .scaleEffect(y: isListening ? CGFloat(1.0 + (Double(audioRecorder.audioLevel) * 5.0)) : 1.0) // Vertical scaling
+                        .frame(width: 4, height: 24) // Base height
+                        .scaleEffect(y: isListening ? min(CGFloat(1.0 + (Double(audioRecorder.audioLevel) * 5.0)), 2.0) : 1.0, anchor: .center) // Bound scale
                         .opacity(isListening ? 1.0 : 0.3)
                         .animation(
                             isListening ? .easeInOut(duration: 0.1) : .default,
@@ -59,9 +59,9 @@ struct MiniRecorderView: View {
                  // Model Selector
                 Menu {
                     Picker("Model", selection: $selectedModel) {
-                        Text("Base (Recommended)").tag("openai_whisper-base")
-                        Text("Small (High Accuracy)").tag("openai_whisper-small")
-                        Text("Tiny (Fastest)").tag("openai_whisper-tiny")
+                        ForEach(AIModel.availableModels) { model in
+                            Text(model.name).tag(model.variant)
+                        }
                     }
                 } label: {
                     Image(systemName: "cpu")
@@ -73,7 +73,7 @@ struct MiniRecorderView: View {
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
-                .onChange(of: selectedModel) { newValue in
+                .onChange(of: selectedModel) { oldValue, newValue in
                      switchModel(to: newValue)
                 }
             

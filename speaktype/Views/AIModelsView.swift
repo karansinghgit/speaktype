@@ -5,23 +5,7 @@ struct AIModelsView: View {
     @AppStorage("selectedModelVariant") private var selectedModel: String = "openai_whisper-base"
     
     // Using standard WhisperKit model variants
-    @State private var models = [
-        AIModel(
-            name: "Whisper Base",
-            variant: "openai_whisper-base",
-            details: "English-only • Optimized for Apple Silicon"
-        ),
-        AIModel(
-            name: "Whisper Small",
-            variant: "openai_whisper-small",
-            details: "English-only • Higher accuracy"
-        ),
-        AIModel(
-            name: "Whisper Tiny",
-            variant: "openai_whisper-tiny",
-            details: "Multilingual • Fastest"
-        )
-    ]
+    @State private var models = AIModel.availableModels
     
     // Helper to get name of selected model
     var selectedModelName: String {
@@ -83,13 +67,7 @@ struct AIModelsView: View {
     }
 }
 
-struct AIModel: Identifiable {
-    let id = UUID()
-    let name: String
-    let variant: String
-    let details: String
-    // status is derived from service now
-}
+
 
 struct ModelRow: View {
     @Binding var model: AIModel
@@ -113,6 +91,10 @@ struct ModelRow: View {
         selectedModel == model.variant
     }
     
+    var downloadError: String? {
+        downloadService.downloadError[model.variant]
+    }
+    
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -120,15 +102,36 @@ struct ModelRow: View {
                     Text(model.name)
                         .font(.headline)
                         .foregroundStyle(.white)
+                    
+                    // Rating Badge
+                    Text(model.rating)
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(ratingColor(for: model.rating).opacity(0.2))
+                        .foregroundStyle(ratingColor(for: model.rating))
+                        .clipShape(Capsule())
+                    
                     if isActive {
                         Text("(Active)")
                             .font(.caption)
                             .foregroundStyle(Color.green)
                     }
                 }
-                Text(model.details)
-                    .font(.caption)
-                    .foregroundStyle(.gray)
+                HStack(spacing: 6) {
+                    Text(model.details)
+                        .font(.caption)
+                        .foregroundStyle(.gray)
+                    
+                    Text("•")
+                        .font(.caption)
+                        .foregroundStyle(.gray)
+                        
+                    Text(model.size)
+                        .font(.caption)
+                        .foregroundStyle(.gray.opacity(0.8))
+                }
             }
             
             Spacer()
@@ -170,20 +173,46 @@ struct ModelRow: View {
                 .background(Color.black.opacity(0.2))
                 .cornerRadius(16)
             } else {
-                Button(action: {
-                    downloadService.downloadModel(variant: model.variant)
-                }) {
-                    HStack(spacing: 4) {
-                        Text("Download")
-                        Image(systemName: "arrow.down.circle")
+                VStack(alignment: .trailing) {
+                    Button(action: {
+                        downloadService.downloadModel(variant: model.variant)
+                    }) {
+                        HStack(spacing: 4) {
+                            Text("Download")
+                            Image(systemName: "arrow.down.circle")
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.appRed)
+                        .foregroundStyle(.white)
+                        .cornerRadius(16)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.appRed)
-                    .foregroundStyle(.white)
-                    .cornerRadius(16)
+                    .buttonStyle(.plain)
+                    
+                    // Debug: Manual Cache Clear
+                    Button(action: {
+                        Task {
+                            let result = await downloadService.deleteModel(variant: model.variant)
+                            await MainActor.run {
+                                downloadService.downloadError[model.variant] = "Manual Delete: \(result)"
+                            }
+                        }
+                    }) {
+                        Image(systemName: "trash")
+                            .foregroundStyle(.gray)
+                            .padding(6)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Force Delete Cache")
+                    
+                    if let error = downloadError {
+                        Text(error)
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                            .multilineTextAlignment(.trailing)
+                            .frame(maxWidth: 150)
+                    }
                 }
-                .buttonStyle(.plain)
             }
         }
         .padding()
@@ -193,5 +222,15 @@ struct ModelRow: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.05), lineWidth: 1)
         )
+    }
+    
+    func ratingColor(for rating: String) -> Color {
+        switch rating {
+        case "Best", "Excellent": return .purple
+        case "Great", "Good": return .green
+        case "Standard": return .blue
+        case "Basic": return .gray
+        default: return .white
+        }
     }
 }

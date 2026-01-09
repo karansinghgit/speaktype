@@ -68,8 +68,9 @@ class AudioRecordingService: NSObject, ObservableObject {
             let power = recorder.averagePower(forChannel: 0) // -160 to 0 dB
             // Normalize: -60dB to 0dB -> 0.0 to 1.0
             let normalized = max(0.0, (power + 60) / 60)
+            // Noise Gate: Ignore background noise below ~10% (approx -54dB)
             DispatchQueue.main.async {
-                self.audioLevel = normalized
+                self.audioLevel = normalized < 0.15 ? 0.0 : normalized
             }
         }
     }

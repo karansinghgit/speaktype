@@ -114,7 +114,7 @@ struct TranscribeAudioView: View {
             do {
                 transcribedText = try await whisperService.transcribe(audioFile: url)
                 // Save to History
-                let duration = getAudioDuration(url: url)
+                let duration = try await getAudioDuration(url: url)
                 HistoryService.shared.addItem(transcript: transcribedText, duration: duration)
             } catch {
                 transcribedText = "Error: \(error.localizedDescription)"
@@ -123,9 +123,10 @@ struct TranscribeAudioView: View {
         }
     }
     
-    private func getAudioDuration(url: URL) -> TimeInterval {
-        // Simple duration check using AVURLAsset
+    private func getAudioDuration(url: URL) async throws -> TimeInterval {
+        // Async duration check using AVURLAsset
         let asset = AVURLAsset(url: url)
-        return CMTimeGetSeconds(asset.duration)
+        let duration = try await asset.load(.duration)
+        return CMTimeGetSeconds(duration)
     }
 }

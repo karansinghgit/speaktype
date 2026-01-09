@@ -13,29 +13,21 @@ struct OnboardingView: View {
                     .ignoresSafeArea()
                 
                 // Content ZStack
-                ScrollView {
                     ZStack {
                         if currentPage == 0 {
                             WelcomePage(action: {
                                 withAnimation { currentPage = 1 }
                             })
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
-                        } else if currentPage == 1 {
-                            PermissionsPage(finishAction: {
-                                withAnimation { currentPage = 2 }
-                            })
-                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
                         } else {
-                            // Tutorial / Final Step
-                             WelcomePage(action: {
+                            PermissionsPage(finishAction: {
                                 completeOnboarding()
                             })
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
                         }
                     }
                     .padding(40)
-                    .frame(maxWidth: .infinity, minHeight: 600) // Ensure layout has space but scrolls
-                }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(minWidth: 600, minHeight: 500) // Lower minimum size
@@ -72,7 +64,7 @@ struct WelcomePage: View {
                     .frame(maxWidth: 500)
             }
             
-            VStack(spacing: 24) {
+            HStack(spacing: 24) {
                 FeatureCard(icon: "lock.shield.fill", title: "Private by Design", description: "Your audio never leaves your device.")
                 FeatureCard(icon: "bolt.fill", title: "Lightning Fast", description: "Optimized for Apple Silicon.")
                 FeatureCard(icon: "keyboard.fill", title: "Global Injection", description: "Type with your voice anywhere.")

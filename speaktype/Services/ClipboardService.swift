@@ -11,7 +11,13 @@ class ClipboardService {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
-        print("Copied to clipboard: \(text.prefix(20))...")
+        
+        // Verify write
+        if let check = pasteboard.string(forType: .string), check == text {
+             print("✅ Clipboard Write Verified: '\(check.prefix(20))...'")
+        } else {
+             print("❌ Clipboard Write FAILED!")
+        }
     }
     
     // Paste content (Simulate Cmd+V)
@@ -43,7 +49,20 @@ class ClipboardService {
             cmdUp?.post(tap: .cghidEventTap)
             
             print("Simulated Cmd+V")
-            print("Simulated Cmd+V")
+        }
+    }
+
+    // Fallback using AppleScript (more robust for some apps)
+    func appleScriptPaste() {
+        let script = "tell application \"System Events\" to keystroke \"v\" using command down"
+        if let appleScript = NSAppleScript(source: script) {
+            var error: NSDictionary?
+            appleScript.executeAndReturnError(&error)
+            if let error = error {
+                print("AppleScript Paste Error: \(error)")
+            } else {
+                print("Executed AppleScript Paste")
+            }
         }
     }
     

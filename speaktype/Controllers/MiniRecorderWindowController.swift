@@ -107,25 +107,24 @@ class MiniRecorderWindowController: NSObject {
             
             // 3. Wait for focus switch
             print("Waiting for focus switch...")
-            try? await Task.sleep(nanoseconds: 800_000_000) // 0.8s
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1.0s wait for stability
             
-            // 4. Paste
-            if ClipboardService.shared.isAccessibilityTrusted {
-                print("Simulating Paste (Accessibility Trusted)...")
-                ClipboardService.shared.paste()
-                print("Paste command sent.")
-            } else {
-                // Only request if we haven't asked recently or just warn once.
-                // If user says it's already given, maybe we just try anyway?
-                // But postEvent fails if not trusted.
-                // Let's just log it and NOT loop the prompt.
-                print("⚠️ Accessibility Permission might be missing, but proceeding to try paste (User claims granted).")
-                // ClipboardService.shared.requestAccessibilityPermission() // STOP LOOPING THIS
-                
-                // FORCE PASTE ATTEMPT
-                ClipboardService.shared.paste()
-                // FORCE PASTE ATTEMPT
-                ClipboardService.shared.paste()
+            // 4. Robust Paste Routine
+            print("Attempting Paste Routine...")
+            
+            // Check permission just for logging, but try anyway
+            if !ClipboardService.shared.isAccessibilityTrusted {
+                 print("⚠️ Accessibility might be missing, but proceeding with force paste.")
+            }
+            
+            // Method A: CGEvent (Fast)
+            ClipboardService.shared.paste()
+            
+            // Method B: AppleScript (Robust backup for 'previous app' context)
+            // Small delay to let CGEvent fire first
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+            await MainActor.run {
+                ClipboardService.shared.appleScriptPaste()
             }
         }
     }

@@ -112,19 +112,20 @@ class MiniRecorderWindowController: NSObject {
             // 4. Robust Paste Routine
             print("Attempting Paste Routine...")
             
-            // Check permission just for logging, but try anyway
-            if !ClipboardService.shared.isAccessibilityTrusted {
-                 print("⚠️ Accessibility might be missing, but proceeding with force paste.")
-            }
-            
-            // Method A: CGEvent (Fast)
+            // Method A: CGEvent (Fast) - Always try this
             ClipboardService.shared.paste()
             
-            // Method B: AppleScript (Robust backup for 'previous app' context)
-            // Small delay to let CGEvent fire first
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
-            await MainActor.run {
-                ClipboardService.shared.appleScriptPaste()
+            // Method B: AppleScript (Backup)
+            // ONLY use if standard Accessibility is NOT trusted, to avoid triggering "Automation" prompts unnecessarily.
+            // If the user has valid Accessibility, CGEvent should work.
+            if !ClipboardService.shared.isAccessibilityTrusted {
+                print("⚠️ Accessibility invalid. Triggering AppleScript backup (May prompt for component control)...")
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+                await MainActor.run {
+                    ClipboardService.shared.appleScriptPaste()
+                }
+            } else {
+                 print("✅ Accessibility Trusted. Skipping AppleScript backup to avoid prompts.")
             }
         }
     }

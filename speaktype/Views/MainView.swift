@@ -6,10 +6,11 @@ struct MainView: View {
     var body: some View {
         NavigationSplitView {
             SidebarView(selection: $selection)
+                .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 300)
         } detail: {
             switch selection {
             case .dashboard:
-                DashboardView()
+                DashboardView(selection: $selection)
             case .transcribeAudio:
                 TranscribeAudioView()
             case .history:

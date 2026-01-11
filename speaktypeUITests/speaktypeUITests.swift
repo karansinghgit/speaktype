@@ -8,26 +8,44 @@ final class speaktypeUITests: XCTestCase {
 
     func testAppLaunchAndNavigation() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["--uitesting"]
         app.launch()
         
-        // Verify Sidebar exists (macOS List maps to Outline)
-        let sidebar = app.outlines.firstMatch
-        // Wait up to 10s for UI to stabilize (increased for robustness)
-        if !sidebar.waitForExistence(timeout: 10.0) {
-            print("🚨 Sidebar NOT found! App Hierarchy:\n\(app.debugDescription)")
-            XCTFail("Sidebar should exist (Outline)")
-        }
+        // Wait for app to fully load
+        sleep(2)
         
-        // Navigate to Settings
-        // On macOS, text is often exposed directly. We look for "Settings" static text.
-        let settingsText = app.staticTexts["Settings"]
+        // Navigate to Settings - look for the link directly
+        let settingsLink = app.links["Settings"]
+        XCTAssertTrue(settingsLink.waitForExistence(timeout: 5.0), "Settings link should exist")
         
-        if settingsText.waitForExistence(timeout: 5.0) {
-             settingsText.click()
-             
-             // Verify we are on Settings View
-             let settingsContent = app.staticTexts["Startup Behavior"]
-             XCTAssertTrue(settingsContent.waitForExistence(timeout: 5.0), "Should find Settings content")
+        settingsLink.click()
+        
+        // Verify we are on Settings View
+        let settingsContent = app.staticTexts["SpeakType Shortcuts"]
+        XCTAssertTrue(settingsContent.waitForExistence(timeout: 5.0), "Should find Settings content")
+    }
+    
+    func testSidebarNavigation() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--uitesting"]
+        app.launch()
+        
+        // Wait for app to fully load
+        sleep(2)
+        
+        // Define sidebar items to test - these should appear as NavigationLinks
+        let items = ["Dashboard", "Transcribe Audio", "History", "AI Models", "Permissions", "Settings"]
+        
+        for item in items {
+            let link = app.links[item]
+            XCTAssertTrue(link.exists, "Link for '\(item)' should exist")
+            
+            if link.exists {
+                link.click()
+                // Just verify we can click without crashing
+                sleep(1)
+            }
         }
     }
 }
+

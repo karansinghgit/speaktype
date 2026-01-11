@@ -195,9 +195,17 @@ class ModelDownloadService: ObservableObject {
         print("🗑️ Cleanup complete. Deleted \(deletedCount) items from \(checkedPaths.count) locations")
         
         if deletedCount > 0 {
-            return "Deleted \(deletedCount) items. Retry download."
+            await MainActor.run {
+                self.downloadProgress[variant] = 0.0
+                self.isDownloading[variant] = false
+            }
+            return "Deleted \(deletedCount) items"
         } else {
-            return "No cached models found matching '\(modelName)'. This error may be in a different location."
+            await MainActor.run {
+                self.downloadProgress[variant] = 0.0
+                self.isDownloading[variant] = false
+            }
+            return "No match for '\(modelName)' in \(checkedPaths.count) locations. checked: \(checkedPaths.map { $0.replacingOccurrences(of: homeDir.path, with: "~") }.joined(separator: ", "))"
         }
     }
     

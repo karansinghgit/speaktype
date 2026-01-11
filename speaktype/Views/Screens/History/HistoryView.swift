@@ -3,6 +3,7 @@ import SwiftUI
 struct HistoryView: View {
     @StateObject private var historyService = HistoryService.shared
     @State private var showCopyAlert = false
+    @State private var showDeleteAlert = false
     
     // We don't need selectedItem anymore for a simple list
     // We can track which item gets copied to show the alert using a simpler mechanism or just the bool
@@ -12,8 +13,7 @@ struct HistoryView: View {
             Text("History")
                 .font(.largeTitle)
                 .fontWeight(.bold)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
+                .padding(.top)
             
             if historyService.items.isEmpty {
                 ContentUnavailableView(
@@ -71,8 +71,29 @@ struct HistoryView: View {
                     .onDelete(perform: deleteItems)
                 }
                 .listStyle(.inset)
+                }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if !historyService.items.isEmpty {
+                    Button(role: .destructive) {
+                        showDeleteAlert = true
+                    } label: {
+                        Label("Clear History", systemImage: "trash")
+                            .foregroundStyle(.red)
+                    }
+                }
             }
         }
+        .alert("Clear All History?", isPresented: $showDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Clear All", role: .destructive) {
+                historyService.clearAll()
+            }
+        } message: {
+            Text("This action cannot be undone.")
+        }
+
         .alert("Copied", isPresented: $showCopyAlert) {
             Button("OK", role: .cancel) { }
         } message: {

@@ -19,8 +19,10 @@ struct speaktypeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     init() {
-        // KeyboardShortcuts init moved to AppDelegate to ensure early binding?
-        // Or keep here.
+        // For UI testing: bypass onboarding automatically
+        if ProcessInfo.processInfo.arguments.contains("--uitesting") {
+            hasCompletedOnboarding = true
+        }
     }
     
     var body: some Scene {

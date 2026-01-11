@@ -1,6 +1,6 @@
 import SwiftUI
 import AVFoundation
-import KeyboardShortcuts
+
 
 struct PermissionsView: View {
     @State private var micStatus: AVAuthorizationStatus = .notDetermined
@@ -54,40 +54,7 @@ struct PermissionsView: View {
                         }
                     )
                     
-                    // Global Hotkey (New Customization Section)
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Global Shortcut")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            
-                        HStack {
-                            Image(systemName: "keyboard")
-                                .foregroundStyle(.orange)
-                                .font(.title2)
-                                .frame(width: 44, height: 44)
-                                .background(Color.orange.opacity(0.1))
-                                .clipShape(Circle())
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Toggle Recorder")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(.white)
-                                Text("Press to start/stop recording")
-                                    .font(.caption)
-                                    .foregroundStyle(.gray)
-                            }
-                            
-                            Spacer()
-                            
-                            // The Recorder
-                            KeyboardShortcuts.Recorder(for: .toggleRecord)
-                                .padding(.vertical, 8)
-                        }
-                        .padding(16)
-                        .background(Color.white.opacity(0.05))
-                        .cornerRadius(12)
-                    }
-                    .padding(.top, 10)
+
                }
                 .padding(.horizontal, 40)
             }

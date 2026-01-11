@@ -1,8 +1,9 @@
 import SwiftUI
+import AVFoundation
 
 struct AudioInputView: View {
+    @StateObject private var audioRecorder = AudioRecordingService.shared
     @State private var selectedMode = "Custom Device"
-    @State private var selectedDevice = "MacBook Air Microphone"
     
     var body: some View {
         ScrollView {
@@ -41,13 +42,13 @@ struct AudioInputView: View {
                         .onTapGesture { selectedMode = "Custom Device" }
                         
                         InputModeCard(
-                            title: "Prioritized",
+                            title: "Prioritized (Coming Soon)",
                             desc: "Set up device priority order",
                             icon: "list.number",
                             isSelected: selectedMode == "Prioritized",
                             color: .gray
                         )
-                        .onTapGesture { selectedMode = "Prioritized" }
+                        .onTapGesture { /* selectedMode = "Prioritized" */ }
                     }
                 }
                 .padding(.horizontal, 40)
@@ -59,7 +60,9 @@ struct AudioInputView: View {
                             .font(.headline)
                             .foregroundStyle(.white)
                         Spacer()
-                        Button(action: {}) {
+                        Button(action: {
+                            audioRecorder.fetchAvailableDevices()
+                        }) {
                             HStack {
                                 Image(systemName: "arrow.clockwise")
                                 Text("Refresh")
@@ -70,24 +73,27 @@ struct AudioInputView: View {
                         .buttonStyle(.plain)
                     }
                     
-                    Text("Note: Selecting a device here will override your Mac's system-wide default microphone.")
+                    Text("Note: SpeakType will use the selected device for all recordings.")
                         .font(.caption)
                         .foregroundStyle(.gray)
                     
                     VStack(spacing: 12) {
-                        DeviceRow(
-                            name: "MacBook Air Microphone",
-                            isActive: true,
-                            isSelected: selectedDevice == "MacBook Air Microphone"
-                        )
-                        .onTapGesture { selectedDevice = "MacBook Air Microphone" }
-                        
-                        DeviceRow(
-                            name: "Microsoft Teams Audio",
-                            isActive: false,
-                            isSelected: selectedDevice == "Microsoft Teams Audio"
-                        )
-                        .onTapGesture { selectedDevice = "Microsoft Teams Audio" }
+                        if audioRecorder.availableDevices.isEmpty {
+                            Text("No input devices found.")
+                                .foregroundStyle(.gray)
+                                .padding()
+                        } else {
+                            ForEach(audioRecorder.availableDevices, id: \.uniqueID) { device in
+                                DeviceRow(
+                                    name: device.localizedName,
+                                    isActive: audioRecorder.selectedDeviceId == device.uniqueID, // Simple check
+                                    isSelected: audioRecorder.selectedDeviceId == device.uniqueID
+                                )
+                                .onTapGesture {
+                                    audioRecorder.selectedDeviceId = device.uniqueID
+                                }
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 40)
@@ -95,6 +101,9 @@ struct AudioInputView: View {
             .padding(.bottom, 40)
         }
         .background(Color.contentBackground)
+        .onAppear {
+            audioRecorder.fetchAvailableDevices()
+        }
     }
 }
 

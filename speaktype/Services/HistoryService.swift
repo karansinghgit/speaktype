@@ -44,6 +44,11 @@ class HistoryService: ObservableObject {
         saveHistory()
     }
     
+    func clearAll() {
+        items.removeAll()
+        saveHistory()
+    }
+    
     private func saveHistory() {
         if let encoded = try? JSONEncoder().encode(items) {
             UserDefaults.standard.set(encoded, forKey: saveKey)

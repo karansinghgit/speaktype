@@ -1,24 +1,27 @@
 import SwiftUI
 import KeyboardShortcuts
 
+
 // import LaunchAtLogin // Uncomment when package added
 // import KeyboardShortcuts // Uncomment when package added
 
 struct SettingsView: View {
-    @State private var soundFeedback = true
-    @State private var muteSystemAudio = true
-    @State private var restoreClipboard = false
-    @State private var powerMode = false
-    @State private var experimentalFeatures = false
-    @State private var hideDockIcon = false
-    @State private var launchAtLogin = false // Will be replaced by LaunchAtLogin.isEnabled if package used
-    @State private var autoUpdate = true
-    @State private var showAnnouncements = true
-    @State private var customCancelShortcut = false
-    @State private var middleClickToggle = false
-    @State private var appleScriptPaste = false
-    @State private var recorderStyle: Int = 1 // 0: Notch, 1: Mini
-    @State private var hotkey1: String = "⌘ Space"
+    @AppStorage("soundFeedback") private var soundFeedback = true
+    @AppStorage("muteSystemAudio") private var muteSystemAudio = true
+    @AppStorage("restoreClipboard") private var restoreClipboard = false
+    @AppStorage("powerMode") private var powerMode = false
+    @AppStorage("experimentalFeatures") private var experimentalFeatures = false
+    @AppStorage("hideDockIcon") private var hideDockIcon = false
+ 
+    @AppStorage("autoUpdate") private var autoUpdate = true
+    @AppStorage("showAnnouncements") private var showAnnouncements = true
+    @AppStorage("customCancelShortcut") private var customCancelShortcut = false
+    @AppStorage("middleClickToggle") private var middleClickToggle = false
+    @AppStorage("appleScriptPaste") private var appleScriptPaste = false
+    @AppStorage("recorderStyle") private var recorderStyle: Int = 1 // 0: Notch, 1: Mini
+    @AppStorage("hotkey1") private var hotkey1: String = "⌘ Space"
+    @AppStorage("useFnKey") private var useFnKey = true
+    @AppStorage("customRecordingPath") private var customRecordingPath: String = ""
 
     
     var body: some View {
@@ -42,8 +45,15 @@ struct SettingsView: View {
                     
                     Divider().background(Color.gray.opacity(0.3))
                     
+                    // Fn Key Toggle
+                    ToggleRow(title: "Use Function (fn) Key", isOn: $useFnKey)
+                        .padding(.vertical, 4)
+                    
+                    Divider().background(Color.gray.opacity(0.3))
+                    
+                    // Custom Shortcut
                     HStack {
-                        Text("Global Hotkey")
+                        Text("Custom Shortcut")
                             .foregroundStyle(.gray)
                         Spacer()
                         KeyboardShortcuts.Recorder(for: .toggleRecord)
@@ -55,32 +65,77 @@ struct SettingsView: View {
                         .foregroundStyle(.gray)
                 }
                 
-                // General
+
+                
+                // Storage
                 SettingsSection {
                     HStack {
-                        Image(systemName: "gear")
+                        Image(systemName: "externaldrive")
                             .foregroundStyle(Color.appRed)
                         VStack(alignment: .leading) {
-                            Text("General")
+                            Text("Storage")
                                 .font(.headline)
                                 .foregroundStyle(.white)
-                            Text("Startup settings")
+                            Text("Where recordings are saved")
                                 .font(.caption)
                                 .foregroundStyle(.gray)
                         }
                         Spacer()
                     }
                     
-                    ToggleRow(title: "Launch at login", isOn: $launchAtLogin)
-                    // Note: If using LaunchAtLogin package, replace the above line with:
-                    // LaunchAtLogin.Toggle {
-                    //    Text("Launch at login")
-                    // }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(customRecordingPath.isEmpty ? "Default (Documents)" : customRecordingPath)
+                            .font(.caption)
+                            .foregroundStyle(.gray)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .padding(8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.black.opacity(0.2))
+                            .cornerRadius(8)
+                        
+                        HStack {
+                            if !customRecordingPath.isEmpty {
+                                Button("Reset to Default") {
+                                    customRecordingPath = ""
+                                }
+                                .buttonStyle(.plain)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                            }
+                            
+                            Spacer()
+                            
+                            Button("Change Location") {
+                                selectFolder()
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.1))
+                            .foregroundStyle(.white)
+                            .cornerRadius(8)
+                        }
+                    }
                 }
             }
             .padding()
         }
         .background(Color.contentBackground)
+    }
+
+    
+    private func selectFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        
+        if panel.runModal() == .OK {
+            if let url = panel.url {
+                customRecordingPath = url.path
+            }
+        }
     }
 }
 

@@ -29,7 +29,7 @@ struct MainView: View {
                     .foregroundStyle(.white)
             }
         }
-        .navigationTitle("SpeakType")
+        // .navigationTitle("SpeakType") // Removed for clean look
         .fontDesign(.rounded) // Global modern font design
     }
 }

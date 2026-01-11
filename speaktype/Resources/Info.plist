@@ -32,7 +32,7 @@
         </dict>
     </array>
 	<key>LSUIElement</key>
-	<true/>
+	<false/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>SpeakType needs access to your microphone to record your voice for transcription. All processing is done locally on your device.</string>
 	<key>NSAppleEventsUsageDescription</key>

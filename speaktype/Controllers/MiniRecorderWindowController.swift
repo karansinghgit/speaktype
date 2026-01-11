@@ -4,7 +4,7 @@ import SwiftUI
 
 class MiniRecorderWindowController: NSObject {
     private var panel: NSPanel?
-    private var hostingController: NSHostingController<MiniRecorderView>?
+    private var hostingController: NSHostingController<AnyView>?
     
     // Toggle visibility
     func toggle() {
@@ -41,6 +41,11 @@ class MiniRecorderWindowController: NSObject {
             // panel.orderFrontDuringApplicationMakeKey() // Does not exist
             // panel.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true) 
+            
+            // Trigger instant recording
+             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                NotificationCenter.default.post(name: .hotkeyTriggered, object: nil)
+            }
         }
     }
     
@@ -55,25 +60,31 @@ class MiniRecorderWindowController: NSObject {
             }
         )
         
-        hostingController = NSHostingController(rootView: recorderView)
+        // Initialize hosting controller with transparent background view
+        // Wrap in AnyView because .background() changes the type from MiniRecorderView to some View
+        hostingController = NSHostingController(rootView: AnyView(recorderView.background(Color.clear)))
         
         let p = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 300, height: 60),
-            styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView, .hudWindow], 
+            styleMask: [.nonactivatingPanel, .fullSizeContentView, .borderless],
             backing: .buffered,
             defer: false
         )
+        
+        p.isOpaque = false
+        p.backgroundColor = .clear
         
         p.contentViewController = hostingController
         p.titleVisibility = .hidden
         p.titlebarAppearsTransparent = true
         p.isMovableByWindowBackground = true
+        p.hasShadow = false // Remove shadow to kill "boundary" artifact
         
         // Window Behavior
         p.level = .floating
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         p.isReleasedWhenClosed = false
-        p.hidesOnDeactivate = false // Keep floating even if focus lost? Yes.
+        p.hidesOnDeactivate = false // Keep floating even if focus lost
         p.standardWindowButton(.closeButton)?.isHidden = true
         p.standardWindowButton(.miniaturizeButton)?.isHidden = true
         p.standardWindowButton(.zoomButton)?.isHidden = true
@@ -96,19 +107,26 @@ class MiniRecorderWindowController: NSObject {
             
             // 3. Wait for focus switch
             print("Waiting for focus switch...")
-            try? await Task.sleep(nanoseconds: 800_000_000) // 0.8s
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1.0s wait for stability
             
-            // 4. Paste
+            // 4. Robust Paste Routine
+            print("Attempting Paste Routine...")
+            
             if ClipboardService.shared.isAccessibilityTrusted {
-                print("Simulating Paste (Accessibility Trusted)...")
-                ClipboardService.shared.paste()
-                print("Paste command sent.")
-            } else {
-                print("⚠️ Accessibility Permission Missing! Cannot paste. Requesting system prompt...")
-                // Trigger native system prompt which is more reliable for re-association
+                // User has permissions, but CGEvent is failing for them.
+                // Switch to AppleScript (System Events) as PRIMARY method. It's slower but 100% reliable.
+                print("✅ Accessibility Trusted. Using robust AppleScript paste.")
+                
+                // Small delay to ensure 'System Events' is ready
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+                
                 await MainActor.run {
-                     ClipboardService.shared.requestAccessibilityPermission()
+                    ClipboardService.shared.appleScriptPaste()
                 }
+            } else {
+                // No permissions? Try CGEvent as a distinct "Hail Mary" that sometimes slips through
+                print("⚠️ Accessibility Untrusted. Trying CGEvent fallback.")
+                ClipboardService.shared.paste()
             }
         }
     }

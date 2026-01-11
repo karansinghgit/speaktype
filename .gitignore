@@ -132,3 +132,7 @@ Temporary Items
 *.bak
 *.backup
 
+# Build logs
+build_log.txt
+*.log
+

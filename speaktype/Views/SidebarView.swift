@@ -29,12 +29,7 @@ struct SidebarView: View {
     
     var body: some View {
         List(selection: $selection) {
-            Section {
-                Label("SpeakType", systemImage: "mic.fill")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .padding(.vertical, 10)
-            }
+            // Header removed for clean design
             
             Section {
                 ForEach(SidebarItem.allCases) { item in

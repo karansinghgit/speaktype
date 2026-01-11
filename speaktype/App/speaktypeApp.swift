@@ -36,6 +36,7 @@ struct speaktypeApp: App {
             .preferredColorScheme(.dark)
             .tint(.appRed)
         }
+        .defaultSize(width: 1200, height: 800)
         .handlesExternalEvents(matching: ["main-dashboard", "open"]) // Only open for matching IDs
         .commands {
              SidebarCommands()

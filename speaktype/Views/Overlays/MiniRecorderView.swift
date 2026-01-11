@@ -170,7 +170,7 @@ struct MiniRecorderView: View {
                 }
                 
                 // Save to History
-                let duration = getAudioDuration(url: url)
+                let duration = await getAudioDuration(url: url)
                 HistoryService.shared.addItem(transcript: text, duration: duration)
                 
                 // Delegate Commit to Controller (Copy, Hide, Paste happens there)
@@ -189,8 +189,14 @@ struct MiniRecorderView: View {
         }
     }
     
-    private func getAudioDuration(url: URL) -> TimeInterval {
+    private func getAudioDuration(url: URL) async -> TimeInterval {
         let asset = AVURLAsset(url: url)
-        return CMTimeGetSeconds(asset.duration)
+        do {
+            let duration = try await asset.load(.duration)
+            return duration.seconds
+        } catch {
+            print("Error loading audio duration: \(error)")
+            return 0
+        }
     }
 }

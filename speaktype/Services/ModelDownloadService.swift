@@ -57,13 +57,13 @@ class ModelDownloadService: ObservableObject {
                 // try await WhisperKit.download(variant: variant) { progress in ... }
                 
                 // likely: download(variant:progressCallback:) - 'from' usually has a default
-                let path = try await WhisperKit.download(variant: variant, progressCallback: { progress in
+                let _ = try await WhisperKit.download(variant: variant, progressCallback: { progress in
                     DispatchQueue.main.async {
                         self.downloadProgress[variant] = progress.fractionCompleted
                     }
                 })
                 
-                print("Model downloaded to: \(path)")
+                print("Model downloaded successfully")
                 
                 DispatchQueue.main.async {
                     self.isDownloading[variant] = false
@@ -74,37 +74,43 @@ class ModelDownloadService: ObservableObject {
                 
                 // Auto-Repair: If duplicate models found, delete and retry ONCE
                 if error.localizedDescription.contains("Multiple models found") {
-                     print("Corruption detected. cleaning cache and retrying...")
-                     Task { @MainActor in
-                         self.downloadError[variant] = "Repairing..."
+                     print("⚠️ Multiple models detected. Cleaning cache and retrying...")
+                     
+                     await MainActor.run {
+                         self.downloadError[variant] = "Cleaning duplicates..."
                      }
                      
                      let log = await self.deleteModel(variant: variant)
+                     print("🧹 Cleanup result: \(log)")
                      
-                     Task { @MainActor in
-                         self.downloadError[variant] = "Repairing... \(log)"
-                         try? await Task.sleep(nanoseconds: 1_000_000_000) // Sleep 1s to let FS settle
+                     // Give filesystem time to settle
+                     try? await Task.sleep(nanoseconds: 2_000_000_000)
+                     
+                     await MainActor.run {
+                         self.downloadError[variant] = "Retrying download..."
                      }
                      
-                     // Retry download
-                     Task {
-                         do {
-                             let path = try await WhisperKit.download(variant: variant, progressCallback: { progress in
-                                 DispatchQueue.main.async {
-                                     self.downloadProgress[variant] = progress.fractionCompleted
-                                 }
-                             })
+                     // Retry download once
+                     do {
+                         let _ = try await WhisperKit.download(variant: variant, progressCallback: { progress in
                              DispatchQueue.main.async {
-                                 self.isDownloading[variant] = false
-                                 self.downloadProgress[variant] = 1.0
-                                 self.downloadError[variant] = nil
+                                 self.downloadProgress[variant] = progress.fractionCompleted
                              }
-                         } catch {
-                             DispatchQueue.main.async {
-                                 self.isDownloading[variant] = false
-                                 self.downloadProgress[variant] = 0.0
-                                 self.downloadError[variant] = error.localizedDescription
-                             }
+                         })
+                         
+                         print("✅ Model downloaded successfully after cleanup")
+                         
+                         DispatchQueue.main.async {
+                             self.isDownloading[variant] = false
+                             self.downloadProgress[variant] = 1.0
+                             self.downloadError[variant] = nil
+                         }
+                     } catch {
+                         print("❌ Retry failed: \(error)")
+                         DispatchQueue.main.async {
+                             self.isDownloading[variant] = false
+                             self.downloadProgress[variant] = 0.0
+                             self.downloadError[variant] = "Error: \(error.localizedDescription)\n\nTry clicking the trash icon to manually clean cache."
                          }
                      }
                      return
@@ -113,8 +119,7 @@ class ModelDownloadService: ObservableObject {
                 DispatchQueue.main.async {
                     self.isDownloading[variant] = false
                     self.downloadProgress[variant] = 0.0
-                    // Append hint
-                    self.downloadError[variant] = error.localizedDescription + "\n(Try Trash icon)"
+                    self.downloadError[variant] = error.localizedDescription + "\n\n(Try Trash icon to clean cache)"
                 }
             }
         }
@@ -125,70 +130,98 @@ class ModelDownloadService: ObservableObject {
         let fileManager = FileManager.default
         let searchDirs: [FileManager.SearchPathDirectory] = [.documentDirectory, .applicationSupportDirectory, .cachesDirectory]
         
-        // "openai/whisper-large-v3" -> "whisper-large-v3"
+        // Parse variant: "openai/whisper-medium" or "openai_whisper-medium"
         let variantParts = variant.split(separator: "/")
         let modelName = variantParts.last ?? Substring(variant)
         
+        // Also search for underscore version: openai_whisper-medium
+        let underscoreVariant = variant.replacingOccurrences(of: "/", with: "_")
+        
         var deletedCount = 0
         var checkedPaths: [String] = []
+        
+        print("🗑️ Searching for model caches matching: '\(modelName)' or '\(underscoreVariant)'")
         
         // 1. Check Standard macOS Paths
         for searchDir in searchDirs {
             guard let baseDir = fileManager.urls(for: searchDir, in: .userDomainMask).first else { continue }
             
-            // Check ./huggingface/models
-            let hfDir = baseDir.appendingPathComponent("huggingface/models")
-            checkedPaths.append(hfDir.path) // Checks: ~/Library/Application Support/huggingface/models
-            deletedCount += cleanupDirectory(hfDir, match: modelName)
+            // Check ./huggingface/models (HuggingFace cache)
+            let hfModelsDir = baseDir.appendingPathComponent("huggingface/models")
+            checkedPaths.append(hfModelsDir.path)
+            deletedCount += cleanupDirectory(hfModelsDir, matchAny: [String(modelName), underscoreVariant])
             
-            // Check ./ (root of Documents/Support, sometimes WhisperKit dumps here)
-            // check baseDir.path
-            deletedCount += cleanupDirectory(baseDir, match: modelName)
+            // Check ./huggingface/hub (Alternative HF structure)
+            let hfHubDir = baseDir.appendingPathComponent("huggingface/hub")
+            checkedPaths.append(hfHubDir.path)
+            deletedCount += cleanupDirectory(hfHubDir, matchAny: [String(modelName), underscoreVariant])
+            
+            // Check SpeakType-specific directory
+            let speaktypeDir = baseDir.appendingPathComponent("SpeakType/huggingface")
+            checkedPaths.append(speaktypeDir.path)
+            deletedCount += cleanupDirectory(speaktypeDir, matchAny: [String(modelName), underscoreVariant])
+            
+            // Check root directory (sometimes models are here)
+            deletedCount += cleanupDirectory(baseDir, matchAny: [String(modelName), underscoreVariant])
         }
         
         // 2. Check ~/.cache (Common for Python/Unix HF tools)
         let homeDir = fileManager.homeDirectoryForCurrentUser
-        let dotCache = homeDir.appendingPathComponent(".cache/huggingface/models")
-        checkedPaths.append(dotCache.path)
-        deletedCount += cleanupDirectory(dotCache, match: modelName)
+        let dotCacheModels = homeDir.appendingPathComponent(".cache/huggingface/models")
+        checkedPaths.append(dotCacheModels.path)
+        deletedCount += cleanupDirectory(dotCacheModels, matchAny: [String(modelName), underscoreVariant])
         
-        // 3. Explicit Container Check (Fallback)
-        let container = homeDir.appendingPathComponent("Library/Containers/org.speaktype.speaktype/Data/Documents/huggingface/models")
-        checkedPaths.append(container.path)
-        deletedCount += cleanupDirectory(container, match: modelName)
+        let dotCacheHub = homeDir.appendingPathComponent(".cache/huggingface/hub")
+        checkedPaths.append(dotCacheHub.path)
+        deletedCount += cleanupDirectory(dotCacheHub, matchAny: [String(modelName), underscoreVariant])
         
-        // 4. Check Temporary Directory
+        // 3. Check Temporary Directory
         let tempDir = fileManager.temporaryDirectory
-        // check tempDir/huggingface/models and just tempDir
-        let tempHf = tempDir.appendingPathComponent("huggingface/models")
-        checkedPaths.append(tempDir.path)
+        let tempHf = tempDir.appendingPathComponent("huggingface")
         checkedPaths.append(tempHf.path)
-        deletedCount += cleanupDirectory(tempDir, match: modelName)
-        deletedCount += cleanupDirectory(tempHf, match: modelName)
+        deletedCount += cleanupDirectory(tempHf, matchAny: [String(modelName), underscoreVariant])
+        deletedCount += cleanupDirectory(tempDir, matchAny: [String(modelName), underscoreVariant])
+        
+        // 4. Check for models--* pattern in Application Support (WhisperKit style)
+        if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let modelsPattern = "models--" + variant.replacingOccurrences(of: "/", with: "--")
+            deletedCount += cleanupDirectory(appSupport, matchAny: [modelsPattern])
+            
+            // Also check nested huggingface/hub for models-- pattern
+            let hfHub = appSupport.appendingPathComponent("huggingface/hub")
+            deletedCount += cleanupDirectory(hfHub, matchAny: [modelsPattern])
+        }
+        
+        print("🗑️ Cleanup complete. Deleted \(deletedCount) items from \(checkedPaths.count) locations")
         
         if deletedCount > 0 {
-            return "Deleted \(deletedCount) items"
+            return "Deleted \(deletedCount) items. Retry download."
         } else {
-            // Return only first 2 checked paths for brevity if they exist, or just summary
-            return "No match for '\(modelName)' in \(checkedPaths.count) locations. checked: \(checkedPaths.map { $0.replacingOccurrences(of: homeDir.path, with: "~") }.joined(separator: ", "))"
+            return "No cached models found matching '\(modelName)'. This error may be in a different location."
         }
     }
     
-    private func cleanupDirectory(_ dir: URL, match: Substring) -> Int {
+    private func cleanupDirectory(_ dir: URL, matchAny patterns: [String]) -> Int {
         let fileManager = FileManager.default
         guard let contents = try? fileManager.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return 0 }
         
         var count = 0
         for url in contents {
-             if url.lastPathComponent.contains(match) {
-                 do {
-                     try fileManager.removeItem(at: url)
-                     print("Deleted corrupted cache: \(url.path)")
-                     count += 1
-                 } catch {
-                     print("Failed to delete \(url.path): \(error)")
-                 }
-             }
+            let fileName = url.lastPathComponent
+            // Check if any pattern matches
+            let matches = patterns.contains { pattern in
+                fileName.contains(pattern) || fileName.contains(pattern.replacingOccurrences(of: "/", with: "--"))
+            }
+            
+            if matches {
+                do {
+                    try fileManager.removeItem(at: url)
+                    print("✅ Deleted cache: \(url.lastPathComponent)")
+                    count += 1
+                } catch {
+                    print("❌ Failed to delete \(url.lastPathComponent): \(error)")
+                }
+            }
         }
         return count
     }

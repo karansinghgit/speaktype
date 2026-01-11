@@ -35,9 +35,22 @@
 		362947392F0DBC5100BE895D /* speaktypeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = speaktypeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		362947242F0DBC4E00BE895E /* Exceptions for "speaktype" folder in "speaktype" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Resources/Info.plist,
+			);
+			target = 362947212F0DBC4E00BE895D /* speaktype */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		362947242F0DBC4E00BE895D /* speaktype */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				362947242F0DBC4E00BE895E /* Exceptions for "speaktype" folder in "speaktype" target */,
+			);
 			path = speaktype;
 			sourceTree = "<group>";
 		};

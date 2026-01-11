@@ -19,31 +19,14 @@ class MiniRecorderWindowController: NSObject {
             panel.orderOut(nil)
         } else {
             print("Showing Mini Recorder Panel")
-            // Center closely to mouse or screen center? Center of screen is safer.
-            // But let's respect previous floating behavior.
-            panel.center() 
-            // panel.makeKeyAndOrderFront(nil) -> Activates app. We want specific behavior.
-            // We want it to float but NOT activate the app if possible?
-            // Actually, for a recorder, we usually want it visible.
+            panel.center()
             
-            // To prevent activating the Main App (and thus showing Main Dashboard if it was key),
-            // we show the panel without activating the app?
-            // "panel.orderFront(nil)" shows it.
-            
-            // However, to type into it (if needed) or interact, we might need activation.
-            // But our Mini Recorder is button-based.
-            
-            // Critical: If we use NSApp.activate, it might switch to the main dashboard scene if that's "primary".
-            // By managing this panel separately, we avoid SwiftUI triggering the main scene.
-            
-            // orderFrontRegardless allows showing the window without activating the app
+            // Show without activating to avoid pulling main app focus unnecessarily
             panel.orderFrontRegardless()
-            // panel.orderFrontDuringApplicationMakeKey() // Does not exist
-            // panel.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true) 
+            NSApp.activate(ignoringOtherApps: true)
             
             // Trigger instant recording
-             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 NotificationCenter.default.post(name: .hotkeyTriggered, object: nil)
             }
         }

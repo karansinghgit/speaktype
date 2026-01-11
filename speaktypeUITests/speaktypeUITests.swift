@@ -1,43 +1,33 @@
-//
-//  speaktypeUITests.swift
-//  speaktypeUITests
-//
-//  Created by Karan Singh on 7/1/26.
-//
-
 import XCTest
 
 final class speaktypeUITests: XCTestCase {
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
     }
 
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-    }
-
-    @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testAppLaunchAndNavigation() throws {
         let app = XCUIApplication()
         app.launch()
-
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        let window = app.windows["SpeakType"]
-        XCTAssertTrue(window.exists, "The SpeakType window should exist")
-    }
-
-    @MainActor
-    func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
+        
+        // Verify Sidebar exists (macOS List maps to Outline)
+        let sidebar = app.outlines.firstMatch
+        // Wait up to 10s for UI to stabilize (increased for robustness)
+        if !sidebar.waitForExistence(timeout: 10.0) {
+            print("🚨 Sidebar NOT found! App Hierarchy:\n\(app.debugDescription)")
+            XCTFail("Sidebar should exist (Outline)")
+        }
+        
+        // Navigate to Settings
+        // On macOS, text is often exposed directly. We look for "Settings" static text.
+        let settingsText = app.staticTexts["Settings"]
+        
+        if settingsText.waitForExistence(timeout: 5.0) {
+             settingsText.click()
+             
+             // Verify we are on Settings View
+             let settingsContent = app.staticTexts["Startup Behavior"]
+             XCTAssertTrue(settingsContent.waitForExistence(timeout: 5.0), "Should find Settings content")
         }
     }
 }

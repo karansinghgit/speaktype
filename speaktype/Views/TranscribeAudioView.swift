@@ -1,12 +1,14 @@
 import SwiftUI
 import AVFoundation
 import CoreMedia
+import UniformTypeIdentifiers
 
 struct TranscribeAudioView: View {
     @StateObject private var audioRecorder = AudioRecordingService()
     @State private var whisperService = WhisperService()
     @State private var transcribedText: String = ""
     @State private var isTranscribing = false
+    @State private var showFileImporter = false
     
     var body: some View {
         VStack(spacing: 30) {
@@ -19,6 +21,15 @@ struct TranscribeAudioView: View {
                     .stroke(style: StrokeStyle(lineWidth: 2, dash: [10]))
                     .foregroundStyle(Color.gray.opacity(0.3))
                     .frame(maxWidth: .infinity, maxHeight: 400)
+                    // Make the entire area tappable for file picker
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        showFileImporter = true
+                    }
+                    .onDrop(of: [.audio, .movie, .fileURL], isTargeted: nil) { providers in
+                        validateAndTranscribe(providers: providers)
+                        return true
+                    }
                 
                 VStack(spacing: 20) {
                     Image(systemName: "arrow.down.doc")
@@ -99,11 +110,82 @@ struct TranscribeAudioView: View {
             Spacer()
         }
         .background(Color.contentBackground)
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: [.audio, .movie],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    handleFileSelection(url: url)
+                }
+            case .failure(let error):
+                print("File selection error: \(error.localizedDescription)")
+            }
+        }
         .onAppear {
             Task {
                 if !whisperService.isInitialized {
                     try? await whisperService.initialize()
                 }
+            }
+        }
+    }
+    
+    private func handleFileSelection(url: URL) {
+        // Access security scoped resource if needed (for file picker)
+        let didStartAccessing = url.startAccessingSecurityScopedResource()
+        
+        // Create a copy or use the URL directly.
+        // For simplicity in this context, we'll try to use it directly but ensure we stop accessing later if needed.
+        // However, since startTranscription is async, we might lose access.
+        // Better pattern: Copy to temp directory if possible, or keep access open during transcription.
+        // Given WhisperKit might need file access, let's copy to a temp location to be safe and avoid scope issues.
+        
+        do {
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
+            try? FileManager.default.removeItem(at: tempURL) // Clean up if exists
+            try FileManager.default.copyItem(at: url, to: tempURL)
+            
+            if didStartAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+            
+            startTranscription(url: tempURL)
+        } catch {
+            print("Error copying file: \(error)")
+            if didStartAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+            // Fallback: try original URL if copy fails
+            startTranscription(url: url)
+        }
+    }
+    
+    private func validateAndTranscribe(providers: [NSItemProvider]) {
+        for provider in providers {
+            if provider.hasItemConformingToTypeIdentifier(UTType.audio.identifier) || 
+               provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+                
+                provider.loadFileRepresentation(forTypeIdentifier: UTType.content.identifier) { url, error in
+                    if let url = url {
+                        // LoadFileRepresentation gives us a temporary URL that might not persist.
+                        // We should copy it immediately.
+                        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
+                        do {
+                            try? FileManager.default.removeItem(at: tempURL)
+                            try FileManager.default.copyItem(at: url, to: tempURL)
+                            
+                            DispatchQueue.main.async {
+                                startTranscription(url: tempURL)
+                            }
+                        } catch {
+                            print("Error copying dropped file: \(error)")
+                        }
+                    }
+                }
+                return // Only handle the first valid file
             }
         }
     }

@@ -10,43 +10,29 @@ struct AIModel: Identifiable, Equatable {
     
     static let availableModels: [AIModel] = [
         AIModel(
-            name: "Distil-Whisper Large v3",
-            variant: "distil-whisper/distil-large-v3",
-            details: "English • High Quality • Fast",
+            name: "Whisper Large v3 Turbo",
+            variant: "openai_whisper-large-v3_turbo",
+            details: "Multilingual • High Accuracy • Fast",
             rating: "Excellent",
-            size: "756 MB"
-        ),
-        AIModel(
-            name: "Whisper Large v3",
-            variant: "openai/whisper-large-v3",
-            details: "Multilingual • Best Accuracy • Slower",
-            rating: "Best",
-            size: "3.1 GB"
+            size: "1.6 GB"
         ),
         AIModel(
             name: "Whisper Medium",
-            variant: "openai/whisper-medium",
+            variant: "openai_whisper-medium",
             details: "Multilingual • Balanced",
             rating: "Great",
             size: "1.5 GB"
         ),
         AIModel(
-            name: "Distil-Whisper Medium",
-            variant: "distil-whisper/distil-medium.en",
-            details: "English-only • Fast • Good Accuracy",
-            rating: "Good",
-            size: "396 MB"
-        ),
-        AIModel(
             name: "Whisper Base",
-            variant: "openai_whisper-base",
+            variant: "openai_whisper-base.en",
             details: "English-only • Optimized for Apple Silicon",
             rating: "Standard",
             size: "74 MB"
         ),
         AIModel(
             name: "Whisper Small",
-            variant: "openai_whisper-small",
+            variant: "openai_whisper-small.en",
             details: "English-only • Higher accuracy",
             rating: "Good",
             size: "244 MB"

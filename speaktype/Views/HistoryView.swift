@@ -2,94 +2,93 @@ import SwiftUI
 
 struct HistoryView: View {
     @StateObject private var historyService = HistoryService.shared
-    @State private var selectedItem: HistoryItem?
     @State private var showCopyAlert = false
     
+    // We don't need selectedItem anymore for a simple list
+    // We can track which item gets copied to show the alert using a simpler mechanism or just the bool
+    
     var body: some View {
-        NavigationSplitView {
-            List(historyService.items, selection: $selectedItem) { item in
-                NavigationLink(value: item) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.transcript.prefix(50) + (item.transcript.count > 50 ? "..." : ""))
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        HStack {
-                            Text(item.date.formatted(date: .abbreviated, time: .shortened))
-                            Spacer()
-                            Text(formatDuration(item.duration))
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.gray)
-                    }
-                    .padding(.vertical, 4)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contextMenu {
-                        Button("Delete", role: .destructive) {
-                            historyService.deleteItem(id: item.id)
-                            if selectedItem?.id == item.id {
-                                selectedItem = nil
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("History")
-            .listStyle(.sidebar)
-        } detail: {
-            if let item = selectedItem {
-                VStack(spacing: 0) {
-                    // Header Bar
-                    HStack {
-                        Text(item.date.formatted(date: .long, time: .standard))
-                            .font(.subheadline)
-                            .foregroundStyle(.gray)
-                        
-                        Spacer()
-                        
-                        Button(action: {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(item.transcript, forType: .string)
-                            showCopyAlert = true
-                        }) {
-                            Label("Copy", systemImage: "doc.on.doc")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .alert("Text Copied", isPresented: $showCopyAlert) {
-                            Button("OK", role: .cancel) { }
-                        } message: {
-                            Text("Transcript has been copied to clipboard.")
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(Color(nsColor: .controlBackgroundColor))
-                    
-                    Divider()
-                    
-                    // Edge-to-Edge Transcript
-                    ScrollView {
-                        Text(item.transcript)
-                            .font(.body)
-                            .foregroundStyle(.white)
-                            .textSelection(.enabled)
-                            .lineSpacing(4)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 20)
-                            .multilineTextAlignment(.leading)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.contentBackground)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        VStack(spacing: 0) {
+            Text("History")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+            
+            if historyService.items.isEmpty {
+                ContentUnavailableView(
+                    "No History Yet",
+                    systemImage: "clock",
+                    description: Text("Your transcriptions will appear here.")
+                )
             } else {
-                Text("Select a recording to view transcript")
-                    .foregroundStyle(.gray)
+                List {
+                    ForEach(historyService.items) { item in
+                        DisclosureGroup {
+                            // Expanded Content
+                            VStack(alignment: .leading, spacing: 12) {
+                                Divider()
+                                
+                                Text(item.transcript)
+                                    .font(.body)
+                                    .textSelection(.enabled)
+                                    .fixedSize(horizontal: false, vertical: true) // Allow multiline growth
+                                
+                                Button(action: {
+                                    copyToClipboard(text: item.transcript)
+                                }) {
+                                    Label("Copy Transcript", systemImage: "doc.on.doc")
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .padding(.top, 4)
+                            }
+                            .padding(.vertical, 8)
+                        } label: {
+                            // Collapsed Header
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(item.date.formatted(date: .abbreviated, time: .shortened))
+                                        .font(.headline)
+                                    Text(item.transcript.prefix(60) + (item.transcript.count > 60 ? "..." : ""))
+                                        .font(.caption)
+                                        .foregroundStyle(.gray)
+                                        .lineLimit(1)
+                                }
+                                
+                                Spacer()
+                                
+                                Text(formatDuration(item.duration))
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.gray.opacity(0.2))
+                                    .cornerRadius(4)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .onDelete(perform: deleteItems)
+                }
+                .listStyle(.inset)
             }
         }
+        .alert("Copied", isPresented: $showCopyAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Transcript copied to clipboard.")
+        }
+    }
+    
+    private func copyToClipboard(text: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        showCopyAlert = true
+    }
+    
+    private func deleteItems(at offsets: IndexSet) {
+        historyService.deleteItem(at: offsets)
     }
     
     func formatDuration(_ duration: TimeInterval) -> String {

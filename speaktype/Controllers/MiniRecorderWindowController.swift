@@ -90,7 +90,7 @@ class MiniRecorderWindowController: NSObject {
             
             // 3. Wait for focus switch
             print("Waiting for focus switch...")
-            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1.0s wait for stability
+            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2s wait for stability
             
             // 4. Robust Paste Routine
             print("Attempting Paste Routine...")

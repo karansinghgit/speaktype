@@ -40,13 +40,27 @@ struct TranscribeAudioView: View {
                         .font(.headline)
                         .foregroundStyle(.white)
                     
+                    Button(action: {
+                        showFileImporter = true
+                    }) {
+                        Label("Upload Audio File", systemImage: "square.and.arrow.up")
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.white.opacity(0.1))
+                            .foregroundStyle(.white)
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                    
                     Text("or")
                         .foregroundStyle(.gray)
                     
                     if audioRecorder.isRecording {
                         Button(action: {
-                            if let url = audioRecorder.stopRecording() {
-                                startTranscription(url: url)
+                            Task {
+                                if let url = await audioRecorder.stopRecording() {
+                                    startTranscription(url: url)
+                                }
                             }
                         }) {
                             Text("Stop Recording")

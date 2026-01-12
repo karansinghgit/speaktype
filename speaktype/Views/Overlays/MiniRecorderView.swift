@@ -11,7 +11,7 @@ struct MiniRecorderView: View {
     var onCommit: ((String) -> Void)?
     var onCancel: (() -> Void)?
     
-    @AppStorage("selectedModelVariant") private var selectedModel: String = "openai_whisper-base"
+    @AppStorage("selectedModelVariant") private var selectedModel: String = "openai_whisper-base.en"
     
     // Default Init for Preview
     init(onCommit: ((String) -> Void)? = nil, onCancel: (() -> Void)? = nil) {
@@ -20,78 +20,97 @@ struct MiniRecorderView: View {
     }
     
     var body: some View {
-        HStack(spacing: 16) {
-            // State Icon / Button
+        HStack(spacing: 12) {
+            // 1. Record/Stop Button
             Button(action: {
-                handleHotkeyTrigger() // Use same toggle logic
+                handleHotkeyTrigger()
             }) {
                 if isProcessing {
                     ProgressView()
                         .controlSize(.small)
                         .tint(.white)
+                        .frame(width: 32, height: 32)
                 } else {
-                    Image(systemName: isListening ? "stop.circle.fill" : "mic.circle.fill") // Explicit Stop/Record icons
-                        .font(.system(size: 28)) // Larger icon
-                        .foregroundStyle(isListening ? Color.appRed : Color.white) // High contrast
+                    Image(systemName: isListening ? "stop.circle.fill" : "mic.circle.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(isListening ? Color.appRed : Color.white)
                         .shadow(color: isListening ? Color.appRed.opacity(0.6) : .clear, radius: 8)
                 }
             }
             .buttonStyle(.plain)
             
-            // Listening Visualizer (Dots)
-            HStack(spacing: 4) {
-                ForEach(0..<12) { index in
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(isListening ? Color.appRed : Color.white.opacity(0.3)) // Red when active
-                        .frame(width: 4, height: 24) // Base height
-                        .scaleEffect(y: isListening ? min(CGFloat(1.0 + (Double(audioRecorder.audioLevel) * 5.0)), 2.0) : 1.0, anchor: .center) // Bound scale
-                        .opacity(isListening ? 1.0 : 0.3)
+            // 2. Model Selector
+            Menu {
+                ForEach(AIModel.availableModels) { model in
+                    Button(action: {
+                        selectedModel = model.variant
+                    }) {
+                        HStack {
+                            Text(model.name)
+                            if selectedModel == model.variant {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "cpu")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .frame(width: 28, height: 28)
+                    .background(Color.white.opacity(0.15))
+                    .clipShape(Circle())
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .onChange(of: selectedModel) { newValue in
+                 switchModel(to: newValue)
+            }
+            
+            // 3. Cancel Button
+            Button(action: {
+                if isListening {
+                    Task {
+                         _ = await audioRecorder.stopRecording()
+                         await MainActor.run {
+                             isListening = false
+                             onCancel?()
+                         }
+                    }
+                } else {
+                    onCancel?()
+                }
+            }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .frame(width: 28, height: 28)
+                    .background(Color.white.opacity(0.15))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            
+            // 4. Divider
+            Rectangle()
+                .fill(Color.white.opacity(0.1))
+                .frame(width: 1, height: 20)
+                .padding(.horizontal, 4)
+            
+            // 5. Mini Visualizer (Right side, like picture)
+            HStack(spacing: 3) {
+                ForEach(0..<4) { index in
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(Color.white)
+                        .frame(width: 3, height: 10) // Small base height
+                        .scaleEffect(y: isListening ? min(CGFloat(1.0 + (Double(audioRecorder.audioLevel) * 4.0)), 2.5) : 1.0, anchor: .center)
+                        .opacity(isListening ? 0.9 : 0.3)
                         .animation(
                             isListening ? .easeInOut(duration: 0.1) : .default,
                             value: audioRecorder.audioLevel
                         )
                 }
             }
-            .frame(width: 120, height: 32) // Fixed frame
-            
-            // Actions
-            HStack(spacing: 12) {
-                 // Model Selector
-                Menu {
-                    Picker("Model", selection: $selectedModel) {
-                        ForEach(AIModel.availableModels) { model in
-                            Text(model.name).tag(model.variant)
-                        }
-                    }
-                } label: {
-                    Image(systemName: "cpu")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.gray)
-                    .padding(6)
-                    .background(Color.white.opacity(0.1))
-                    .clipShape(Circle())
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                .onChange(of: selectedModel) { oldValue, newValue in
-                     switchModel(to: newValue)
-                }
-            
-                Button(action: {
-                    // Cancel / Close
-                    if isListening {
-                        _ = audioRecorder.stopRecording()
-                        isListening = false
-                    }
-                    // Notify controller to cancel/close
-                    onCancel?()
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(Color.white.opacity(0.6))
-                    .font(.system(size: 20))
-                }
-                .buttonStyle(.plain)
-            }
+            .frame(width: 30, height: 24, alignment: .center)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
@@ -124,7 +143,13 @@ struct MiniRecorderView: View {
     }
     
     private func switchModel(to variant: String) {
-        guard !isListening && !isProcessing else { return }
+        if isListening {
+            print("Model selection changed to \(variant) (deferred until transcription)")
+            return
+        }
+        
+        guard !isProcessing else { return }
+        
         Task {
             print("Switching model to: \(variant)")
             try? await whisperService.loadModel(variant: variant)
@@ -147,45 +172,47 @@ struct MiniRecorderView: View {
     }
     
     private func stopAndTranscribe() {
-        guard let url = audioRecorder.stopRecording() else {
-            isListening = false
-            return
-        }
-        isListening = false
-        isProcessing = true
-        
         Task {
-            // Transcribe
-            do {
-                if !whisperService.isInitialized {
-                    try? await whisperService.loadModel(variant: selectedModel)
-                }
-                let text = try await whisperService.transcribe(audioFile: url)
-                print("Transcription Result: '\(text)'")
-                
-                guard !text.isEmpty else {
-                    print("Transcription was empty. Skipping paste.")
-                    isProcessing = false
-                    return
-                }
-                
-                // Save to History
-                let duration = await getAudioDuration(url: url)
-                HistoryService.shared.addItem(transcript: text, duration: duration)
-                
-                // Delegate Commit to Controller (Copy, Hide, Paste happens there)
-                await MainActor.run {
-                    onCommit?(text)
-                }
-                
-            } catch {
-                print("Transcription error: \(error)")
+            guard let url = await audioRecorder.stopRecording() else {
+                await MainActor.run { isListening = false }
+                return
             }
             
-            // Reset state
             await MainActor.run {
-                 isProcessing = false
+                isListening = false
+                isProcessing = true
             }
+            
+            await processRecording(url: url)
+        }
+    }
+
+    private func processRecording(url: URL) async {
+        do {
+             if !whisperService.isInitialized || whisperService.currentModelVariant != selectedModel {
+                 print("Loading deferred model: \(selectedModel)")
+                 try? await whisperService.loadModel(variant: selectedModel)
+             }
+             
+             let text = try await whisperService.transcribe(audioFile: url)
+             print("Transcription Result: '\(text)'")
+             
+             guard !text.isEmpty else {
+                 print("Transcription was empty. Skipping paste.")
+                 await MainActor.run { isProcessing = false }
+                 return
+             }
+             
+             let duration = await getAudioDuration(url: url)
+             HistoryService.shared.addItem(transcript: text, duration: duration)
+             
+             await MainActor.run {
+                 onCommit?(text)
+                 isProcessing = false
+             }
+        } catch {
+             print("Transcription error: \(error)")
+             await MainActor.run { isProcessing = false }
         }
     }
     
@@ -193,9 +220,8 @@ struct MiniRecorderView: View {
         let asset = AVURLAsset(url: url)
         do {
             let duration = try await asset.load(.duration)
-            return duration.seconds
+            return CMTimeGetSeconds(duration)
         } catch {
-            print("Error loading audio duration: \(error)")
             return 0
         }
     }

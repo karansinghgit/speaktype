@@ -7,7 +7,7 @@ class WhisperService {
     var isInitialized = false
     var isTranscribing = false
     
-    var currentModelVariant: String = "openai_whisper-base" // Default
+    var currentModelVariant: String = "openai_whisper-base.en" // Default
     
     enum TranscriptionError: Error {
         case notInitialized

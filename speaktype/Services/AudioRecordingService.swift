@@ -30,6 +30,26 @@ class AudioRecordingService: NSObject, ObservableObject {
         if let first = availableDevices.first {
             selectedDeviceId = first.uniqueID
         }
+        
+        // Listen for device changes (plug/unplug)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleDeviceChange),
+            name: NSNotification.Name.AVCaptureDeviceWasConnected,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleDeviceChange),
+            name: NSNotification.Name.AVCaptureDeviceWasDisconnected,
+            object: nil
+        )
+    }
+    
+    @objc private func handleDeviceChange(_ notification: Notification) {
+        print("Audio device change detected")
+        fetchAvailableDevices()
     }
     
     func fetchAvailableDevices() {
@@ -76,7 +96,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         guard !isRecording else { return }
         if captureSession == nil { setupSession() }
         
-        let url = getDocumentsDirectory().appendingPathComponent("recording-\(Date().timeIntervalSince1970).wav")
+        let url = getRecordingsDirectory().appendingPathComponent("recording-\(Date().timeIntervalSince1970).wav")
         currentFileURL = url
         
         do {
@@ -148,16 +168,24 @@ class AudioRecordingService: NSObject, ObservableObject {
         }
     }
     
-    private func getDocumentsDirectory() -> URL {
-        if let customPath = UserDefaults.standard.string(forKey: "customRecordingPath"), 
-           !customPath.isEmpty {
-            var isDir: ObjCBool = false
-            if FileManager.default.fileExists(atPath: customPath, isDirectory: &isDir), isDir.boolValue {
-                return URL(fileURLWithPath: customPath)
-            }
-        }
+    private func getRecordingsDirectory() -> URL {
+        // Use Application Support instead of Documents for app-managed storage
+        let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        )[0]
         
-        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let recordingsDir = appSupport
+            .appendingPathComponent("SpeakType")
+            .appendingPathComponent("Recordings")
+        
+        // Create directory if it doesn't exist
+        try? FileManager.default.createDirectory(
+            at: recordingsDir,
+            withIntermediateDirectories: true
+        )
+        
+        return recordingsDir
     }
 }
 

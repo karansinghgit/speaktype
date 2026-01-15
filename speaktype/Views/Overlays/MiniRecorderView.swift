@@ -204,7 +204,14 @@ struct MiniRecorderView: View {
              }
              
              let duration = await getAudioDuration(url: url)
-             HistoryService.shared.addItem(transcript: text, duration: duration)
+             let modelName = AIModel.availableModels.first(where: { $0.variant == selectedModel })?.name ?? selectedModel
+             HistoryService.shared.addItem(
+                transcript: text,
+                duration: duration,
+                audioFileURL: url,
+                modelUsed: modelName,
+                transcriptionTime: nil // Can add timing later if needed
+             )
              
              await MainActor.run {
                  onCommit?(text)

@@ -208,9 +208,16 @@ struct DashboardView: View {
                 
                 let text = try await whisperService.transcribe(audioFile: url)
                 let duration = try await getAudioDuration(url: url)
+                let modelName = AIModel.availableModels.first(where: { $0.variant == selectedModel })?.name ?? selectedModel
                 
                 DispatchQueue.main.async {
-                    historyService.addItem(transcript: text, duration: duration)
+                    historyService.addItem(
+                        transcript: text,
+                        duration: duration,
+                        audioFileURL: url,
+                        modelUsed: modelName,
+                        transcriptionTime: nil
+                    )
                     transcriptionStatus = "Done!"
                     isTranscribing = false
                     // Clear status after delay

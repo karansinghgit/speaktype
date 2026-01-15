@@ -7,6 +7,9 @@ struct HistoryItem: Identifiable, Codable, Hashable {
     let date: Date
     let transcript: String
     let duration: TimeInterval
+    let audioFileURL: URL?
+    let modelUsed: String?
+    let transcriptionTime: TimeInterval?
     
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
@@ -28,8 +31,16 @@ class HistoryService: ObservableObject {
         loadHistory()
     }
     
-    func addItem(transcript: String, duration: TimeInterval) {
-        let newItem = HistoryItem(id: UUID(), date: Date(), transcript: transcript, duration: duration)
+    func addItem(transcript: String, duration: TimeInterval, audioFileURL: URL? = nil, modelUsed: String? = nil, transcriptionTime: TimeInterval? = nil) {
+        let newItem = HistoryItem(
+            id: UUID(),
+            date: Date(),
+            transcript: transcript,
+            duration: duration,
+            audioFileURL: audioFileURL,
+            modelUsed: modelUsed,
+            transcriptionTime: transcriptionTime
+        )
         items.insert(newItem, at: 0) // Newest first
         saveHistory()
     }

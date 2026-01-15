@@ -2,11 +2,7 @@ import SwiftUI
 
 struct HistoryView: View {
     @StateObject private var historyService = HistoryService.shared
-    @State private var showCopyAlert = false
     @State private var showDeleteAlert = false
-    
-    // We don't need selectedItem anymore for a simple list
-    // We can track which item gets copied to show the alert using a simpler mechanism or just the bool
     
     var body: some View {
         VStack(spacing: 0) {
@@ -24,30 +20,10 @@ struct HistoryView: View {
             } else {
                 List {
                     ForEach(historyService.items) { item in
-                        DisclosureGroup {
-                            // Expanded Content
-                            VStack(alignment: .leading, spacing: 12) {
-                                Divider()
-                                
-                                Text(item.transcript)
-                                    .font(.body)
-                                    .textSelection(.enabled)
-                                    .fixedSize(horizontal: false, vertical: true) // Allow multiline growth
-                                
-                                Button(action: {
-                                    copyToClipboard(text: item.transcript)
-                                }) {
-                                    Label("Copy Transcript", systemImage: "doc.on.doc")
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                                .padding(.top, 4)
-                            }
-                            .padding(.vertical, 8)
-                        } label: {
-                            // Collapsed Header
+                        NavigationLink(destination: HistoryDetailView(item: item)) {
+                            // Row Content
                             HStack {
-                                VStack(alignment: .leading) {
+                                VStack(alignment: .leading, spacing: 4) {
                                     Text(item.date.formatted(date: .abbreviated, time: .shortened))
                                         .font(.headline)
                                     Text(item.transcript.prefix(60) + (item.transcript.count > 60 ? "..." : ""))
@@ -93,19 +69,6 @@ struct HistoryView: View {
         } message: {
             Text("This action cannot be undone.")
         }
-
-        .alert("Copied", isPresented: $showCopyAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("Transcript copied to clipboard.")
-        }
-    }
-    
-    private func copyToClipboard(text: String) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
-        showCopyAlert = true
     }
     
     private func deleteItems(at offsets: IndexSet) {

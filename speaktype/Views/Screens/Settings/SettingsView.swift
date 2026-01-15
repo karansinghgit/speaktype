@@ -1,5 +1,6 @@
 import SwiftUI
 import KeyboardShortcuts
+import AVFoundation
 
 
 // import LaunchAtLogin // Uncomment when package added
@@ -25,6 +26,7 @@ struct SettingsView: View {
     @StateObject private var updateService = UpdateService.shared
     @State private var showUpdateSheet = false
     @State private var selectedHotkey = HotkeyOption.binding(forKey: "selectedHotkey", default: .fn)
+    @StateObject private var audioRecorder = AudioRecordingService.shared
 
     
     var body: some View {
@@ -80,7 +82,52 @@ struct SettingsView: View {
                         .foregroundStyle(.gray)
                 }
                 
-
+                // Microphone Input Section
+                SettingsSection {
+                    HStack {
+                        Image(systemName: "mic.circle")
+                            .foregroundStyle(Color.appRed)
+                        Text("Microphone Input")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                        Spacer()
+                    }
+                    .padding(.bottom, 8)
+                    
+                    Text("Choose which microphone to use for recording")
+                        .font(.caption)
+                        .foregroundStyle(.gray)
+                    
+                    Divider().background(Color.gray.opacity(0.3))
+                    
+                    // Microphone Picker
+                    HStack {
+                        Text("Input Device")
+                            .foregroundStyle(.white)
+                        Spacer()
+                        
+                        if audioRecorder.availableDevices.isEmpty {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Picker("", selection: $audioRecorder.selectedDeviceId) {
+                                ForEach(audioRecorder.availableDevices, id: \.uniqueID) { device in
+                                    Text(device.localizedName).tag(device.uniqueID as String?)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: 250)
+                            .labelsHidden()
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    
+                    if audioRecorder.availableDevices.count > 1 {
+                        Text("\(audioRecorder.availableDevices.count) microphones detected")
+                            .font(.caption2)
+                            .foregroundStyle(.gray)
+                    }
+                }
                 
                 // Storage
                 SettingsSection {

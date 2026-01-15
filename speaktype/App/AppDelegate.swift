@@ -35,6 +35,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
              return event
          }
         
+        // Check for updates on app launch
+        checkForUpdatesOnLaunch()
+        
         // Start Hidden: Close the main window that SwiftUI opens by default
         // UNLESS we are in UI testing mode
         let isUITesting = ProcessInfo.processInfo.arguments.contains("--uitesting")
@@ -52,4 +55,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
     }
+    
+    // MARK: - Update Checking
+    
+    private func checkForUpdatesOnLaunch() {
+        let updateService = UpdateService.shared
+        let autoUpdate = UserDefaults.standard.bool(forKey: "autoUpdate")
+        
+        // Only check if auto-update is enabled and enough time has passed
+        guard autoUpdate && updateService.shouldCheckForUpdates() else { return }
+        
+        Task {
+            await updateService.checkForUpdates(silent: true)
+            
+            // If update is available and we should show reminder
+            if updateService.availableUpdate != nil && updateService.shouldShowReminder() {
+                // Show update window on main thread
+                await MainActor.run {
+                    self.showUpdateWindow()
+                }
+            }
+        }
+    }
+    
+    private func showUpdateWindow() {
+        guard let update = UpdateService.shared.availableUpdate else { return }
+        
+        let updateSheetView = UpdateSheet(update: update)
+        let hostingController = NSHostingController(rootView: updateSheetView)
+        
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "Software Update"
+        window.styleMask = [.titled, .closable]
+        window.isReleasedWhenClosed = false
+        window.center()
+        window.isMovableByWindowBackground = true
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
 }
+

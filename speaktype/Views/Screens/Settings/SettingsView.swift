@@ -22,6 +22,9 @@ struct SettingsView: View {
     @AppStorage("hotkey1") private var hotkey1: String = "⌘ Space"
     @AppStorage("useFnKey") private var useFnKey = true
     @AppStorage("customRecordingPath") private var customRecordingPath: String = ""
+    
+    @StateObject private var updateService = UpdateService.shared
+    @State private var showUpdateSheet = false
 
     
     var body: some View {
@@ -118,10 +121,103 @@ struct SettingsView: View {
                         }
                     }
                 }
+                
+                // Software Update Section
+                SettingsSection {
+                    HStack {
+                        Image(systemName: "arrow.down.circle")
+                            .foregroundStyle(Color.appRed)
+                        VStack(alignment: .leading) {
+                            Text("Software Update")
+                                .font(.headline)
+                                .foregroundStyle(.white)
+                            Text("Keep your app up to date")
+                                .font(.caption)
+                                .foregroundStyle(.gray)
+                        }
+                        Spacer()
+                    }
+                    .padding(.bottom, 8)
+                    
+                    Divider().background(Color.gray.opacity(0.3))
+                    
+                    // Current version info
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Current Version")
+                                .font(.caption)
+                                .foregroundStyle(.gray)
+                            Text("SpeakType \(AppVersion.currentVersion) (Build \(AppVersion.currentBuildNumber))")
+                                .font(.subheadline)
+                                .foregroundStyle(.white)
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            Task {
+                                await updateService.checkForUpdates()
+                                if updateService.availableUpdate != nil {
+                                    showUpdateSheet = true
+                                }
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                if updateService.isCheckingForUpdates {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                        .frame(width: 16, height: 16)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.subheadline)
+                                }
+                                Text(updateService.isCheckingForUpdates ? "Checking..." : "Check for Updates")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
+                            .foregroundStyle(.white)
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(updateService.isCheckingForUpdates)
+                    }
+                    .padding(.vertical, 8)
+                    
+                    // Last check time
+                    if let lastCheck = updateService.lastCheckDate {
+                        Text("Last checked: \(lastCheck, style: .relative) ago")
+                            .font(.caption2)
+                            .foregroundStyle(.gray)
+                    }
+                    
+                    Divider().background(Color.gray.opacity(0.3))
+                    
+                    // Auto-update toggle
+                    ToggleRow(title: "Automatically check for updates", isOn: $autoUpdate)
+                        .padding(.vertical, 4)
+                    
+                    Text("The app will check for updates every 24 hours and notify you when a new version is available.")
+                        .font(.caption2)
+                        .foregroundStyle(.gray)
+                }
             }
             .padding()
         }
         .background(Color.contentBackground)
+        .sheet(isPresented: $showUpdateSheet) {
+            if let update = updateService.availableUpdate {
+                UpdateSheet(update: update)
+            }
+        }
+        .onAppear {
+            // Check if there's already an available update
+            if updateService.availableUpdate != nil {
+                showUpdateSheet = true
+            }
+        }
     }
 
     

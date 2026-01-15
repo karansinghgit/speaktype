@@ -20,11 +20,11 @@ struct SettingsView: View {
     @AppStorage("appleScriptPaste") private var appleScriptPaste = false
     @AppStorage("recorderStyle") private var recorderStyle: Int = 1 // 0: Notch, 1: Mini
     @AppStorage("hotkey1") private var hotkey1: String = "⌘ Space"
-    @AppStorage("useFnKey") private var useFnKey = true
     @AppStorage("customRecordingPath") private var customRecordingPath: String = ""
     
     @StateObject private var updateService = UpdateService.shared
     @State private var showUpdateSheet = false
+    @State private var selectedHotkey = HotkeyOption.binding(forKey: "selectedHotkey", default: .fn)
 
     
     var body: some View {
@@ -48,9 +48,21 @@ struct SettingsView: View {
                     
                     Divider().background(Color.gray.opacity(0.3))
                     
-                    // Fn Key Toggle
-                    ToggleRow(title: "Use Function (fn) Key", isOn: $useFnKey)
-                        .padding(.vertical, 4)
+                    // Hotkey Selection Dropdown
+                    HStack {
+                        Text("Hotkey 1")
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Picker("", selection: selectedHotkey) {
+                            ForEach(HotkeyOption.allCases) { option in
+                                Text(option.displayName).tag(option)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 120)
+                        .labelsHidden()
+                    }
+                    .padding(.vertical, 4)
                     
                     Divider().background(Color.gray.opacity(0.3))
                     

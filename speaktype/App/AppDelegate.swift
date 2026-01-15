@@ -15,25 +15,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.miniRecorderController?.toggle()
         }
         
-        // Fn Key Monitor (KeyCode 63)
-         NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-             if event.keyCode == 63 {
-                 // Check if pressed (modifier flags contain .function)
-                 // Note: This triggers on both press and release if we don't check flags carefully
-                 // For toggle, we usually want "on press"
-                 if event.modifierFlags.contains(.function) {
-                     self?.miniRecorderController?.toggle()
-                 }
-             }
-         }
-         
-         NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-             let useFnKey = UserDefaults.standard.object(forKey: "useFnKey") as? Bool ?? true
-             if useFnKey && event.keyCode == 63 && event.modifierFlags.contains(.function) {
-                 self?.miniRecorderController?.toggle()
-             }
-             return event
-         }
+        // Setup dynamic hotkey monitoring based on user selection
+        setupHotkeyMonitoring()
         
         // Check for updates on app launch
         checkForUpdatesOnLaunch()
@@ -54,6 +37,57 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Since we are a Menu Bar app (mostly), we must stay alive.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
+    }
+    
+    // MARK: - Hotkey Monitoring
+    
+    private func setupHotkeyMonitoring() {
+        // Get selected hotkey from UserDefaults (default to Fn)
+        let selectedHotkey = getSelectedHotkey()
+        
+        // Add global monitor for hotkey events
+        NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            let currentHotkey = self?.getSelectedHotkey() ?? .fn
+            
+            // Check if the pressed key matches the selected hotkey
+            if event.keyCode == currentHotkey.keyCode && 
+               event.modifierFlags.contains(currentHotkey.modifierFlag) {
+                self?.miniRecorderController?.toggle()
+            }
+        }
+        
+        // Add local monitor for hotkey events
+        NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            let currentHotkey = self?.getSelectedHotkey() ?? .fn
+            
+            if event.keyCode == currentHotkey.keyCode && 
+               event.modifierFlags.contains(currentHotkey.modifierFlag) {
+                self?.miniRecorderController?.toggle()
+            }
+            return event
+        }
+    }
+    
+    private func getSelectedHotkey() -> HotkeyOption {
+        // Migration: Check if old useFnKey setting exists
+        if UserDefaults.standard.object(forKey: "useFnKey") != nil {
+            let useFnKey = UserDefaults.standard.bool(forKey: "useFnKey")
+            if useFnKey {
+                // Migrate to new system
+                UserDefaults.standard.set(HotkeyOption.fn.rawValue, forKey: "selectedHotkey")
+                UserDefaults.standard.removeObject(forKey: "useFnKey")
+                return .fn
+            }
+        }
+        
+        // Load selected hotkey
+        if let rawValue = UserDefaults.standard.string(forKey: "selectedHotkey"),
+           let option = HotkeyOption(rawValue: rawValue) {
+            return option
+        }
+        
+        // Default to Fn
+        return .fn
     }
     
     // MARK: - Update Checking

@@ -67,7 +67,24 @@ struct MiniRecorderView: View {
                  switchModel(to: newValue)
             }
             
-            // 3. Cancel Button
+            // 3. Dashboard/History Shortcut
+            Button(action: {
+                 // Open dashboard
+                 if let url = URL(string: "speaktype://open") {
+                     NSWorkspace.shared.open(url)
+                 }
+            }) {
+                Image(systemName: "rectangle.grid.2x2")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .frame(width: 28, height: 28)
+                    .background(Color.white.opacity(0.15))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .help("Open Dashboard")
+            
+            // 4. Cancel Button
             Button(action: {
                 if isListening {
                     Task {
@@ -90,13 +107,13 @@ struct MiniRecorderView: View {
             }
             .buttonStyle(.plain)
             
-            // 4. Divider
+            // 5. Divider
             Rectangle()
                 .fill(Color.white.opacity(0.1))
                 .frame(width: 1, height: 20)
                 .padding(.horizontal, 4)
             
-            // 5. Mini Visualizer (Right side, like picture)
+            // 6. Mini Visualizer
             HStack(spacing: 3) {
                 ForEach(0..<4) { index in
                     RoundedRectangle(cornerRadius: 1.5)
@@ -116,12 +133,12 @@ struct MiniRecorderView: View {
         .padding(.vertical, 12)
         .background(
             Capsule()
-                .fill(Color.black) // Pure black for high contrast
-                .shadow(color: Color.black.opacity(0.5), radius: 10, x: 0, y: 5)
-        )
-        .overlay(
-            Capsule()
-                .stroke(Color.white.opacity(0.15), lineWidth: 1) // Subtle border
+                .fill(Color(hex: "0E0F12").opacity(0.98)) // Refined Matte Black
+                .shadow(color: Color.black.opacity(0.6), radius: 16, x: 0, y: 8)
+                .overlay(
+                    Capsule()
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
         )
         .fontDesign(.rounded)
         .onReceive(NotificationCenter.default.publisher(for: .hotkeyTriggered)) { _ in

@@ -15,9 +15,11 @@ class MiniRecorderWindowController: NSObject {
         guard let panel = panel else { return }
         
         if panel.isVisible {
-            print("Hiding Mini Recorder Panel")
-            panel.orderOut(nil)
+            // If visible, trigger the view's action (Stop & Transcribe)
+            // The View will call onCommit/onCancel to close the window when done.
+            NotificationCenter.default.post(name: .hotkeyTriggered, object: nil)
         } else {
+            // If hidden, show and start recording
             print("Showing Mini Recorder Panel")
             panel.center()
             

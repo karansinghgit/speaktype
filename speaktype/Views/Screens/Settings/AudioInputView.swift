@@ -100,7 +100,7 @@ struct AudioInputView: View {
             }
             .padding(.bottom, 40)
         }
-        .background(Color.contentBackground)
+        .background(Color.clear)
         .onAppear {
             audioRecorder.fetchAvailableDevices()
         }

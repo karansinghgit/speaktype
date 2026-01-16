@@ -76,17 +76,13 @@ struct ModelRow: View {
                             Text("Speed")
                                 .font(.caption)
                             HStack(spacing: 2) {
-                                Circle()
-                                    .fill(Color.yellow)
-                                    .frame(width: 4, height: 4)
-                                Circle()
-                                    .fill(Color.yellow)
-                                    .frame(width: 4, height: 4)
-                                Circle()
-                                    .fill(Color.yellow)
-                                    .frame(width: 4, height: 4)
+                                ForEach(0..<3) { i in
+                                    Circle()
+                                        .fill(i < Int(model.speed / 3.3) ? Color.yellow : Color.gray.opacity(0.3))
+                                        .frame(width: 4, height: 4)
+                                }
                             }
-                            Text("7.5")
+                            Text(String(format: "%.1f", model.speed))
                                 .font(.caption)
                         }
                         .foregroundStyle(.gray)
@@ -96,20 +92,13 @@ struct ModelRow: View {
                             Text("Accuracy")
                                 .font(.caption)
                             HStack(spacing: 2) {
-                                Circle()
-                                    .fill(Color.green)
-                                    .frame(width: 4, height: 4)
-                                Circle()
-                                    .fill(Color.green)
-                                    .frame(width: 4, height: 4)
-                                Circle()
-                                    .fill(Color.green)
-                                    .frame(width: 4, height: 4)
-                                Circle()
-                                    .fill(Color.green)
-                                    .frame(width: 4, height: 4)
+                                ForEach(0..<3) { i in
+                                    Circle()
+                                        .fill(i < Int(model.accuracy / 3.3) ? Color.green : Color.gray.opacity(0.3))
+                                        .frame(width: 4, height: 4)
+                                }
                             }
-                            Text("9.7")
+                            Text(String(format: "%.1f", model.accuracy))
                                 .font(.caption)
                         }
                         .foregroundStyle(.gray)
@@ -210,6 +199,20 @@ struct ModelRow: View {
                 .cornerRadius(20)
                 .buttonStyle(.plain)
             }
+            
+            // Delete button (Only available when downloaded)
+            Button(action: {
+                Task {
+                    _ = await downloadService.deleteModel(variant: model.variant)
+                }
+            }) {
+                Image(systemName: "trash")
+                    .font(.subheadline)
+                    .foregroundStyle(.gray)
+                    .padding(8)
+            }
+            .buttonStyle(.plain)
+            .help("Delete Model")
         }
     }
     
@@ -229,42 +232,23 @@ struct ModelRow: View {
     }
     
     private var downloadButton: some View {
-        HStack(spacing: 8) {
-            Button(action: {
-                downloadService.downloadModel(variant: model.variant)
-            }) {
-                HStack(spacing: 6) {
-                    Text("Download")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    Image(systemName: "arrow.down.circle")
-                        .font(.subheadline)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.blue)
-                .foregroundStyle(.white)
-                .cornerRadius(20)
-            }
-            .buttonStyle(.plain)
-            
-            // Trash button for manual cache cleanup
-            Button(action: {
-                Task {
-                    let result = await downloadService.deleteModel(variant: model.variant)
-                    await MainActor.run {
-                        downloadService.downloadError[model.variant] = "Manual Delete: \(result)"
-                    }
-                }
-            }) {
-                Image(systemName: "trash")
+        Button(action: {
+            downloadService.downloadModel(variant: model.variant)
+        }) {
+            HStack(spacing: 6) {
+                Text("Download")
                     .font(.subheadline)
-                    .foregroundStyle(.gray)
-                    .padding(8)
+                    .fontWeight(.medium)
+                Image(systemName: "arrow.down.circle")
+                    .font(.subheadline)
             }
-            .buttonStyle(.plain)
-            .help("Force Delete Cache")
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.blue)
+            .foregroundStyle(.white)
+            .cornerRadius(20)
         }
+        .buttonStyle(.plain)
     }
 }
 

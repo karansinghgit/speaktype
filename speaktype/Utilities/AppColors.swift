@@ -1,7 +1,8 @@
 import SwiftUI
 
 extension Color {
-    static let appRed = Color(red: 0.913, green: 0.293, blue: 0.352)
-    static let sidebarBackground = Color(red: 0.1, green: 0.1, blue: 0.1) // Approximate dark sidebar
-    static let contentBackground = Color(red: 0.12, green: 0.12, blue: 0.12) // Approximate dark content
+    // Legacy colors (kept for compatibility)
+    static let appRed = Color(hex: "FF4D4D") // Updated to SpeedCursor red
+    static let sidebarBackground = Color(hex: "121318") // SpeedCursor sidebar
+    static let contentBackground = Color(hex: "16171C") // SpeedCursor surface
 }

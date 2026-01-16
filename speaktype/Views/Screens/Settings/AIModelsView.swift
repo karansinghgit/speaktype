@@ -25,7 +25,7 @@ struct AIModelsView: View {
             }
             .padding(30)
         }
-        .background(Color.contentBackground)
+        .background(Color.clear)
     }
     
     // MARK: - Subviews

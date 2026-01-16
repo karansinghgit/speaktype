@@ -82,104 +82,9 @@ struct SettingsView: View {
                         .foregroundStyle(.gray)
                 }
                 
-                // Microphone Input Section
-                SettingsSection {
-                    HStack {
-                        Image(systemName: "mic.circle")
-                            .foregroundStyle(Color.appRed)
-                        Text("Microphone Input")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                        Spacer()
-                    }
-                    .padding(.bottom, 8)
-                    
-                    Text("Choose which microphone to use for recording")
-                        .font(.caption)
-                        .foregroundStyle(.gray)
-                    
-                    Divider().background(Color.gray.opacity(0.3))
-                    
-                    // Microphone Picker
-                    HStack {
-                        Text("Input Device")
-                            .foregroundStyle(.white)
-                        Spacer()
-                        
-                        if audioRecorder.availableDevices.isEmpty {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Picker("", selection: $audioRecorder.selectedDeviceId) {
-                                ForEach(audioRecorder.availableDevices, id: \.uniqueID) { device in
-                                    Text(device.localizedName).tag(device.uniqueID as String?)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            .frame(maxWidth: 250)
-                            .labelsHidden()
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    
-                    if audioRecorder.availableDevices.count > 1 {
-                        Text("\(audioRecorder.availableDevices.count) microphones detected")
-                            .font(.caption2)
-                            .foregroundStyle(.gray)
-                    }
-                }
+
                 
-                // Storage
-                SettingsSection {
-                    HStack {
-                        Image(systemName: "externaldrive")
-                            .foregroundStyle(Color.appRed)
-                        VStack(alignment: .leading) {
-                            Text("Storage")
-                                .font(.headline)
-                                .foregroundStyle(.white)
-                            Text("Where recordings are saved")
-                                .font(.caption)
-                                .foregroundStyle(.gray)
-                        }
-                        Spacer()
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(customRecordingPath.isEmpty ? "Default (Documents)" : customRecordingPath)
-                            .font(.caption)
-                            .foregroundStyle(.gray)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .padding(8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.black.opacity(0.2))
-                            .cornerRadius(8)
-                        
-                        HStack {
-                            if !customRecordingPath.isEmpty {
-                                Button("Reset to Default") {
-                                    customRecordingPath = ""
-                                }
-                                .buttonStyle(.plain)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                            }
-                            
-                            Spacer()
-                            
-                            Button("Change Location") {
-                                selectFolder()
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.1))
-                            .foregroundStyle(.white)
-                            .cornerRadius(8)
-                        }
-                    }
-                }
+
                 
                 // Software Update Section
                 SettingsSection {
@@ -265,7 +170,7 @@ struct SettingsView: View {
             }
             .padding()
         }
-        .background(Color.contentBackground)
+        .background(Color.clear)
         .sheet(isPresented: $showUpdateSheet) {
             if let update = updateService.availableUpdate {
                 UpdateSheet(update: update)
@@ -280,18 +185,7 @@ struct SettingsView: View {
     }
 
     
-    private func selectFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        
-        if panel.runModal() == .OK {
-            if let url = panel.url {
-                customRecordingPath = url.path
-            }
-        }
-    }
+
 }
 
 struct SettingsSection<Content: View>: View {

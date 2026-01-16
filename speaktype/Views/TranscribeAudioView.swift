@@ -123,7 +123,7 @@ struct TranscribeAudioView: View {
             
             Spacer()
         }
-        .background(Color.contentBackground)
+        .background(Color.clear)
         .fileImporter(
             isPresented: $showFileImporter,
             allowedContentTypes: [.audio, .movie],
@@ -211,7 +211,7 @@ struct TranscribeAudioView: View {
                 transcribedText = try await whisperService.transcribe(audioFile: url)
                 // Save to History
                 let duration = try await getAudioDuration(url: url)
-                HistoryService.shared.addItem(transcript: transcribedText, duration: duration)
+                HistoryService.shared.addItem(transcript: transcribedText, duration: duration, audioFileURL: url)
             } catch {
                 transcribedText = "Error: \(error.localizedDescription)"
             }

@@ -41,8 +41,8 @@ class UpdateService: ObservableObject {
         await MainActor.run {
             // Check if there's a newer version available
             if AppVersion.isNewerVersion(mockUpdate.version, than: currentVersion) {
-                // Don't show if user skipped this version
-                if !isVersionSkipped(mockUpdate.version) {
+                // Don't show if user skipped this version, unless it's a manual check
+                if !silent || !isVersionSkipped(mockUpdate.version) {
                     self.availableUpdate = mockUpdate
                 }
             } else {

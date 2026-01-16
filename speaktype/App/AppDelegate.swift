@@ -21,16 +21,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Check for updates on app launch
         checkForUpdatesOnLaunch()
         
-        // Start Hidden: Close the main window that SwiftUI opens by default
-        // UNLESS we are in UI testing mode
-        let isUITesting = ProcessInfo.processInfo.arguments.contains("--uitesting")
-        if !isUITesting {
-            DispatchQueue.main.async {
-                NSApplication.shared.windows.forEach { window in
-                    window.close()
-                }
-            }
-        }
+
     }
     
     // Critical: Prevent the app from quitting when the Mini Recorder panel closes.

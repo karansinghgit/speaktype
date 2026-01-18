@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		1C547F2B2F0E7DC0008120A6 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1C547F2A2F0E7DC0008120A6 /* WhisperKit */; };
-
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,7 +70,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				1C547F2B2F0E7DC0008120A6 /* WhisperKit in Frameworks */,
-
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -141,7 +139,6 @@
 			name = speaktype;
 			packageProductDependencies = (
 				1C547F2A2F0E7DC0008120A6 /* WhisperKit */,
-
 			);
 			productName = speaktype;
 			productReference = 362947222F0DBC4E00BE895D /* speaktype.app */;
@@ -227,7 +224,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				1C547F222F0E7D07008120A6 /* XCRemoteSwiftPackageReference "WhisperKit" */,
-
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 362947232F0DBC4E00BE895D /* Products */;
@@ -611,7 +607,6 @@
 				version = 0.9.4;
 			};
 		};
-
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -620,7 +615,6 @@
 			package = 1C547F222F0E7D07008120A6 /* XCRemoteSwiftPackageReference "WhisperKit" */;
 			productName = WhisperKit;
 		};
-
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 3629471A2F0DBC4E00BE895D /* Project object */;

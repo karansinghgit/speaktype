@@ -1,41 +1,51 @@
-//
-//  speaktypeUITests.swift
-//  speaktypeUITests
-//
-//  Created by Karan Singh on 7/1/26.
-//
-
 import XCTest
 
 final class speaktypeUITests: XCTestCase {
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
     }
 
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-    }
-
-    @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testAppLaunchAndNavigation() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["--uitesting"]
         app.launch()
-
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        
+        // Wait for app to fully load
+        sleep(2)
+        
+        // Navigate to Settings - look for the link directly
+        let settingsLink = app.links["Settings"]
+        XCTAssertTrue(settingsLink.waitForExistence(timeout: 5.0), "Settings link should exist")
+        
+        settingsLink.click()
+        
+        // Verify we are on Settings View
+        let settingsContent = app.staticTexts["SpeakType Shortcuts"]
+        XCTAssertTrue(settingsContent.waitForExistence(timeout: 5.0), "Should find Settings content")
     }
-
-    @MainActor
-    func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
+    
+    func testSidebarNavigation() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--uitesting"]
+        app.launch()
+        
+        // Wait for app to fully load
+        sleep(2)
+        
+        // Define sidebar items to test - these should appear as NavigationLinks
+        let items = ["Dashboard", "Transcribe Audio", "History", "AI Models", "Permissions", "Settings"]
+        
+        for item in items {
+            let link = app.links[item]
+            XCTAssertTrue(link.exists, "Link for '\(item)' should exist")
+            
+            if link.exists {
+                link.click()
+                // Just verify we can click without crashing
+                sleep(1)
+            }
         }
     }
 }
+

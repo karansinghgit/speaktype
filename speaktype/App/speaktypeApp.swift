@@ -18,6 +18,12 @@ struct speaktypeApp: App {
     
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
+    // License Manager
+    @StateObject private var licenseManager = LicenseManager.shared
+    
+    // Trial Manager
+    @StateObject private var trialManager = TrialManager.shared
+    
     init() {
         // For UI testing: bypass onboarding automatically
         if ProcessInfo.processInfo.arguments.contains("--uitesting") {
@@ -35,6 +41,8 @@ struct speaktypeApp: App {
                     OnboardingView()
                 }
             }
+            .environmentObject(licenseManager)
+            .environmentObject(trialManager)
             .preferredColorScheme(.dark)
             .tint(.appRed)
         }
@@ -42,7 +50,22 @@ struct speaktypeApp: App {
         .handlesExternalEvents(matching: ["main-dashboard", "open"]) // Only open for matching IDs
         .commands {
              SidebarCommands()
+             CommandGroup(after: .appInfo) {
+                 Button("Manage License...") {
+                     openWindow(id: "license-window")
+                 }
+                 .keyboardShortcut("L", modifiers: [.command, .shift])
+             }
         }
+        
+        // License Window
+        Window("License", id: "license-window") {
+            LicenseView()
+                .environmentObject(licenseManager)
+                .frame(width: 480, height: 520)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
         
         // Note: Mini Recorder is now managed manually by AppDelegate -> MiniRecorderWindowController
         // to prevent SwiftUI from auto-opening the main dashboard on activation.

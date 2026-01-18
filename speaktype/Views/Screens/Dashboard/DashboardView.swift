@@ -9,6 +9,10 @@ struct DashboardView: View {
     @StateObject private var audioRecorder = AudioRecordingService()
     @State private var whisperService = WhisperService()
     
+    // Trial & License
+    @EnvironmentObject var trialManager: TrialManager
+    @EnvironmentObject var licenseManager: LicenseManager
+    
     @AppStorage("selectedModelVariant") private var selectedModel: String = "openai_whisper-base"
     @State private var showFileImporter = false
     @State private var isTranscribing = false
@@ -53,6 +57,11 @@ struct DashboardView: View {
             
             ScrollView {
                 VStack(spacing: 32) {
+                    // Trial Banner (always show for non-Pro users)
+                    if !licenseManager.isPro {
+                        TrialBanner(status: trialManager.trialStatus)
+                    }
+                    
                     // Header
                     VStack(alignment: .leading, spacing: 6) {
                         Text(timeBasedGreeting)

@@ -20,6 +20,8 @@ struct MainView: View {
                     TranscribeAudioView()
                 case .history:
                     HistoryView()
+                case .statistics:
+                    StatisticsView()
                 case .aiModels:
                     AIModelsView()
                 case .permissions:

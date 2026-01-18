@@ -4,20 +4,43 @@ import ApplicationServices
 class ClipboardService {
     static let shared = ClipboardService()
     
+    // Dependency injection for license checking
+    private var licenseManager: LicenseManager {
+        return LicenseManager.shared
+    }
+    
     private init() {}
     
-    // Copy text to system clipboard
+    // Copy text to system clipboard with optional promotional wrapper
     func copy(text: String) {
+        let finalText = wrapTextIfNeeded(text)
+        
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+        pasteboard.setString(finalText, forType: .string)
         
         // Verify write
-        if let check = pasteboard.string(forType: .string), check == text {
+        if let check = pasteboard.string(forType: .string), check == finalText {
              print("✅ Clipboard Write Verified: '\(check.prefix(20))...'")
         } else {
              print("❌ Clipboard Write FAILED!")
         }
+    }
+    
+    // Wrap text with promotional message for free users
+    private func wrapTextIfNeeded(_ text: String) -> String {
+        // Skip if user has Pro license
+        if licenseManager.isPro {
+            return text
+        }
+        
+        // Add promotional text above and below
+        let promotionalText = "Upgrade to a lifetime subscription at speaktype.io"
+        let separator = "\n\n" // Double newline for spacing
+        
+        return """
+        \(promotionalText)\(separator)\(text)\(separator)\(promotionalText)
+        """
     }
     
     // Paste content (Simulate Cmd+V)

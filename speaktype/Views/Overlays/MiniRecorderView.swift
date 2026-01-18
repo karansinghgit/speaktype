@@ -39,7 +39,7 @@ struct MiniRecorderView: View {
             }
             .buttonStyle(.plain)
             
-            Spacer()
+
             
             // 2. Waveform (Center)
             // 2. Center Content

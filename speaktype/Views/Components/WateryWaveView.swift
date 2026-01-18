@@ -19,7 +19,7 @@ struct WateryWaveView: View {
                     let phase = time * (3.0 + Double(i))
                     // Amplify the wave height based on audio level
                     // Base amplitude adds a subtle movement even when silent
-                    let amplitude = (Double(audioLevel) * 25.0) + 2.0
+                    let amplitude = (Double(audioLevel) * 40.0) + 5.0
                     
                     for x in stride(from: 0, to: width, by: 2) {
                         // Normalized position (0 to 1)
@@ -37,13 +37,13 @@ struct WateryWaveView: View {
                     
                     context.stroke(
                         path,
-                        with: .color(.white.opacity(0.6 - Double(i) * 0.15)),
+                        with: .color(.white.opacity(0.8 - Double(i) * 0.15)),
                         lineWidth: 2
                     )
                 }
             }
         }
-        .frame(height: 40) // Constrain height for the signal look
+
     }
 }
 

@@ -283,7 +283,7 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
         var normalizedLevel = (clamped - lowerLimit) / (upperLimit - lowerLimit)
         
         // Signal Gate: Force silence if below a threshold
-        if normalizedLevel < 0.1 {
+        if normalizedLevel < 0.01 {
             normalizedLevel = 0
         }
         

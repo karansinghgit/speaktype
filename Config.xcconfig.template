@@ -1,0 +1,4 @@
+// Configuration Template for Contributors
+
+POLAR_ORGANIZATION_ID = your-test-org-id-here
+POLAR_PURCHASE_URL = https://polar.sh

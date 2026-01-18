@@ -41,6 +41,10 @@
 	<true/>
 	<key>NSSupportsSuddenTermination</key>
 	<false/>
+	<key>PolarOrganizationID</key>
+	<string>$(POLAR_ORGANIZATION_ID)</string>
+	<key>PolarPurchaseURL</key>
+	<string>$(POLAR_PURCHASE_URL)</string>
 </dict>
 </plist>
 

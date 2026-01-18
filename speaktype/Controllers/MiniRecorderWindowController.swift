@@ -68,7 +68,7 @@ class MiniRecorderWindowController: NSObject {
         hostingController = NSHostingController(rootView: AnyView(recorderView.background(Color.clear)))
         
         let p = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 60),
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 60),
             styleMask: [.nonactivatingPanel, .fullSizeContentView, .borderless],
             backing: .buffered,
             defer: false

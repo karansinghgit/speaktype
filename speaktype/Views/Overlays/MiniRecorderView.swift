@@ -42,12 +42,24 @@ struct MiniRecorderView: View {
             Spacer()
             
             // 2. Waveform (Center)
-            // 2. Waveform (Center)
-            WateryWaveView(audioLevel: audioRecorder.audioLevel)
-                .frame(maxWidth: .infinity) // Allow full width
-                .frame(height: 48) // Explicit comfortable height
-                .padding(.horizontal, 4)
-                .opacity(isListening ? 1.0 : 0.4) // More visible base state
+            // 2. Center Content
+            ZStack {
+                if isProcessing {
+                    HStack(spacing: 8) {
+                        Text("Transcribing...")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white)
+                    }
+                    .transition(.opacity)
+                } else {
+                    WateryWaveView(audioLevel: audioRecorder.audioLevel)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .padding(.horizontal, 4)
+                        .opacity(isListening ? 1.0 : 0.5)
+                        .transition(.opacity)
+                }
+            }
             
             // Right padding instead of Spacer to allow wave to end near the edge
             Color.clear.frame(width: 16, height: 1)

@@ -1,7 +1,7 @@
 import Foundation
 import AVFoundation
 import Combine
-
+import CoreMedia
 class AudioRecordingService: NSObject, ObservableObject {
     static let shared = AudioRecordingService() // Shared instance for settings/dashboard sync
 
@@ -209,6 +209,9 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
     }
     
     private func processAudioLevel(from sampleBuffer: CMSampleBuffer) {
+        guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription)?.pointee else { return }
+
         var audioBufferList = AudioBufferList()
         var blockBuffer: CMBlockBuffer?
         
@@ -225,22 +228,41 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
         
         guard let data = audioBufferList.mBuffers.mData else { return }
         
-        // Assuming 16-bit PCM (Int16) as configured in setupSession settings
-        let actualData = data.assumingMemoryBound(to: Int16.self)
-        let frameCount = Int(audioBufferList.mBuffers.mDataByteSize) / 2 // 2 bytes per sample
+        // Safety check for bytes per frame
+        let bytesPerFrame = Int(asbd.mBytesPerFrame)
+        guard bytesPerFrame > 0 else { return }
         
-        var sumSquares: Float = 0.0
-        
-        // Optimization: Don't check every single sample for visualization purposes
-        // Checking every 4th sample is usually sufficient for UI and saves CPU
+        let frameCount = Int(audioBufferList.mBuffers.mDataByteSize) / bytesPerFrame
         let stride = 4
         let samplesToRead = frameCount / stride
         
-        for i in 0..<samplesToRead {
-            let sample = Float(actualData[i * stride])
-            // Normalized sample (-1.0 to 1.0 range based on Int16 max)
-            let normalized = sample / 32767.0
-            sumSquares += normalized * normalized
+        guard samplesToRead > 0 else { return }
+        
+        var sumSquares: Float = 0.0
+        
+        if (asbd.mFormatFlags & kAudioFormatFlagIsFloat) != 0 {
+            // Float32 Processing (Standard on Mac)
+            let actualData = data.assumingMemoryBound(to: Float.self)
+            for i in 0..<samplesToRead {
+                let sample = actualData[i * stride]
+                sumSquares += sample * sample
+            }
+        } else {
+            // Int16 Processing (Fallback)
+            if asbd.mBitsPerChannel == 16 {
+                let actualData = data.assumingMemoryBound(to: Int16.self)
+                for i in 0..<samplesToRead {
+                    let sample = Float(actualData[i * stride]) / 32768.0
+                    sumSquares += sample * sample
+                }
+            } else if asbd.mBitsPerChannel == 32 {
+                 // Int32 Processing
+                 let actualData = data.assumingMemoryBound(to: Int32.self)
+                 for i in 0..<samplesToRead {
+                     let sample = Float(actualData[i * stride]) / 2147483648.0
+                     sumSquares += sample * sample
+                 }
+            }
         }
         
         let rms = sqrt(sumSquares / Float(samplesToRead))
@@ -250,8 +272,8 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
         let dB = 20 * log10(rms > 0 ? rms : 0.0001)
         
         // Normalize to 0...1 for UI
-        // Raised noise floor to -45.0 dB to ignore ambient noise (fans, AC, etc.)
-        let lowerLimit: Float = -45.0
+        // Raised noise floor to -35.0 dB to strictly ignore ambient noise
+        let lowerLimit: Float = -35.0
         let upperLimit: Float = 0.0
         
         // Clamp
@@ -260,8 +282,8 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
         // Linear mapping
         var normalizedLevel = (clamped - lowerLimit) / (upperLimit - lowerLimit)
         
-        // Signal Gate: Force silence if below a low threshold to prevent "nervous" jitter
-        if normalizedLevel < 0.05 {
+        // Signal Gate: Force silence if below a threshold
+        if normalizedLevel < 0.1 {
             normalizedLevel = 0
         }
         

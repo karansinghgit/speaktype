@@ -3,16 +3,21 @@ import KeyboardShortcuts
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var miniRecorderController: MiniRecorderWindowController?
+    private var isHotkeyPressed = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize the controller
         miniRecorderController = MiniRecorderWindowController()
         
-        // Setup global hotkey listener
+        // Setup global hotkey listener - HOLD TO RECORD
+        KeyboardShortcuts.onKeyDown(for: .toggleRecord) { [weak self] in
+            // Start recording when key is pressed down
+            self?.miniRecorderController?.startRecording()
+        }
+        
         KeyboardShortcuts.onKeyUp(for: .toggleRecord) { [weak self] in
-            // Direct toggle via controller. 
-            // Bypasses URL schemes and SwiftUI Scene routing completely.
-            self?.miniRecorderController?.toggle()
+            // Stop recording and paste when key is released
+            self?.miniRecorderController?.stopRecording()
         }
         
         // Setup dynamic hotkey monitoring based on user selection
@@ -38,22 +43,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Add global monitor for hotkey events
         NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            let currentHotkey = self?.getSelectedHotkey() ?? .fn
+            guard let self = self else { return }
+            let currentHotkey = self.getSelectedHotkey()
             
-            // Check if the pressed key matches the selected hotkey
-            if event.keyCode == currentHotkey.keyCode && 
-               event.modifierFlags.contains(currentHotkey.modifierFlag) {
-                self?.miniRecorderController?.toggle()
+            // Check if the hotkey is currently pressed
+            let isPressed = event.keyCode == currentHotkey.keyCode && 
+                           event.modifierFlags.contains(currentHotkey.modifierFlag)
+            
+            if isPressed && !self.isHotkeyPressed {
+                // Key was just pressed down - start recording
+                self.isHotkeyPressed = true
+                self.miniRecorderController?.startRecording()
+            } else if !isPressed && self.isHotkeyPressed {
+                // Key was just released - stop recording
+                self.isHotkeyPressed = false
+                self.miniRecorderController?.stopRecording()
             }
         }
         
         // Add local monitor for hotkey events
         NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            let currentHotkey = self?.getSelectedHotkey() ?? .fn
+            guard let self = self else { return event }
+            let currentHotkey = self.getSelectedHotkey()
             
-            if event.keyCode == currentHotkey.keyCode && 
-               event.modifierFlags.contains(currentHotkey.modifierFlag) {
-                self?.miniRecorderController?.toggle()
+            let isPressed = event.keyCode == currentHotkey.keyCode && 
+                           event.modifierFlags.contains(currentHotkey.modifierFlag)
+            
+            if isPressed && !self.isHotkeyPressed {
+                self.isHotkeyPressed = true
+                self.miniRecorderController?.startRecording()
+            } else if !isPressed && self.isHotkeyPressed {
+                self.isHotkeyPressed = false
+                self.miniRecorderController?.stopRecording()
             }
             return event
         }

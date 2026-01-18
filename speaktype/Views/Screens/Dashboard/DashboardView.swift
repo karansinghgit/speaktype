@@ -273,7 +273,7 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Recent Transcription Row (SpeedCursor Style)
+// MARK: - Recent Transcription Row (SpeakType Style)
 
 struct RecentTranscriptionRow: View {
     let item: HistoryItem
@@ -349,7 +349,7 @@ struct RecentTranscriptionRow: View {
         .background(Color.bgHover)
         .cornerRadius(12)
         .overlay(
-            // Left border accent (like SpeedCursor)
+            // Left border accent (like SpeedType)
             Rectangle()
                 .fill(accentColor)
                 .frame(width: 4) // Thicker accent

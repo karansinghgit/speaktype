@@ -5,33 +5,51 @@ import SwiftUI
 class MiniRecorderWindowController: NSObject {
     private var panel: NSPanel?
     private var hostingController: NSHostingController<AnyView>?
+    private var lastActiveApp: NSRunningApplication?
     
-    // Toggle visibility
-    func toggle() {
+    // Start recording - show panel and begin recording
+    func startRecording() {
+        // Capture previous app to restore focus later
+        lastActiveApp = NSWorkspace.shared.frontmostApplication
+        
         if panel == nil {
             setupPanel()
         }
         
         guard let panel = panel else { return }
         
-        if panel.isVisible {
-            // If visible, trigger the view's action (Stop & Transcribe)
-            // The View will call onCommit/onCancel to close the window when done.
-            NotificationCenter.default.post(name: .hotkeyTriggered, object: nil)
-        } else {
-            // If hidden, show and start recording
+        if !panel.isVisible {
             print("Showing Mini Recorder Panel")
-            panel.center()
+            
+            // Position above dock
+            if let screen = NSScreen.main {
+                let visibleFrame = screen.visibleFrame
+                let windowWidth = panel.frame.width
+                let x = visibleFrame.midX - (windowWidth / 2)
+                let y = visibleFrame.minY + 50 // 50px padding above dock
+                panel.setFrameOrigin(NSPoint(x: x, y: y))
+            } else {
+                panel.center()
+            }
             
             // Show without activating to avoid pulling main app focus unnecessarily
             panel.orderFrontRegardless()
-            NSApp.activate(ignoringOtherApps: true)
-            
-            // Trigger instant recording
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                NotificationCenter.default.post(name: .hotkeyTriggered, object: nil)
-            }
         }
+        
+        // Trigger instant recording
+        NotificationCenter.default.post(name: .recordingStartRequested, object: nil)
+    }
+    
+    // Stop recording - trigger transcription and paste
+    func stopRecording() {
+        // 1. Hide recorder immediately
+        panel?.orderOut(nil)
+        
+        // 2. Return focus to previous app
+        lastActiveApp?.activate(options: .activateIgnoringOtherApps)
+        
+        // 3. Trigger transcription
+        NotificationCenter.default.post(name: .recordingStopRequested, object: nil)
     }
     
     private func setupPanel() {
@@ -63,7 +81,7 @@ class MiniRecorderWindowController: NSObject {
         p.titleVisibility = .hidden
         p.titlebarAppearsTransparent = true
         p.isMovableByWindowBackground = true
-        p.hasShadow = false // Remove shadow to kill "boundary" artifact
+        p.hasShadow = true
         
         // Window Behavior
         p.level = .floating
@@ -82,12 +100,9 @@ class MiniRecorderWindowController: NSObject {
             // 1. Copy to clipboard
             ClipboardService.shared.copy(text: text)
             
-            // 2. Hide window to return focus
+            // 2. Ensure panel is closed
             await MainActor.run {
-                 print("Closing recorder panel...")
                  self.panel?.orderOut(nil)
-                 // Also force deactivation just in case
-                 NSApp.hide(nil)
             }
             
             // 3. Wait for focus switch

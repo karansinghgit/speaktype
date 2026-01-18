@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - SpeedCursor Color System
+// MARK: - SpeakType Color System
 
 extension Color {
     // MARK: - Core Background Layers

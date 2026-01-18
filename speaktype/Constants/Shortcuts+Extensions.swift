@@ -7,5 +7,7 @@ extension KeyboardShortcuts.Name {
 }
 
 extension Notification.Name {
-    static let hotkeyTriggered = Notification.Name("hotkeyTriggered")
+    static let hotkeyTriggered = Notification.Name("hotkeyTriggered") // Legacy, can be removed
+    static let recordingStartRequested = Notification.Name("recordingStartRequested")
+    static let recordingStopRequested = Notification.Name("recordingStopRequested")
 }

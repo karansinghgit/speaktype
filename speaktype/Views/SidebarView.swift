@@ -12,7 +12,7 @@ struct SidebarView: View {
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 48, height: 48) // Slightly larger logo
                 
-                Text("SpeedCursor")
+                Text("SpeakType")
                     .font(.system(size: 22, weight: .bold)) // Reduced text size
                     .foregroundStyle(.white)
                 

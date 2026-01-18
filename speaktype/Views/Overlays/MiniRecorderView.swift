@@ -4,7 +4,7 @@ import AVFoundation
 import CoreMedia
 
 struct MiniRecorderView: View {
-    @StateObject private var audioRecorder = AudioRecordingService()
+    @ObservedObject private var audioRecorder = AudioRecordingService.shared
     @State private var whisperService = WhisperService()
     @State private var isListening = false
     @State private var isProcessing = false
@@ -20,8 +20,8 @@ struct MiniRecorderView: View {
     }
     
     var body: some View {
-        HStack(spacing: 12) {
-            // 1. Record/Stop Button
+        HStack(spacing: 0) {
+            // 1. Mic Button (Left)
             Button(action: {
                 handleHotkeyTrigger()
             }) {
@@ -39,7 +39,27 @@ struct MiniRecorderView: View {
             }
             .buttonStyle(.plain)
             
-            // 2. Model Selector
+            Spacer()
+            
+            // 2. Waveform (Center)
+            HStack(spacing: 3) {
+                ForEach(0..<4) { index in
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(Color.white)
+                        .frame(width: 3, height: 10) // Small base height
+                        .scaleEffect(y: isListening ? min(CGFloat(1.0 + (Double(audioRecorder.audioLevel) * 2.5)), 2.5) : 1.0, anchor: .center)
+                        .opacity(isListening ? 0.9 : 0.3)
+                        .animation(
+                            isListening ? .easeInOut(duration: 0.1) : .default,
+                            value: audioRecorder.audioLevel
+                        )
+                }
+            }
+            .frame(width: 30, height: 24, alignment: .center)
+            
+            Spacer()
+            
+            // 3. Model Selector (Right)
             Menu {
                 ForEach(AIModel.availableModels) { model in
                     Button(action: {
@@ -66,83 +86,24 @@ struct MiniRecorderView: View {
             .onChange(of: selectedModel) { newValue in
                  switchModel(to: newValue)
             }
-            
-            // 3. Dashboard/History Shortcut
-            Button(action: {
-                 // Open dashboard
-                 if let url = URL(string: "speaktype://open") {
-                     NSWorkspace.shared.open(url)
-                 }
-            }) {
-                Image(systemName: "rectangle.grid.2x2")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .frame(width: 28, height: 28)
-                    .background(Color.white.opacity(0.15))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .help("Open Dashboard")
-            
-            // 4. Cancel Button
-            Button(action: {
-                if isListening {
-                    Task {
-                         _ = await audioRecorder.stopRecording()
-                         await MainActor.run {
-                             isListening = false
-                             onCancel?()
-                         }
-                    }
-                } else {
-                    onCancel?()
-                }
-            }) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .frame(width: 28, height: 28)
-                    .background(Color.white.opacity(0.15))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            
-            // 5. Divider
-            Rectangle()
-                .fill(Color.white.opacity(0.1))
-                .frame(width: 1, height: 20)
-                .padding(.horizontal, 4)
-            
-            // 6. Mini Visualizer
-            HStack(spacing: 3) {
-                ForEach(0..<4) { index in
-                    RoundedRectangle(cornerRadius: 1.5)
-                        .fill(Color.white)
-                        .frame(width: 3, height: 10) // Small base height
-                        .scaleEffect(y: isListening ? min(CGFloat(1.0 + (Double(audioRecorder.audioLevel) * 4.0)), 2.5) : 1.0, anchor: .center)
-                        .opacity(isListening ? 0.9 : 0.3)
-                        .animation(
-                            isListening ? .easeInOut(duration: 0.1) : .default,
-                            value: audioRecorder.audioLevel
-                        )
-                }
-            }
-            .frame(width: 30, height: 24, alignment: .center)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .background(
-            Capsule()
+            RoundedRectangle(cornerRadius: 20)
                 .fill(Color(hex: "0E0F12").opacity(0.98)) // Refined Matte Black
-                .shadow(color: Color.black.opacity(0.6), radius: 16, x: 0, y: 8)
+
                 .overlay(
-                    Capsule()
+                    RoundedRectangle(cornerRadius: 20)
                         .stroke(Color.white.opacity(0.1), lineWidth: 1)
                 )
         )
         .fontDesign(.rounded)
-        .onReceive(NotificationCenter.default.publisher(for: .hotkeyTriggered)) { _ in
-            handleHotkeyTrigger()
+        .onReceive(NotificationCenter.default.publisher(for: .recordingStartRequested)) { _ in
+            startRecording()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .recordingStopRequested)) { _ in
+            stopAndTranscribe()
         }
         .onAppear {
             initializedService()

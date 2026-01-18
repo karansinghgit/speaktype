@@ -128,6 +128,13 @@ Temporary Items
 .env.local
 .env.*.local
 
+# Build Configuration (contains secrets)
+Config.xcconfig
+
+# Xcode schemes with secrets (environment variables)
+*.xcscheme
+xcshareddata/xcschemes/*.xcscheme
+
 # Backup files
 *.bak
 *.backup

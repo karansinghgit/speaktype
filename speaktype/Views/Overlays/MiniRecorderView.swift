@@ -42,50 +42,17 @@ struct MiniRecorderView: View {
             Spacer()
             
             // 2. Waveform (Center)
-            HStack(spacing: 3) {
-                ForEach(0..<4) { index in
-                    RoundedRectangle(cornerRadius: 1.5)
-                        .fill(Color.white)
-                        .frame(width: 3, height: 10) // Small base height
-                        .scaleEffect(y: isListening ? min(CGFloat(1.0 + (Double(audioRecorder.audioLevel) * 2.5)), 2.5) : 1.0, anchor: .center)
-                        .opacity(isListening ? 0.9 : 0.3)
-                        .animation(
-                            isListening ? .easeInOut(duration: 0.1) : .default,
-                            value: audioRecorder.audioLevel
-                        )
-                }
-            }
-            .frame(width: 30, height: 24, alignment: .center)
+            // 2. Waveform (Center)
+            WateryWaveView(audioLevel: audioRecorder.audioLevel)
+                .frame(maxWidth: .infinity, maxHeight: 30)
+                .padding(.horizontal, 8)
+                .opacity(isListening ? 1.0 : 0.3)
+
             
             Spacer()
             
-            // 3. Model Selector (Right)
-            Menu {
-                ForEach(AIModel.availableModels) { model in
-                    Button(action: {
-                        selectedModel = model.variant
-                    }) {
-                        HStack {
-                            Text(model.name)
-                            if selectedModel == model.variant {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                Image(systemName: "cpu")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .frame(width: 28, height: 28)
-                    .background(Color.white.opacity(0.15))
-                    .clipShape(Circle())
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            .onChange(of: selectedModel) { newValue in
-                 switchModel(to: newValue)
-            }
+            // 3. Model Selector (Removed)
+
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
@@ -120,19 +87,7 @@ struct MiniRecorderView: View {
         }
     }
     
-    private func switchModel(to variant: String) {
-        if isListening {
-            print("Model selection changed to \(variant) (deferred until transcription)")
-            return
-        }
-        
-        guard !isProcessing else { return }
-        
-        Task {
-            print("Switching model to: \(variant)")
-            try? await whisperService.loadModel(variant: variant)
-        }
-    }
+
     
     // Main Workflow Logic
     private func handleHotkeyTrigger() {

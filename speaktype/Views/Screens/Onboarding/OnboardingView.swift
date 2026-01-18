@@ -8,22 +8,31 @@ struct OnboardingView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Background - Solid Dark
-                Color.contentBackground
+                // Background - Darker Contrast (Matches Main App)
+                ZStack {
+                    Color.bgApp.ignoresSafeArea()
+                    
+                    // Subtle ambient gradient for premium feel
+                    LinearGradient(
+                        colors: [Color.accentRed.opacity(0.15), Color.accentBlue.opacity(0.1), Color.clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                     .ignoresSafeArea()
+                }
                 
                 // Content ZStack
                     ZStack {
                         if currentPage == 0 {
                             WelcomePage(action: {
-                                withAnimation { currentPage = 1 }
+                                withAnimation(.easeInOut(duration: 0.5)) { currentPage = 1 }
                             })
-                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+                            .transition(.opacity)
                         } else {
                             PermissionsPage(finishAction: {
                                 completeOnboarding()
                             })
-                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+                            .transition(.opacity)
                         }
                     }
                     .padding(40)
@@ -31,7 +40,7 @@ struct OnboardingView: View {
             }
         }
         .frame(minWidth: 600, minHeight: 500) // Lower minimum size
-        .fontDesign(.rounded) // Apply global rounded font for Onboarding
+        .frame(minWidth: 600, minHeight: 500) // Lower minimum size
     }
     
     func completeOnboarding() {
@@ -47,14 +56,15 @@ struct WelcomePage: View {
     var body: some View {
         VStack(spacing: 40) {
             // Icon / Hero
-            Image(systemName: "mic.circle.fill")
-                .font(.system(size: 100))
-                .foregroundStyle(Color.appRed)
-                .shadow(color: Color.appRed.opacity(0.5), radius: 20, x: 0, y: 0)
+            Image("AppLogo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 100, height: 100)
+                .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
             
             VStack(spacing: 16) {
                 Text("Welcome to SpeakType")
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
+                    .font(.system(size: 42, weight: .bold)) // Removed .rounded
                     .foregroundStyle(.white)
                 
                 Text("Experience the power of local AI transcription. Secure, fast, and completely offline.")
@@ -76,7 +86,7 @@ struct WelcomePage: View {
                     .fontWeight(.bold)
                     .foregroundStyle(.white)
                     .frame(width: 200, height: 50)
-                    .background(Color.appRed)
+                    .background(Color.accentRed)
                     .cornerRadius(25)
             }
             .buttonStyle(.plain)
@@ -94,7 +104,7 @@ struct PermissionsPage: View {
         VStack(spacing: 40) {
             VStack(spacing: 10) {
                 Text("Permissions Setup")
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .font(.system(size: 36, weight: .bold)) // Removed .rounded
                     .foregroundStyle(.white)
                 Text("SpeakType needs access to your microphone and accessibility features to function.")
                     .font(.body)
@@ -139,8 +149,8 @@ struct PermissionsPage: View {
                 .frame(width: 300, height: 60)
                 .background(
                     RoundedRectangle(cornerRadius: 30)
-                        .fill((micStatus == .authorized && accessibilityStatus) ? Color.appRed : Color.gray.opacity(0.3))
-                        .shadow(color: (micStatus == .authorized && accessibilityStatus) ? Color.appRed.opacity(0.4) : Color.clear, radius: 10, x: 0, y: 5)
+                        .fill((micStatus == .authorized && accessibilityStatus) ? Color.accentRed : Color.gray.opacity(0.3))
+                        .shadow(color: (micStatus == .authorized && accessibilityStatus) ? Color.accentRed.opacity(0.4) : Color.clear, radius: 10, x: 0, y: 5)
                 )
                 .animation(.easeInOut, value: micStatus == .authorized && accessibilityStatus)
             }
@@ -151,6 +161,10 @@ struct PermissionsPage: View {
         .onAppear {
             checkPermissions()
             startPolling()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            print("App became active, checking permissions...")
+            checkPermissions()
         }
         .onDisappear {
             timer?.invalidate()
@@ -209,9 +223,9 @@ struct FeatureCard: View {
         VStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.title)
-                .foregroundStyle(Color.appRed)
+                .foregroundStyle(Color.accentRed)
                 .frame(width: 50, height: 50)
-                .background(Color.appRed.opacity(0.1))
+                .background(Color.accentRed.opacity(0.1))
                 .clipShape(Circle())
             
             Text(title)
@@ -226,7 +240,7 @@ struct FeatureCard: View {
         }
         .frame(width: 140, height: 160)
         .padding()
-        .background(Color.white.opacity(0.03))
+        .background(.ultraThinMaterial)
         .cornerRadius(20)
         .overlay(
             RoundedRectangle(cornerRadius: 20)
@@ -246,9 +260,9 @@ struct OnboardingPermissionRow: View {
         HStack {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundStyle(Color.appRed)
+                .foregroundStyle(Color.accentRed)
                 .frame(width: 50, height: 50)
-                .background(Color.appRed.opacity(0.1))
+                .background(Color.accentRed.opacity(0.1))
                 .clipShape(Circle())
             
             VStack(alignment: .leading, spacing: 4) {
@@ -280,7 +294,7 @@ struct OnboardingPermissionRow: View {
                         .fontWeight(.semibold)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(Color.appRed)
+                        .background(Color.accentRed)
                         .foregroundStyle(.white)
                         .clipShape(Capsule())
                 }
@@ -288,7 +302,7 @@ struct OnboardingPermissionRow: View {
             }
         }
         .padding(20)
-        .background(Color.white.opacity(0.05))
+        .background(.ultraThinMaterial)
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)

@@ -41,52 +41,118 @@ struct ModelRow: View {
     // MARK: - Body
     
     var body: some View {
-        HStack {
-            // Model Info
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                // Model Info
+                VStack(alignment: .leading, spacing: 8) {
+                    // Model Name
                     Text(model.name)
-                        .font(.headline)
+                        .font(.title3)
+                        .fontWeight(.semibold)
                         .foregroundStyle(.white)
                     
-                    // Rating Badge
-                    Text(model.rating)
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(ratingColor.opacity(0.2))
-                        .foregroundStyle(ratingColor)
-                        .clipShape(Capsule())
-                    
-                    if isActive {
-                        Text("(Active)")
-                            .font(.caption)
-                            .foregroundStyle(Color.green)
+                    // Model Details - Icons and stats
+                    HStack(spacing: 12) {
+                        // Multilingual icon
+                        HStack(spacing: 4) {
+                            Image(systemName: "globe")
+                                .font(.caption)
+                            Text("Multilingual")
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.gray)
+                        
+                        // Size icon
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.down.circle")
+                                .font(.caption)
+                            Text(model.size)
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.gray)
+                        
+                        // Speed rating (showing dots)
+                        HStack(spacing: 4) {
+                            Text("Speed")
+                                .font(.caption)
+                            HStack(spacing: 2) {
+                                ForEach(0..<3) { i in
+                                    Circle()
+                                        .fill(i < Int(model.speed / 3.3) ? Color.yellow : Color.gray.opacity(0.3))
+                                        .frame(width: 4, height: 4)
+                                }
+                            }
+                            Text(String(format: "%.1f", model.speed))
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.gray)
+                        
+                        // Accuracy rating
+                        HStack(spacing: 4) {
+                            Text("Accuracy")
+                                .font(.caption)
+                            HStack(spacing: 2) {
+                                ForEach(0..<3) { i in
+                                    Circle()
+                                        .fill(i < Int(model.accuracy / 3.3) ? Color.green : Color.gray.opacity(0.3))
+                                        .frame(width: 4, height: 4)
+                                }
+                            }
+                            Text(String(format: "%.1f", model.accuracy))
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.gray)
                     }
+                    
+                    // Description
+                    Text(model.details)
+                        .font(.subheadline)
+                        .foregroundStyle(.gray)
+                        .padding(.top, 4)
                 }
                 
-                HStack(spacing: 6) {
-                    Text(model.details)
-                        .font(.caption)
-                        .foregroundStyle(.gray)
-                    
-                    Text("•")
-                        .font(.caption)
-                        .foregroundStyle(.gray)
-                    
-                    Text(model.size)
-                        .font(.caption)
-                        .foregroundStyle(.gray.opacity(0.8))
-                }
+                Spacer()
+                
+                // Action button (top right)
+                actionButton
             }
+            .padding()
             
-            Spacer()
-            
-            // Actions
-            actionButton
+            // Download progress section (only shown when downloading)
+            if isDownloading {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Downloading \(model.variant) Model")
+                            .font(.subheadline)
+                            .foregroundStyle(.gray)
+                        
+                        Spacer()
+                        
+                        Text("\(Int(progress * 100))%")
+                            .font(.subheadline)
+                            .foregroundStyle(.gray)
+                    }
+                    
+                    // Blue progress bar
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            // Background track
+                            Rectangle()
+                                .fill(Color.white.opacity(0.1))
+                                .frame(height: 4)
+                            
+                            // Progress fill
+                            Rectangle()
+                                .fill(Color.blue)
+                                .frame(width: geometry.size.width * progress, height: 4)
+                        }
+                    }
+                    .frame(height: 4)
+                }
+                .padding(.horizontal)
+                .padding(.bottom)
+            }
         }
-        .padding()
         .background(Color.white.opacity(0.05))
         .cornerRadius(12)
         .overlay(
@@ -102,7 +168,7 @@ struct ModelRow: View {
         if isDownloaded {
             downloadedActions
         } else if isDownloading {
-            downloadingProgress
+            downloadingButton
         } else {
             downloadButton
         }
@@ -111,95 +177,101 @@ struct ModelRow: View {
     private var downloadedActions: some View {
         HStack(spacing: 12) {
             if isActive {
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
+                        .font(.subheadline)
                     Text("Selected")
+                        .font(.subheadline)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.green.opacity(0.2))
                 .foregroundStyle(Color.green)
+                .cornerRadius(20)
             } else {
                 Button("Use") {
                     selectedModel = model.variant
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
                 .background(Color.white.opacity(0.1))
                 .foregroundStyle(.white)
-                .cornerRadius(16)
+                .cornerRadius(20)
                 .buttonStyle(.plain)
             }
-        }
-    }
-    
-    private var downloadingProgress: some View {
-        HStack {
-            ProgressView(value: progress)
-                .progressViewStyle(.linear)
-                .frame(width: 80)
-                .tint(Color.appRed)
             
-            Text("\(Int(progress * 100))%")
-                .font(.caption)
-                .foregroundStyle(.gray)
-                .frame(width: 35, alignment: .trailing)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(Color.black.opacity(0.2))
-        .cornerRadius(16)
-    }
-    
-    private var downloadButton: some View {
-        VStack(alignment: .trailing, spacing: 8) {
-            Button(action: {
-                downloadService.downloadModel(variant: model.variant)
-            }) {
-                HStack(spacing: 4) {
-                    Text("Download")
-                    Image(systemName: "arrow.down.circle")
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.appRed)
-                .foregroundStyle(.white)
-                .cornerRadius(16)
-            }
-            .buttonStyle(.plain)
-            
+            // Delete button (Only available when downloaded)
             Button(action: {
                 Task {
-                    let result = await downloadService.deleteModel(variant: model.variant)
-                    await MainActor.run {
-                        downloadService.downloadError[model.variant] = "Manual Delete: \(result)"
-                    }
+                    _ = await downloadService.deleteModel(variant: model.variant)
                 }
             }) {
                 Image(systemName: "trash")
+                    .font(.subheadline)
                     .foregroundStyle(.gray)
-                    .padding(6)
+                    .padding(8)
             }
             .buttonStyle(.plain)
-            .help("Force Delete Cache")
-            
-            if let error = downloadError {
-                Text(error)
-                    .font(.caption2)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.trailing)
-                    .frame(maxWidth: 150)
-            }
+            .help("Delete Model")
         }
+    }
+    
+    private var downloadingButton: some View {
+        HStack(spacing: 6) {
+            Text("Downloading...")
+                .font(.subheadline)
+                .fontWeight(.medium)
+            Image(systemName: "info.circle")
+                .font(.subheadline)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color.blue)
+        .foregroundStyle(.white)
+        .cornerRadius(20)
+    }
+    
+    private var downloadButton: some View {
+        Button(action: {
+            downloadService.downloadModel(variant: model.variant)
+        }) {
+            HStack(spacing: 6) {
+                Text("Download")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Image(systemName: "arrow.down.circle")
+                    .font(.subheadline)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.blue)
+            .foregroundStyle(.white)
+            .cornerRadius(20)
+        }
+        .buttonStyle(.plain)
     }
 }
 
 // MARK: - Preview
 
 #Preview {
-    ModelRow(
-        model: .constant(AIModel.availableModels[0]),
-        selectedModel: .constant("openai_whisper-base")
-    )
+    VStack(spacing: 16) {
+        // Normal state
+        ModelRow(
+            model: .constant(AIModel.availableModels[0]),
+            selectedModel: .constant("openai_whisper-base")
+        )
+        
+        // Downloading state (simulated)
+        ModelRow(
+            model: .constant(AIModel.availableModels[0]),
+            selectedModel: .constant("openai_whisper-base")
+        )
+        .onAppear {
+            ModelDownloadService.shared.isDownloading["openai_whisper-large-v3_turbo"] = true
+            ModelDownloadService.shared.downloadProgress["openai_whisper-large-v3_turbo"] = 0.04
+        }
+    }
     .padding()
     .background(Color.black)
 }

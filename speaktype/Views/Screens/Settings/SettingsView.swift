@@ -1,5 +1,6 @@
 import SwiftUI
 import KeyboardShortcuts
+import AVFoundation
 
 
 // import LaunchAtLogin // Uncomment when package added
@@ -20,8 +21,12 @@ struct SettingsView: View {
     @AppStorage("appleScriptPaste") private var appleScriptPaste = false
     @AppStorage("recorderStyle") private var recorderStyle: Int = 1 // 0: Notch, 1: Mini
     @AppStorage("hotkey1") private var hotkey1: String = "⌘ Space"
-    @AppStorage("useFnKey") private var useFnKey = true
     @AppStorage("customRecordingPath") private var customRecordingPath: String = ""
+    
+    @StateObject private var updateService = UpdateService.shared
+    @State private var showUpdateSheet = false
+    @State private var selectedHotkey = HotkeyOption.binding(forKey: "selectedHotkey", default: .fn)
+    @StateObject private var audioRecorder = AudioRecordingService.shared
 
     
     var body: some View {
@@ -45,9 +50,21 @@ struct SettingsView: View {
                     
                     Divider().background(Color.gray.opacity(0.3))
                     
-                    // Fn Key Toggle
-                    ToggleRow(title: "Use Function (fn) Key", isOn: $useFnKey)
-                        .padding(.vertical, 4)
+                    // Hotkey Selection Dropdown
+                    HStack {
+                        Text("Hotkey 1")
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Picker("", selection: selectedHotkey) {
+                            ForEach(HotkeyOption.allCases) { option in
+                                Text(option.displayName).tag(option)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 120)
+                        .labelsHidden()
+                    }
+                    .padding(.vertical, 4)
                     
                     Divider().background(Color.gray.opacity(0.3))
                     
@@ -67,76 +84,108 @@ struct SettingsView: View {
                 
 
                 
-                // Storage
+
+                
+                // Software Update Section
                 SettingsSection {
                     HStack {
-                        Image(systemName: "externaldrive")
+                        Image(systemName: "arrow.down.circle")
                             .foregroundStyle(Color.appRed)
                         VStack(alignment: .leading) {
-                            Text("Storage")
+                            Text("Software Update")
                                 .font(.headline)
                                 .foregroundStyle(.white)
-                            Text("Where recordings are saved")
+                            Text("Keep your app up to date")
                                 .font(.caption)
                                 .foregroundStyle(.gray)
                         }
                         Spacer()
                     }
+                    .padding(.bottom, 8)
                     
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(customRecordingPath.isEmpty ? "Default (Documents)" : customRecordingPath)
-                            .font(.caption)
-                            .foregroundStyle(.gray)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .padding(8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.black.opacity(0.2))
-                            .cornerRadius(8)
-                        
-                        HStack {
-                            if !customRecordingPath.isEmpty {
-                                Button("Reset to Default") {
-                                    customRecordingPath = ""
-                                }
-                                .buttonStyle(.plain)
+                    Divider().background(Color.gray.opacity(0.3))
+                    
+                    // Current version info
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Current Version")
                                 .font(.caption)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(.gray)
+                            Text("SpeakType \(AppVersion.currentVersion) (Build \(AppVersion.currentBuildNumber))")
+                                .font(.subheadline)
+                                .foregroundStyle(.white)
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            Task {
+                                await updateService.checkForUpdates()
+                                if updateService.availableUpdate != nil {
+                                    showUpdateSheet = true
+                                }
                             }
-                            
-                            Spacer()
-                            
-                            Button("Change Location") {
-                                selectFolder()
+                        }) {
+                            HStack(spacing: 6) {
+                                if updateService.isCheckingForUpdates {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                        .frame(width: 16, height: 16)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.subheadline)
+                                }
+                                Text(updateService.isCheckingForUpdates ? "Checking..." : "Check for Updates")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
                             }
-                            .buttonStyle(.plain)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.1))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
                             .foregroundStyle(.white)
                             .cornerRadius(8)
                         }
+                        .buttonStyle(.plain)
+                        .disabled(updateService.isCheckingForUpdates)
                     }
+                    .padding(.vertical, 8)
+                    
+                    // Last check time
+                    if let lastCheck = updateService.lastCheckDate {
+                        Text("Last checked: \(lastCheck, style: .relative) ago")
+                            .font(.caption2)
+                            .foregroundStyle(.gray)
+                    }
+                    
+                    Divider().background(Color.gray.opacity(0.3))
+                    
+                    // Auto-update toggle
+                    ToggleRow(title: "Automatically check for updates", isOn: $autoUpdate)
+                        .padding(.vertical, 4)
+                    
+                    Text("The app will check for updates every 24 hours and notify you when a new version is available.")
+                        .font(.caption2)
+                        .foregroundStyle(.gray)
                 }
             }
             .padding()
         }
-        .background(Color.contentBackground)
-    }
-
-    
-    private func selectFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        
-        if panel.runModal() == .OK {
-            if let url = panel.url {
-                customRecordingPath = url.path
+        .background(Color.clear)
+        .sheet(isPresented: $showUpdateSheet) {
+            if let update = updateService.availableUpdate {
+                UpdateSheet(update: update)
+            }
+        }
+        .onAppear {
+            // Check if there's already an available update
+            if updateService.availableUpdate != nil {
+                showUpdateSheet = true
             }
         }
     }
+
+    
+
 }
 
 struct SettingsSection<Content: View>: View {

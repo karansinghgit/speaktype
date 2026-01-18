@@ -9,10 +9,7 @@ struct DashboardView: View {
     @StateObject private var audioRecorder = AudioRecordingService()
     @State private var whisperService = WhisperService()
     
-
     @AppStorage("selectedModelVariant") private var selectedModel: String = "openai_whisper-base"
-    @State private var sharedPlayer: AVPlayer?
-    
     @State private var showFileImporter = false
     @State private var isTranscribing = false
     @State private var transcriptionStatus = ""
@@ -28,135 +25,150 @@ struct DashboardView: View {
         }
     }
     
+    var timeSavedMinutes: Int {
+        // Average typing speed: 40 WPM.
+        // Time saved = (Words / 40) - (Duration / 60)
+        // Simplified: Just typing time for positive reinforcement.
+        return totalWordsTranscribed / 40
+    }
+    
+    var totalDurationSeconds: TimeInterval {
+        historyService.items.reduce(0) { $0 + $1.duration }
+    }
+    
+    var timeBasedGreeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 6..<12: return "Good morning,"
+        case 12..<17: return "Good afternoon,"
+        case 17..<22: return "Good evening,"
+        default: return "Welcome back,"
+        }
+    }
+    
     var body: some View {
         ZStack {
-            GeometryReader { geometry in
-                HStack(spacing: 20) {
-                    // ... (Left Column unchanged)
-                    VStack(spacing: 20) {
-                        // Header
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Dashboard")
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                            Text("Welcome back, User")
-                                .font(.subheadline)
-                                .foregroundStyle(.gray)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        // Stats Cards Row
-                        HStack(spacing: 16) {
-                            StatsCard(
+            // Background is now provided by MainView
+            Color.clear.ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 32) {
+                    // Header
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(timeBasedGreeting)
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.textPrimary)
+                        Text("Here's your productivity overview.")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    // Split Layout: Metrics (Left) + Tips (Right)
+                    HStack(alignment: .top, spacing: 24) {
+                        // Left Column: Stats Grid
+                        LazyVGrid(columns: [
+                            GridItem(.flexible(), spacing: 20),
+                            GridItem(.flexible(), spacing: 20)
+                        ], spacing: 20) {
+                            // Card 1: Transcriptions Today
+                            MetricCard(
                                 title: "Transcriptions Today",
                                 value: "\(transcriptionCountToday)",
+                                unit: "",
                                 icon: "waveform",
-                                gradient: LinearGradient(colors: [.red.opacity(0.8), .orange.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                color: .accentRed
                             )
                             
-                            StatsCard(
+                            // Card 2: Words Transcribed
+                            MetricCard(
                                 title: "Words Transcribed",
                                 value: "\(totalWordsTranscribed)",
-                                icon: "text.quote",
-                                gradient: LinearGradient(colors: [.blue.opacity(0.8), .purple.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                unit: "words",
+                                icon: "doc.text",
+                                color: .accentBlue
+                            )
+                            
+                            // Card 3: Time Saved
+                            MetricCard(
+                                title: "Est. Time Saved",
+                                value: formatTimeSaved(minutes: timeSavedMinutes),
+                                unit: "",
+                                icon: "clock.fill",
+                                color: .accentBlue // Theme Blue (Time)
+                            )
+                            
+                            // Card 4: Total Recording Time
+                            MetricCard(
+                                title: "Total Recorded",
+                                value: formatDurationHighLevel(totalDurationSeconds),
+                                unit: "",
+                                icon: "mic.fill",
+                                color: .accentRed // Theme Red (Recording)
                             )
                         }
                         
-                        // Quick Start Card
-                        QuickStartCard(
-                            isRecording: audioRecorder.isRecording,
-                            isTranscribing: isTranscribing,
-                            statusText: transcriptionStatus,
-                            onRecord: toggleRecording,
-                            onImport: { showFileImporter = true }
-                        )
-                        
-                        // Recent Transcriptions
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text("Recent Transcriptions")
-                                    .font(.headline)
-                                Spacer()
-                                Button("See All") {
-                                    selection = .history
-                                }
-                                .buttonStyle(.link)
-                                .font(.caption)
-                            }
-                            
-                            ScrollView {
-                                VStack(spacing: 10) {
-                                    if historyService.items.isEmpty {
-                                        Text("No recent activity")
-                                            .font(.caption)
-                                            .foregroundStyle(.gray)
-                                            .padding()
-                                    } else {
-                                        ForEach(historyService.items.prefix(5)) { item in
-                                            RecentItemRow(item: item)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .padding()
-                        .background(Color.white.opacity(0.05))
-                        .cornerRadius(12)
+                        // Right Column: Tips Section
+                        TipsCard()
                     }
-                    .frame(maxWidth: .infinity)
                     
-                    // Right Column: Tutorials
-                    if geometry.size.width > 800 {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Tips & Tutorials")
+                    // Recent Transcriptions
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            Text("Recent Transcriptions")
                                 .font(.headline)
-                            
-                            VideoPlayerView(player: sharedPlayer)
-                            
-                            VStack(alignment: .leading, spacing: 12) {
-                                TutorialLink(text: "How to record audio and transcribe")
-                                TutorialLink(text: "Improving transcription accuracy")
-                                TutorialLink(text: "Explore AI models for specific tasks")
-                            }
-                            
+                                .foregroundStyle(Color.textPrimary)
                             Spacer()
+                            Button("See All") {
+                                selection = .history
+                            }
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+                            .buttonStyle(.plain)
                         }
-                        .padding()
-                        .frame(width: 300)
-                        .background(Color.black.opacity(0.2))
-                        .cornerRadius(16)
+                        
+                        if historyService.items.isEmpty {
+                            Text("No recent activity")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.textMuted)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 32)
+                        } else {
+                            VStack(spacing: 8) {
+                                ForEach(historyService.items.prefix(5)) { item in
+                                    RecentTranscriptionRow(item: item)
+                                }
+                            }
+                        }
                     }
+                    .padding(24)
+                    .background(Color.bgCard)
+                    .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.borderCard, lineWidth: 1)
+                    )
                 }
-                .padding(24)
+                .padding(20)
             }
-
-            
-
         }
-        .background(Color.contentBackground)
         .fileImporter(
             isPresented: $showFileImporter,
             allowedContentTypes: [.audio, .movie],
             allowsMultipleSelection: false
         ) { result in
-             // ... existing file importer logic
-             switch result {
-             case .success(let urls):
-                 if let url = urls.first {
-                     handleFileSelection(url: url)
-                 }
-             case .failure(let error):
-                 print("File selection error: \(error.localizedDescription)")
-             }
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    handleFileSelection(url: url)
+                }
+            case .failure(let error):
+                print("File selection error: \(error.localizedDescription)")
+            }
         }
         .onAppear {
-            if sharedPlayer == nil {
-                if let url = Bundle.main.url(forResource: "tutorial", withExtension: "mp4") {
-                    sharedPlayer = AVPlayer(url: url)
-                }
-            }
             Task {
-                // Initialize with user's selected model from Settings
                 if !whisperService.isInitialized || whisperService.currentModelVariant != selectedModel {
                     try? await whisperService.loadModel(variant: selectedModel)
                 }
@@ -169,13 +181,34 @@ struct DashboardView: View {
         }
     }
     
+    // MARK: - Helpers
+    
+    private func formatTimeSaved(minutes: Int) -> String {
+        if minutes < 60 {
+            return "\(minutes)m"
+        } else {
+            let hours = Double(minutes) / 60.0
+            return String(format: "%.1fh", hours)
+        }
+    }
+    
+    private func formatDurationHighLevel(_ seconds: TimeInterval) -> String {
+        let mins = Int(seconds) / 60
+        if mins < 60 {
+            return "\(mins)m"
+        } else {
+            let hours = Double(mins) / 60.0
+            return String(format: "%.1fh", hours)
+        }
+    }
+    
     // MARK: - Actions
     
     private func toggleRecording() {
         if audioRecorder.isRecording {
             Task {
                 if let url = await audioRecorder.stopRecording() {
-                     startTranscription(url: url)
+                    startTranscription(url: url)
                 }
             }
         } else {
@@ -194,7 +227,7 @@ struct DashboardView: View {
             startTranscription(url: tempURL)
         } catch {
             print("Error copying file: \(error)")
-            startTranscription(url: url) // Fallback
+            startTranscription(url: url)
         }
     }
     
@@ -208,12 +241,18 @@ struct DashboardView: View {
                 
                 let text = try await whisperService.transcribe(audioFile: url)
                 let duration = try await getAudioDuration(url: url)
+                let modelName = AIModel.availableModels.first(where: { $0.variant == selectedModel })?.name ?? selectedModel
                 
                 DispatchQueue.main.async {
-                    historyService.addItem(transcript: text, duration: duration)
+                    historyService.addItem(
+                        transcript: text,
+                        duration: duration,
+                        audioFileURL: url,
+                        modelUsed: modelName,
+                        transcriptionTime: nil
+                    )
                     transcriptionStatus = "Done!"
                     isTranscribing = false
-                    // Clear status after delay
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         transcriptionStatus = ""
                     }
@@ -234,122 +273,142 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Components
+// MARK: - Recent Transcription Row (SpeakType Style)
 
-struct StatsCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    let gradient: LinearGradient
+struct RecentTranscriptionRow: View {
+    let item: HistoryItem
+    
+    private var itemIcon: String {
+        if item.transcript.localizedCaseInsensitiveContains("music") {
+            return "music.note"
+        } else if item.transcript.isEmpty {
+            return "doc.text"
+        } else {
+            return "mic.fill"
+        }
+    }
+    
+    private var itemTag: (text: String, color: Color, bg: Color)? {
+        if item.transcript.localizedCaseInsensitiveContains("music") {
+            return ("MUSIC", Color.badgeMusicText, Color.badgeMusicBg)
+        } else if item.transcript.isEmpty || item.transcript.count < 10 {
+            return ("INAUDIBLE", Color.badgeMutedText, Color.badgeMutedBg)
+        } else {
+            return ("VOICE", Color.badgeVoiceText, Color.badgeVoiceBg)
+        }
+    }
+    
+    private var accentColor: Color {
+        if item.transcript.localizedCaseInsensitiveContains("music") {
+            return Color.accentBlue
+        } else {
+            return Color.accentRed
+        }
+    }
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundStyle(.white)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.8))
-                    Text(value)
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                }
+        HStack(spacing: 16) {
+            // Icon - Larger
+            Image(systemName: itemIcon)
+                .font(.title3)
+                .foregroundStyle(accentColor)
+                .frame(width: 28)
+            
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.transcript.isEmpty ? "No transcript" : item.transcript)
+                    .font(.body) // Larger font (was subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(1)
+                Text(item.date.formatted(date: .numeric, time: .shortened))
+                    .font(.subheadline) // Larger font (was caption2)
+                    .foregroundStyle(Color.textMuted)
             }
+            
             Spacer()
+            
+            // Tag
+            if let tag = itemTag {
+                Text(tag.text)
+                    .font(.system(size: 11, weight: .bold)) // Slightly larger tag
+                    .foregroundStyle(tag.color)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(tag.bg)
+                    .cornerRadius(6)
+            }
+            
+            // Duration
+            Text(formatDuration(item.duration))
+                .font(.subheadline) // Larger time
+                .foregroundStyle(Color.textMuted)
+                .monospacedDigit()
         }
-        .padding()
-        .background(gradient)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 2)
+        .padding(16) // Increased padding
+        .background(Color.bgHover)
+        .cornerRadius(12)
+        .overlay(
+            // Left border accent (like SpeedType)
+            Rectangle()
+                .fill(accentColor)
+                .frame(width: 4) // Thicker accent
+                .cornerRadius(2)
+                .padding(.leading, 0),
+            alignment: .leading
+        )
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let seconds = Int(duration)
+        return "\(seconds) s"
     }
 }
 
-struct QuickStartCard: View {
-    let isRecording: Bool
-    let isTranscribing: Bool
-    let statusText: String
-    let onRecord: () -> Void
-    let onImport: () -> Void
+// MARK: - Metric Card Component
+
+struct MetricCard: View {
+    let title: String
+    let value: String
+    let unit: String
+    let icon: String
+    let color: Color
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Quick Start")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                Text("Start a new audio recording to begin transcribing conversation instantly.")
-                    .font(.caption)
-                    .foregroundStyle(.gray)
-                
-                if !statusText.isEmpty {
-                    Text(statusText)
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundStyle(statusText == "Error" ? .red : .yellow)
-                        .padding(.top, 4)
-                }
-                
-                Button(action: onImport) {
-                    Label("Browse Files", systemImage: "arrow.down.doc")
-                }
-                .buttonStyle(.link)
-                .controlSize(.small)
-                .padding(.top, 4)
-            }
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 32, weight: .medium)) // Smaller Icon
+                .foregroundStyle(color)
+                .frame(width: 40)
             
-            Spacer()
-            
-            Button(action: onRecord) {
-                ZStack {
-                    if isTranscribing {
-                        ProgressView()
-                            .tint(.white)
-                    } else {
-                        Image(systemName: isRecording ? "stop.circle.fill" : "mic.circle.fill")
-                            .resizable()
-                            .frame(width: 48, height: 48)
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(.white, isRecording ? .white.opacity(0.2) : Color.appRed) // Outer ring effect if desired
-                            .background(
-                                Circle()
-                                    .fill(isRecording ? Color.appRed : Color.clear)
-                                    .frame(width: 40, height: 40) // Fill background when recording
-                            )
-                            .overlay(
-                                Image(systemName: isRecording ? "square.fill" : "mic.fill") // Inner icon
-                                    .font(.title3)
-                                    .foregroundStyle(.white)
-                                    .opacity(isRecording ? 1 : 0) // Hide mic fill, show square
-                            )
-                        
-                        // Let's stick to the user's simple mic icon style but functional logic
-                        // Re-doing icon to match style exactly
-                        Image(systemName: isRecording ? "stop.circle.fill" : "mic.circle.fill")
-                             .resizable()
-                             .symbolRenderingMode(.palette)
-                             .foregroundStyle(.white, Color.appRed)
-                             .frame(width: 56, height: 56)
-                             .overlay(
-                                isRecording ?
-                                    Circle().stroke(Color.white, lineWidth: 2).scaleEffect(1.2).opacity(0.5)
-                                : nil
-                             )
+            VStack(alignment: .leading, spacing: 4) { // Increased spacing
+                Text(title)
+                    .font(.title3) // Increased from headline
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.textMuted)
+                    .lineLimit(2) // Allow wrapping
+                    .minimumScaleFactor(0.8)
+                
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(value)
+                        .font(.system(size: 34, weight: .bold)) // Smaller Value
+                        .foregroundStyle(Color.textPrimary)
+                    
+                    if !unit.isEmpty {
+                        Text(unit)
+                            .font(.title3)
+                            .foregroundStyle(Color.textMuted)
                     }
                 }
             }
-            .buttonStyle(.plain)
-            .disabled(isTranscribing)
         }
-        .padding()
-        .background(
-            LinearGradient(colors: [Color.appRed.opacity(0.1), Color.clear], startPoint: .leading, endPoint: .trailing)
-        )
-        .background(Color.white.opacity(0.05))
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(minHeight: 110) // Rectangular shape
+        .background(.ultraThinMaterial)
+        .background(Color.bgCard.opacity(0.4))
         .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
@@ -357,114 +416,105 @@ struct QuickStartCard: View {
     }
 }
 
-struct RecentItemRow: View {
-    let item: HistoryItem
+
+
+// MARK: - Tips & Tutorial Card
+
+struct TipsCard: View {
+    @State private var isMaximized = false
     
     var body: some View {
-        HStack {
-            Image(systemName: "doc.text")
-                .foregroundStyle(Color.appRed)
-                .font(.title3)
-                .frame(width: 24)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.transcript.prefix(40) + "...")
-                    .font(.subheadline)
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                Text(item.date.formatted(date: .omitted, time: .shortened))
-                    .font(.caption2)
-                    .foregroundStyle(.gray)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "lightbulb.fill")
+                    .foregroundStyle(.yellow)
+                    .font(.title3)
+                Text("Tips & Tutorials")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.textPrimary)
             }
             
-            Spacer()
-            
-            Text(formatDuration(item.duration))
-                .font(.caption2)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.appRed.opacity(0.2))
-                .cornerRadius(4)
-                .foregroundStyle(Color.appRed)
-        }
-        .padding(8)
-        .background(Color.white.opacity(0.02))
-        .cornerRadius(8)
-    }
-    
-    func formatDuration(_ duration: TimeInterval) -> String {
-        let formatter = DateComponentsFormatter()
-        formatter.allowedUnits = [.minute, .second]
-        formatter.unitsStyle = .positional
-        formatter.zeroFormattingBehavior = .pad
-        return formatter.string(from: duration) ?? "0:00"
-    }
-}
-
-struct TutorialLink: View {
-    let text: String
-    
-    var body: some View {
-        HStack {
-            Text("•")
-                .foregroundStyle(.gray)
-            Text(text)
-                .font(.caption)
-                .foregroundStyle(.gray)
-        }
-    }
-}
-
-struct VideoPlayerView: View {
-    let player: AVPlayer?
-    
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Group {
-                if let player = player {
-                    VideoPlayer(player: player)
+            // Video Player
+            ZStack {
+                if let videoURL = Bundle.main.url(forResource: "tutorial", withExtension: "mp4") {
+                     VideoPlayer(player: AVPlayer(url: videoURL))
+                         .aspectRatio(16/9, contentMode: .fit)
+                         .cornerRadius(12)
+                         .overlay(alignment: .topTrailing) {
+                             Button(action: { isMaximized = true }) {
+                                 Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                     .font(.headline)
+                                     .foregroundStyle(.white)
+                                     .padding(8)
+                                     .background(.ultraThinMaterial)
+                                     .clipShape(Circle())
+                             }
+                             .buttonStyle(.plain)
+                             .padding(8)
+                             .help("Maximize Video")
+                         }
+                         .sheet(isPresented: $isMaximized) {
+                             ZStack {
+                                 Color.black.ignoresSafeArea()
+                                 VideoPlayer(player: AVPlayer(url: videoURL))
+                                     .aspectRatio(16/9, contentMode: .fit)
+                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                     
+                                 // Close button for maximized view
+                                 VStack {
+                                     HStack {
+                                         Spacer()
+                                         Button(action: { isMaximized = false }) {
+                                             Image(systemName: "xmark.circle.fill")
+                                                 .font(.largeTitle)
+                                                 .foregroundStyle(.white)
+                                                 .padding()
+                                         }
+                                         .buttonStyle(.plain)
+                                         .keyboardShortcut(.escape, modifiers: [])
+                                     }
+                                     Spacer()
+                                 }
+                             }
+                             .frame(minWidth: 800, minHeight: 600) // Ensure reasonable size
+                         }
                 } else {
-                    Color.black
-                }
-            }
-            .frame(height: 160)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-            )
-            .overlay {
-                if player == nil {
+                    // Fallback if video not found
                     ZStack {
-                        Color.black.opacity(0.6)
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.black.opacity(0.5))
+                            .aspectRatio(16/9, contentMode: .fit)
+                        
                         VStack(spacing: 8) {
-                            Image(systemName: "play.circle")
+                            Image(systemName: "exclamationmark.triangle")
                                 .font(.largeTitle)
-                            Text("Add 'tutorial.mp4' to Resources")
-                                .font(.caption2)
+                                .foregroundStyle(.yellow)
+                            Text("Video not found")
+                                .font(.caption)
+                                .foregroundStyle(.white)
                         }
                     }
                 }
             }
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            )
+            
+            Text("Learn how to get the most out of SpeakType with our quick video guide.")
+                .font(.body)
+                .foregroundStyle(Color.textSecondary)
         }
-    }
-}
-
-struct CustomVideoPlayer: NSViewRepresentable {
-    let player: AVPlayer
-    
-    func makeNSView(context: Context) -> AVPlayerView {
-        let view = AVPlayerView()
-        view.player = player
-        view.controlsStyle = .floating
-        view.wantsLayer = true
-        view.layer?.backgroundColor = NSColor.black.cgColor
-        return view
-    }
-    
-    func updateNSView(_ view: AVPlayerView, context: Context) {
-        if view.player != player {
-            view.player = player
-        }
+        .padding(24)
+        .frame(width: 260) // Reduced width to give more space to Metrics
+        .background(.ultraThinMaterial)
+        .background(Color.bgCard.opacity(0.4))
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
     }
 }

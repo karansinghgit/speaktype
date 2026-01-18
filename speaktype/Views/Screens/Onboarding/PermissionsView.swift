@@ -60,7 +60,7 @@ struct PermissionsView: View {
             }
             .padding(.bottom, 40)
         }
-        .background(Color.contentBackground)
+        .background(Color.clear)
         .onAppear {
             checkPermissions()
             startPolling()

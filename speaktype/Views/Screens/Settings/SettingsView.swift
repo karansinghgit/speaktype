@@ -27,6 +27,11 @@ struct SettingsView: View {
     @State private var showUpdateSheet = false
     @State private var selectedHotkey = HotkeyOption.binding(forKey: "selectedHotkey", default: .fn)
     @StateObject private var audioRecorder = AudioRecordingService.shared
+    
+    // License Management
+    @EnvironmentObject var licenseManager: LicenseManager
+    @State private var showLicenseSheet = false
+    @State private var showDeactivateAlert = false
 
     
     var body: some View {
@@ -167,6 +172,115 @@ struct SettingsView: View {
                         .font(.caption2)
                         .foregroundStyle(.gray)
                 }
+                
+                // License Section
+                SettingsSection {
+                    HStack {
+                        Image(systemName: "key.fill")
+                            .foregroundStyle(Color.appRed)
+                        Text("License")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                        Spacer()
+                    }
+                    .padding(.bottom, 8)
+                    
+                    Text("Manage your SpeakType Pro license")
+                        .font(.caption)
+                        .foregroundStyle(.gray)
+                    
+                    Divider().background(Color.gray.opacity(0.3))
+                    
+                    // License Status
+                    HStack {
+                        Text("Status")
+                            .foregroundStyle(.gray)
+                        Spacer()
+                        HStack(spacing: 6) {
+                            if licenseManager.isPro {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                Text("Pro")
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.white)
+                            } else {
+                                Image(systemName: "circle")
+                                    .foregroundColor(.gray)
+                                Text("Free")
+                                    .foregroundStyle(.gray)
+                            }
+                        }
+                        .font(.subheadline)
+                    }
+                    .padding(.vertical, 4)
+                    
+                    // Expiration Date (if applicable)
+                    if let expirationDate = licenseManager.expirationDate {
+                        Divider().background(Color.gray.opacity(0.3))
+                        
+                        HStack {
+                            Text("Expires")
+                                .foregroundStyle(.gray)
+                            Spacer()
+                            Text(expirationDate, style: .date)
+                                .font(.subheadline)
+                                .foregroundStyle(licenseManager.isExpiringSoon ? .orange : .white)
+                        }
+                        .padding(.vertical, 4)
+                        
+                        if licenseManager.isExpiringSoon,
+                           let days = licenseManager.daysUntilExpiration {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                Text("Expires in \(days) days")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                    }
+                    
+                    Divider().background(Color.gray.opacity(0.3))
+                    
+                    // Action Buttons
+                    if licenseManager.isPro {
+                        Button(action: {
+                            showDeactivateAlert = true
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "xmark.circle")
+                                Text("Deactivate License")
+                            }
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.red.opacity(0.2))
+                            .foregroundStyle(.red)
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button(action: {
+                            showLicenseSheet = true
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "key.fill")
+                                Text("Activate License")
+                            }
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.blue)
+                            .foregroundStyle(.white)
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
             .padding()
         }
@@ -175,6 +289,20 @@ struct SettingsView: View {
             if let update = updateService.availableUpdate {
                 UpdateSheet(update: update)
             }
+        }
+        .sheet(isPresented: $showLicenseSheet) {
+            LicenseView()
+                .environmentObject(licenseManager)
+        }
+        .alert("Deactivate License", isPresented: $showDeactivateAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Deactivate", role: .destructive) {
+                Task {
+                    try? await licenseManager.deactivateLicense()
+                }
+            }
+        } message: {
+            Text("Are you sure you want to deactivate your Pro license? You can reactivate it at any time.")
         }
         .onAppear {
             // Check if there's already an available update

@@ -1,30 +1,29 @@
 import SwiftUI
 import KeyboardShortcuts
+import Combine
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var miniRecorderController: MiniRecorderWindowController?
     private var isHotkeyPressed = false
+    private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize the controller
         miniRecorderController = MiniRecorderWindowController()
-        
-        // Setup global hotkey listener - HOLD TO RECORD
-        KeyboardShortcuts.onKeyDown(for: .toggleRecord) { [weak self] in
-            // Start recording when key is pressed down
-            self?.miniRecorderController?.startRecording()
-        }
-        
-        KeyboardShortcuts.onKeyUp(for: .toggleRecord) { [weak self] in
-            // Stop recording and paste when key is released
-            self?.miniRecorderController?.stopRecording()
-        }
         
         // Setup dynamic hotkey monitoring based on user selection
         setupHotkeyMonitoring()
         
         // Check for updates on app launch
         checkForUpdatesOnLaunch()
+        
+        // Listen for update window requests
+        UpdateService.shared.showUpdateWindowPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.showUpdateWindow()
+            }
+            .store(in: &cancellables)
         
 
     }

@@ -22,6 +22,7 @@ class AudioRecordingService: NSObject, ObservableObject {
     public private(set) var recordingStartTime: Date?
     private var currentFileURL: URL?
     private var isSessionStarted = false
+    private var setupTask: Task<Void, Never>?
     
     private let audioQueue = DispatchQueue(label: "com.speaktype.audioQueue")
     
@@ -89,6 +90,11 @@ class AudioRecordingService: NSObject, ObservableObject {
             captureSession?.addOutput(audioOutput!)
             audioOutput?.setSampleBufferDelegate(self, queue: audioQueue)
         }
+        
+        // Start running immediately to keep warm
+        audioQueue.async {
+            self.captureSession?.startRunning()
+        }
     }
     
     func startRecording() {
@@ -97,50 +103,57 @@ class AudioRecordingService: NSObject, ObservableObject {
         guard !isRecording else { return }
         if captureSession == nil { setupSession() }
         
-        let url = getRecordingsDirectory().appendingPathComponent("recording-\(Date().timeIntervalSince1970).wav")
-        currentFileURL = url
+        // 1. Set Recording State Immediately to prevent "Stop" from being ignored
+        isRecording = true
         
-        do {
-            assetWriter = try AVAssetWriter(outputURL: url, fileType: .wav)
+        // 2. Wrap setup in a Task so stopRecording can wait for it
+        setupTask = Task { @MainActor in
+            let url = getRecordingsDirectory().appendingPathComponent("recording-\(Date().timeIntervalSince1970).wav")
+            currentFileURL = url
             
-            let settings: [String: Any] = [
-                AVFormatIDKey: kAudioFormatLinearPCM,
-                AVSampleRateKey: 16000,
-                AVNumberOfChannelsKey: 1,
-                AVLinearPCMBitDepthKey: 16,
-                AVLinearPCMIsFloatKey: false,
-                AVLinearPCMIsBigEndianKey: false,
-                AVLinearPCMIsNonInterleaved: false
-            ]
-            
-            assetWriterInput = AVAssetWriterInput(mediaType: .audio, outputSettings: settings)
-            assetWriterInput?.expectsMediaDataInRealTime = true
-            
-            if assetWriter?.canAdd(assetWriterInput!) == true {
-                assetWriter?.add(assetWriterInput!)
+            do {
+                assetWriter = try AVAssetWriter(outputURL: url, fileType: .wav)
+                
+                let settings: [String: Any] = [
+                    AVFormatIDKey: kAudioFormatLinearPCM,
+                    AVSampleRateKey: 16000,
+                    AVNumberOfChannelsKey: 1,
+                    AVLinearPCMBitDepthKey: 16,
+                    AVLinearPCMIsFloatKey: false,
+                    AVLinearPCMIsBigEndianKey: false,
+                    AVLinearPCMIsNonInterleaved: false
+                ]
+                
+                assetWriterInput = AVAssetWriterInput(mediaType: .audio, outputSettings: settings)
+                assetWriterInput?.expectsMediaDataInRealTime = true
+                
+                if assetWriter?.canAdd(assetWriterInput!) == true {
+                    assetWriter?.add(assetWriterInput!)
+                }
+                
+                assetWriter?.startWriting()
+                isSessionStarted = false
+                
+                // captureSession is already running (warm start)
+                
+                DispatchQueue.main.async {
+                    self.audioLevel = 0.0
+                    self.audioFrequency = 0.0
+                }
+                
+                print("Recording started: \(url.lastPathComponent)")
+                
+            } catch {
+                print("Error starting recording: \(error)")
+                isRecording = false // Revert if failed
             }
-            
-            assetWriter?.startWriting()
-            isSessionStarted = false
-            
-            audioQueue.async {
-                self.captureSession?.startRunning()
-            }
-            
-            DispatchQueue.main.async {
-                self.audioLevel = 0.0
-                self.audioFrequency = 0.0
-            }
-            
-            isRecording = true
-            print("Recording started: \(url.lastPathComponent)")
-            
-        } catch {
-            print("Error starting recording: \(error)")
         }
     }
     
     func stopRecording() async -> URL? {
+        // Wait for setup to complete if it's running
+        _ = await setupTask?.value
+        
         guard isRecording, let url = currentFileURL else { return nil }
         
         isRecording = false // Stop capturing new frames immediately
@@ -151,7 +164,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         
         return await withCheckedContinuation { continuation in
             audioQueue.async {
-                self.captureSession?.stopRunning()
+                // Do NOT stop captureSession, keep it warm
                 self.assetWriterInput?.markAsFinished()
                 self.assetWriter?.finishWriting {
                     print("Recording finished saving to \(url.path)")

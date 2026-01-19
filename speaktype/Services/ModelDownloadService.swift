@@ -9,6 +9,8 @@ class ModelDownloadService: ObservableObject {
     @Published var downloadError: [String: String] = [:] // Debugging: track errors
     @Published var isDownloading: [String: Bool] = [:]
     
+    private var activeTasks: [String: Task<Void, Never>] = [:] // Track running download tasks
+    
     private init() {
         // Force a custom cache directory to avoid "Multiple models found" conflicts
         setupCustomCache()
@@ -39,7 +41,7 @@ class ModelDownloadService: ObservableObject {
         downloadError[variant] = nil
         print("Starting WhisperKit download for: \(variant)")
         
-        Task {
+        let task = Task {
             // Debug: List what WhisperKit sees
             // Note: WhisperKit API might differ, but let's try to see if we can get info.
             // If fetchAvailableModels exists.
@@ -63,13 +65,22 @@ class ModelDownloadService: ObservableObject {
                     }
                 })
                 
+                // Check if task was cancelled before declaring success
+                if Task.isCancelled { return }
+                
                 print("Model downloaded successfully")
                 
                 DispatchQueue.main.async {
                     self.isDownloading[variant] = false
                     self.downloadProgress[variant] = 1.0
+                    self.activeTasks[variant] = nil // Cleanup task
                 }
             } catch {
+                if Task.isCancelled {
+                   print("Download cancelled for \(variant)")
+                   return
+                }
+                
                 print("WhisperKit download error: \(error)")
                 
                 // Auto-Repair: If duplicate models found, delete and retry ONCE
@@ -85,6 +96,7 @@ class ModelDownloadService: ObservableObject {
                      
                      // Give filesystem time to settle
                      try? await Task.sleep(nanoseconds: 2_000_000_000)
+                     if Task.isCancelled { return }
                      
                      await MainActor.run {
                          self.downloadError[variant] = "Retrying download..."
@@ -98,19 +110,24 @@ class ModelDownloadService: ObservableObject {
                              }
                          })
                          
+                         if Task.isCancelled { return }
+                         
                          print("✅ Model downloaded successfully after cleanup")
                          
                          DispatchQueue.main.async {
                              self.isDownloading[variant] = false
                              self.downloadProgress[variant] = 1.0
                              self.downloadError[variant] = nil
+                             self.activeTasks[variant] = nil
                          }
                      } catch {
+                         if Task.isCancelled { return }
                          print("❌ Retry failed: \(error)")
                          DispatchQueue.main.async {
                              self.isDownloading[variant] = false
                              self.downloadProgress[variant] = 0.0
                              self.downloadError[variant] = "Error: \(error.localizedDescription)\n\nTry clicking the trash icon to manually clean cache."
+                             self.activeTasks[variant] = nil
                          }
                      }
                      return
@@ -120,9 +137,12 @@ class ModelDownloadService: ObservableObject {
                     self.isDownloading[variant] = false
                     self.downloadProgress[variant] = 0.0
                     self.downloadError[variant] = error.localizedDescription + "\n\n(Try Trash icon to clean cache)"
+                    self.activeTasks[variant] = nil
                 }
             }
         }
+        
+        activeTasks[variant] = task
     }
     
     // Aggressively deletes any potential cache for this variant
@@ -234,9 +254,14 @@ class ModelDownloadService: ObservableObject {
         return count
     }
     func cancelDownload(for variant: String) {
-        // WhisperKit might not support cancellation easily via this simple wrapper
-        // For now, just reset state
+        if let task = activeTasks[variant] {
+            task.cancel()
+            activeTasks[variant] = nil
+            print("Cancelled download task for \(variant)")
+        }
+        
         isDownloading[variant] = false
         downloadProgress[variant] = 0.0
+        downloadError[variant] = nil
     }
 }

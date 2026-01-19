@@ -39,7 +39,7 @@ struct MainView: View {
             }
             .navigationTitle("") // Remove branding text
             .background(Color.clear) // Unified background color
-            .fontDesign(.rounded)
+
             .toolbar(removing: .sidebarToggle)
             .toolbarBackground(.hidden, for: .windowToolbar)
         }

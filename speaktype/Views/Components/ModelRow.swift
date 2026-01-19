@@ -34,7 +34,7 @@ struct ModelRow: View {
         case "Great", "Good": return .green
         case "Standard": return .blue
         case "Basic": return .gray
-        default: return .white
+        default: return Color.textPrimary
         }
     }
     
@@ -49,7 +49,7 @@ struct ModelRow: View {
                     Text(model.name)
                         .font(.title3)
                         .fontWeight(.semibold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.textPrimary)
                     
                     // Model Details - Icons and stats
                     HStack(spacing: 12) {
@@ -138,7 +138,7 @@ struct ModelRow: View {
                         ZStack(alignment: .leading) {
                             // Background track
                             Rectangle()
-                                .fill(Color.white.opacity(0.1))
+                                .fill(Color.bgHover)
                                 .frame(height: 4)
                             
                             // Progress fill
@@ -153,11 +153,11 @@ struct ModelRow: View {
                 .padding(.bottom)
             }
         }
-        .background(Color.white.opacity(0.05))
+        .background(Color.bgCard)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isActive ? Color.green.opacity(0.5) : Color.white.opacity(0.05), lineWidth: 1)
+                .stroke(isActive ? Color.green.opacity(0.5) : Color.borderCard, lineWidth: 1)
         )
     }
     
@@ -194,8 +194,8 @@ struct ModelRow: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                .background(Color.white.opacity(0.1))
-                .foregroundStyle(.white)
+                .background(Color.bgHover)
+                .foregroundStyle(Color.textPrimary)
                 .cornerRadius(20)
                 .buttonStyle(.plain)
             }

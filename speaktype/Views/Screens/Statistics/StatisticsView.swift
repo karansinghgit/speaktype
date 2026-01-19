@@ -55,7 +55,7 @@ struct StatisticsView: View {
             Text("Statistics")
                 .font(.largeTitle)
                 .fontWeight(.bold)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
             
             Text("Track your transcription activity")
                 .foregroundStyle(.gray)
@@ -82,27 +82,54 @@ struct StatisticsView: View {
     }
     
     private var summaryCards: some View {
-        HStack(spacing: 16) {
-            SummaryCard(
-                icon: "doc.text",
-                title: "Total Words",
-                value: "\(totalWords(for: selectedPeriod))",
-                color: Color(hex: "A62D35")
-            )
+        ViewThatFits(in: .horizontal) {
+            // Wide Layout
+            HStack(spacing: 16) {
+                SummaryCard(
+                    icon: "doc.text",
+                    title: "Total Words",
+                    value: "\(totalWords(for: selectedPeriod))",
+                    color: Color(hex: "A62D35")
+                )
+                
+                SummaryCard(
+                    icon: "calendar",
+                    title: "Daily Average",
+                    value: "\(dailyAverage(for: selectedPeriod))",
+                    color: Color(hex: "2D5DA6")
+                )
+                
+                SummaryCard(
+                    icon: "chart.line.uptrend.xyaxis",
+                    title: "Best Day",
+                    value: "\(bestDay(for: selectedPeriod))",
+                    color: Color.green
+                )
+            }
             
-            SummaryCard(
-                icon: "calendar",
-                title: "Daily Average",
-                value: "\(dailyAverage(for: selectedPeriod))",
-                color: Color(hex: "2D5DA6")
-            )
-            
-            SummaryCard(
-                icon: "chart.line.uptrend.xyaxis",
-                title: "Best Day",
-                value: "\(bestDay(for: selectedPeriod))",
-                color: Color.green
-            )
+            // Narrow Layout (Vertical)
+            VStack(spacing: 16) {
+                SummaryCard(
+                    icon: "doc.text",
+                    title: "Total Words",
+                    value: "\(totalWords(for: selectedPeriod))",
+                    color: Color(hex: "A62D35")
+                )
+                
+                SummaryCard(
+                    icon: "calendar",
+                    title: "Daily Average",
+                    value: "\(dailyAverage(for: selectedPeriod))",
+                    color: Color(hex: "2D5DA6")
+                )
+                
+                SummaryCard(
+                    icon: "chart.line.uptrend.xyaxis",
+                    title: "Best Day",
+                    value: "\(bestDay(for: selectedPeriod))",
+                    color: Color.green
+                )
+            }
         }
         .padding(.horizontal, 40)
     }
@@ -111,7 +138,7 @@ struct StatisticsView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Words Transcribed Per Day")
                 .font(.headline)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
                 .padding(.horizontal, 40)
             
             if dailyData(for: selectedPeriod).isEmpty {
@@ -121,11 +148,11 @@ struct StatisticsView: View {
             }
         }
         .padding(.vertical, 20)
-        .background(Color.white.opacity(0.03))
+        .background(Color.bgCard)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                .stroke(Color.borderCard, lineWidth: 1)
         )
         .padding(.horizontal, 40)
     }
@@ -146,7 +173,7 @@ struct StatisticsView: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 300)
-        .background(Color.white.opacity(0.05))
+        .background(Color.bgCard)
         .cornerRadius(12)
         .padding(.horizontal, 40)
     }
@@ -206,29 +233,43 @@ struct StatisticsView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Details")
                 .font(.headline)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
             
-            HStack {
-                StatRow(label: "Total Transcriptions", value: "\(transcriptionCount(for: selectedPeriod))")
-                Spacer()
-                StatRow(label: "Total Duration", value: formattedDuration(for: selectedPeriod))
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    StatRow(label: "Total Transcriptions", value: "\(transcriptionCount(for: selectedPeriod))")
+                    Spacer()
+                    StatRow(label: "Total Duration", value: formattedDuration(for: selectedPeriod))
+                }
+                
+                VStack(alignment: .leading, spacing: 16) {
+                    StatRow(label: "Total Transcriptions", value: "\(transcriptionCount(for: selectedPeriod))")
+                    StatRow(label: "Total Duration", value: formattedDuration(for: selectedPeriod))
+                }
             }
             
             Divider()
                 .background(Color.white.opacity(0.1))
             
-            HStack {
-                StatRow(label: "Average Words Per Transcription", value: "\(averageWordsPerTranscription(for: selectedPeriod))")
-                Spacer()
-                StatRow(label: "Most Active Day", value: mostActiveDay(for: selectedPeriod))
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    StatRow(label: "Average Words Per Transcription", value: "\(averageWordsPerTranscription(for: selectedPeriod))")
+                    Spacer()
+                    StatRow(label: "Most Active Day", value: mostActiveDay(for: selectedPeriod))
+                }
+                
+                VStack(alignment: .leading, spacing: 16) {
+                    StatRow(label: "Average Words Per Transcription", value: "\(averageWordsPerTranscription(for: selectedPeriod))")
+                    StatRow(label: "Most Active Day", value: mostActiveDay(for: selectedPeriod))
+                }
             }
         }
         .padding(24)
-        .background(Color.white.opacity(0.03))
+        .background(Color.bgCard)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                .stroke(Color.borderCard, lineWidth: 1)
         )
         .padding(.horizontal, 40)
         .padding(.bottom, 40)
@@ -466,7 +507,7 @@ struct SummaryCard: View {
             
             Text(value)
                 .font(.system(size: 32, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
             
             Text(title)
                 .font(.subheadline)
@@ -474,11 +515,11 @@ struct SummaryCard: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.05))
+        .background(Color.bgCard)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                .stroke(Color.borderCard, lineWidth: 1)
         )
     }
 }
@@ -494,7 +535,7 @@ struct StatRow: View {
                 .foregroundStyle(.gray)
             Text(value)
                 .font(.headline)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
         }
     }
 }
@@ -525,7 +566,11 @@ struct PeriodButton: View {
                     startPoint: .leading,
                     endPoint: .trailing
                   )) : 
-                  AnyShapeStyle(Color.white.opacity(0.05))
+                  AnyShapeStyle(Color.bgCard)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color.clear : Color.borderCard, lineWidth: 1)
             )
     }
 }

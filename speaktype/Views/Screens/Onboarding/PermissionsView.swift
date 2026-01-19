@@ -19,10 +19,10 @@ struct PermissionsView: View {
                     Text("App Permissions")
                         .font(.largeTitle)
                         .fontWeight(.bold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.textPrimary)
                     
                     Text("Manage permissions to ensure full functionality")
-                        .foregroundStyle(.gray)
+                        .foregroundStyle(Color.textSecondary)
                 }
                 .padding(.top, 40)
                 
@@ -110,10 +110,10 @@ struct PermissionRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.textPrimary)
                 Text(desc)
                     .font(.caption)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(Color.textSecondary)
             }
             
             Spacer()
@@ -131,7 +131,11 @@ struct PermissionRow: View {
             }
         }
         .padding(16)
-        .background(Color.white.opacity(0.05))
+        .background(Color.bgCard)
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.borderCard, lineWidth: 1)
+        )
     }
 }

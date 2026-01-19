@@ -16,7 +16,7 @@ struct AudioInputView: View {
                     Text("Audio Input")
                         .font(.largeTitle)
                         .fontWeight(.bold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.textPrimary)
                     
                     Text("Configure your microphone preferences")
                         .foregroundStyle(.gray)
@@ -35,7 +35,7 @@ struct AudioInputView: View {
                     HStack {
                         Text("Available Devices")
                             .font(.headline)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.textPrimary)
                         Spacer()
                         Button(action: {
                             audioRecorder.fetchAvailableDevices()
@@ -99,7 +99,7 @@ struct DeviceRow: View {
             
             Text(name)
                 .font(.body)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
             
             Spacer()
             
@@ -117,7 +117,7 @@ struct DeviceRow: View {
             }
         }
         .padding()
-        .background(isSelected ? Color.appRed.opacity(0.05) : Color.white.opacity(0.02))
+        .background(isSelected ? Color.appRed.opacity(0.05) : Color.bgCard)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)

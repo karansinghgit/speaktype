@@ -35,7 +35,7 @@ struct AIModelsView: View {
             Text("AI Models")
                 .font(.largeTitle)
                 .fontWeight(.bold)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
             
             Text("Manage your local transcription models powered by WhisperKit.")
                 .font(.body)
@@ -52,15 +52,15 @@ struct AIModelsView: View {
             Text(selectedModelName)
                 .font(.title2)
                 .fontWeight(.bold)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.contentBackground.opacity(0.5))
+        .background(Color.bgCard)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                .stroke(Color.borderCard, lineWidth: 1)
         )
     }
     
@@ -70,7 +70,7 @@ struct AIModelsView: View {
                 Text("Available Models")
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.textPrimary)
                 Spacer()
             }
             

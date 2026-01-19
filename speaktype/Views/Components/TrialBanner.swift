@@ -46,11 +46,11 @@ struct TrialBanner: View {
                 Text("Trial Expired")
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.textPrimary)
                 
                 Text("Your trial has expired. Upgrade to continue using all features")
                     .font(.subheadline)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(Color.textSecondary)
             }
             
             Spacer()
@@ -125,11 +125,11 @@ struct TrialBanner: View {
                 Text("Trial Ending Soon")
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.textPrimary)
                 
                 Text("\(days) day\(days == 1 ? "" : "s") remaining in your trial")
                     .font(.subheadline)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(Color.textSecondary)
             }
             
             Spacer()
@@ -184,11 +184,11 @@ struct TrialBanner: View {
                 Text("Free Trial Active")
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.textPrimary)
                 
                 Text("\(days) day\(days == 1 ? "" : "s") remaining • Full access to all features")
                     .font(.subheadline)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(Color.textSecondary)
             }
             
             Spacer()

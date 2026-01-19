@@ -65,12 +65,12 @@ struct WelcomePage: View {
             VStack(spacing: 16) {
                 Text("Welcome to SpeakType")
                     .font(.system(size: 42, weight: .bold)) // Removed .rounded
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.textPrimary)
                 
                 Text("Experience the power of local AI transcription. Secure, fast, and completely offline.")
                     .font(.title3)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(Color.textSecondary)
                     .frame(maxWidth: 500)
             }
             
@@ -105,7 +105,7 @@ struct PermissionsPage: View {
             VStack(spacing: 10) {
                 Text("Permissions Setup")
                     .font(.system(size: 36, weight: .bold)) // Removed .rounded
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.textPrimary)
                 Text("SpeakType needs access to your microphone and accessibility features to function.")
                     .font(.body)
                     .foregroundStyle(.secondary)
@@ -230,21 +230,23 @@ struct FeatureCard: View {
             
             Text(title)
                 .font(.headline)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
             
             Text(description)
                 .font(.caption)
-                .foregroundStyle(.gray)
+                .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(width: 140, height: 160)
         .padding()
-        .background(.ultraThinMaterial)
+        .padding()
+        .background(Color.bgCard)
+        .cornerRadius(20)
         .cornerRadius(20)
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.05), lineWidth: 1)
+                .stroke(Color.borderCard, lineWidth: 1)
         )
     }
 }
@@ -268,10 +270,10 @@ struct OnboardingPermissionRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.textPrimary)
                 Text(description)
                     .font(.subheadline)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(Color.textSecondary)
             }
             
             Spacer()
@@ -302,11 +304,13 @@ struct OnboardingPermissionRow: View {
             }
         }
         .padding(20)
-        .background(.ultraThinMaterial)
+        .padding(20)
+        .background(Color.bgCard)
+        .cornerRadius(16)
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(isGranted ? Color.green.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1)
+                .stroke(isGranted ? Color.green.opacity(0.3) : Color.borderCard, lineWidth: 1)
         )
     }
 }

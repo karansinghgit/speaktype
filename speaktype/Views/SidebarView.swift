@@ -14,7 +14,7 @@ struct SidebarView: View {
                 
                 Text("SpeakType")
                     .font(.system(size: 22, weight: .bold)) // Reduced text size
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.textPrimary)
                 
                 Spacer()
             }
@@ -51,13 +51,13 @@ struct SidebarButton: View {
                 Image(systemName: item.icon)
                     .font(.title3) // Keep icon size consistent or slightly larger
                     .fontWeight(.medium)
-                    .foregroundStyle(isSelected ? .white : Color(hex: "E5E5E7"))
+                    .foregroundStyle(isSelected ? .white : Color.sidebarItem)
                     .frame(width: 24)
                 
                 Text(item.rawValue)
                     .font(.title3) // Even bigger tab text (was .headline)
                     .fontWeight(isSelected ? .semibold : .medium)
-                    .foregroundStyle(isSelected ? .white : Color(hex: "E5E5E7"))
+                    .foregroundStyle(isSelected ? .white : Color.sidebarItem)
                 
                 Spacer()
             }

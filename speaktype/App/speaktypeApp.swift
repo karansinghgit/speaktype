@@ -15,6 +15,7 @@ struct speaktypeApp: App {
     @Environment(\.dismissWindow) var dismissWindow
     
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
+    @AppStorage("appTheme") private var appTheme: AppTheme = .system
     
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
@@ -43,7 +44,7 @@ struct speaktypeApp: App {
             }
             .environmentObject(licenseManager)
             .environmentObject(trialManager)
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(appTheme.colorScheme)
             .tint(.appRed)
         }
         .defaultSize(width: 1200, height: 800)

@@ -3,7 +3,6 @@ import AVFoundation
 
 struct AudioInputView: View {
     @StateObject private var audioRecorder = AudioRecordingService.shared
-    @State private var selectedMode = "Custom Device"
     
     var body: some View {
         ScrollView {
@@ -25,33 +24,11 @@ struct AudioInputView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 40)
                 
-                // Input Mode Section
-                VStack(alignment: .leading, spacing: 15) {
-                    Text("Input Mode")
-                        .font(.headline)
-                        .foregroundStyle(.white)
+                // Input Mode Section Removed
+
                     
-                    HStack(spacing: 20) {
-                        InputModeCard(
-                            title: "Custom Device",
-                            desc: "Select a specific input device",
-                            icon: "mic.fill",
-                            isSelected: selectedMode == "Custom Device",
-                            color: .appRed
-                        )
-                        .onTapGesture { selectedMode = "Custom Device" }
-                        
-                        InputModeCard(
-                            title: "Prioritized (Coming Soon)",
-                            desc: "Set up device priority order",
-                            icon: "list.number",
-                            isSelected: selectedMode == "Prioritized",
-                            color: .gray
-                        )
-                        .onTapGesture { /* selectedMode = "Prioritized" */ }
-                    }
-                }
-                .padding(.horizontal, 40)
+
+
                 
                 // Available Devices Section
                 VStack(alignment: .leading, spacing: 15) {
@@ -107,43 +84,7 @@ struct AudioInputView: View {
     }
 }
 
-struct InputModeCard: View {
-    let title: String
-    let desc: String
-    let icon: String
-    let isSelected: Bool
-    let color: Color
-    
-    var body: some View {
-        HStack(alignment: .top, spacing: 15) {
-            ZStack {
-                Circle()
-                    .fill(isSelected ? color.opacity(0.2) : Color.white.opacity(0.1))
-                    .frame(width: 36, height: 36)
-                Image(systemName: icon)
-                    .foregroundStyle(isSelected ? color : .gray)
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                Text(desc)
-                    .font(.caption)
-                    .foregroundStyle(.gray)
-            }
-            Spacer()
-        }
-        .padding()
-        .frame(height: 100)
-        .background(Color.white.opacity(0.05))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isSelected ? color : Color.white.opacity(0.1), lineWidth: 1)
-        )
-    }
-}
+
 
 struct DeviceRow: View {
     let name: String

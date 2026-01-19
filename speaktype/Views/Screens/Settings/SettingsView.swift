@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage("powerMode") private var powerMode = false
     @AppStorage("experimentalFeatures") private var experimentalFeatures = false
     @AppStorage("hideDockIcon") private var hideDockIcon = false
+    @AppStorage("appTheme") private var appTheme: AppTheme = .system
  
     @AppStorage("autoUpdate") private var autoUpdate = true
     @AppStorage("showAnnouncements") private var showAnnouncements = true
@@ -20,12 +21,13 @@ struct SettingsView: View {
     @AppStorage("middleClickToggle") private var middleClickToggle = false
     @AppStorage("appleScriptPaste") private var appleScriptPaste = false
     @AppStorage("recorderStyle") private var recorderStyle: Int = 1 // 0: Notch, 1: Mini
-    @AppStorage("hotkey1") private var hotkey1: String = "⌘ Space"
+    // hotkey1 removed as it was unused and confusing
+    @AppStorage("selectedHotkey") private var selectedHotkey: HotkeyOption = .fn
     @AppStorage("customRecordingPath") private var customRecordingPath: String = ""
     
     @StateObject private var updateService = UpdateService.shared
     @State private var showUpdateSheet = false
-    @State private var selectedHotkey = HotkeyOption.binding(forKey: "selectedHotkey", default: .fn)
+    // selectedHotkey moved to AppStorage
     @StateObject private var audioRecorder = AudioRecordingService.shared
     
     // License Management
@@ -37,6 +39,40 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
+                // Appearance Section
+                SettingsSection {
+                    HStack {
+                        Image(systemName: "paintpalette.fill")
+                            .foregroundStyle(Color.appRed)
+                        Text("Appearance")
+                            .font(.headline)
+                            .foregroundStyle(Color.textPrimary)
+                        Spacer()
+                    }
+                    .padding(.bottom, 8)
+                    
+                    Text("Choose your preferred theme")
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                    
+                    Divider().background(Color.borderSubtle)
+                    
+                    HStack(spacing: 20) {
+                        ForEach(AppTheme.allCases) { theme in
+                            RadioButton(
+                                title: theme.rawValue,
+                                isSelected: appTheme == theme,
+                                action: {
+                                    withAnimation(.easeInOut) {
+                                        appTheme = theme
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+
                 // Shortcuts Section
                 SettingsSection {
                     HStack {
@@ -44,7 +80,7 @@ struct SettingsView: View {
                             .foregroundStyle(Color.appRed)
                         Text("SpeakType Shortcuts")
                             .font(.headline)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.textPrimary)
                         Spacer()
                     }
                     .padding(.bottom, 8)
@@ -58,16 +94,34 @@ struct SettingsView: View {
                     // Hotkey Selection Dropdown
                     HStack {
                         Text("Hotkey 1")
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.textPrimary)
                         Spacer()
-                        Picker("", selection: selectedHotkey) {
+                        Menu {
                             ForEach(HotkeyOption.allCases) { option in
-                                Text(option.displayName).tag(option)
+                                Button(option.displayName) {
+                                    selectedHotkey = option
+                                }
                             }
+                        } label: {
+                            HStack {
+                                Text(selectedHotkey.displayName)
+                                    .foregroundStyle(Color.textPrimary)
+                                Spacer()
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(Color.textSecondary)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.bgCard)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.primary.opacity(0.15), lineWidth: 1)
+                            )
                         }
-                        .pickerStyle(.menu)
-                        .frame(width: 120)
-                        .labelsHidden()
+                        .menuStyle(.borderlessButton)
+                        .frame(width: 140)
                     }
                     .padding(.vertical, 4)
                     
@@ -84,7 +138,7 @@ struct SettingsView: View {
                     
                     Text("Quick tap to start hands-free recording (tap again to stop). Press and hold for push-to-talk.")
                         .font(.caption2)
-                        .foregroundStyle(.gray)
+                        .foregroundStyle(Color.textSecondary)
                 }
                 
 
@@ -99,10 +153,10 @@ struct SettingsView: View {
                         VStack(alignment: .leading) {
                             Text("Software Update")
                                 .font(.headline)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.textPrimary)
                             Text("Keep your app up to date")
                                 .font(.caption)
-                                .foregroundStyle(.gray)
+                                .foregroundStyle(Color.textSecondary)
                         }
                         Spacer()
                     }
@@ -115,10 +169,10 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Current Version")
                                 .font(.caption)
-                                .foregroundStyle(.gray)
+                                .foregroundStyle(Color.textSecondary)
                             Text("SpeakType \(AppVersion.currentVersion) (Build \(AppVersion.currentBuildNumber))")
                                 .font(.subheadline)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.textPrimary)
                         }
                         
                         Spacer()
@@ -180,14 +234,14 @@ struct SettingsView: View {
                             .foregroundStyle(Color.appRed)
                         Text("License")
                             .font(.headline)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.textPrimary)
                         Spacer()
                     }
                     .padding(.bottom, 8)
                     
                     Text("Manage your SpeakType Pro license")
                         .font(.caption)
-                        .foregroundStyle(.gray)
+                        .foregroundStyle(Color.textSecondary)
                     
                     Divider().background(Color.gray.opacity(0.3))
                     
@@ -202,7 +256,7 @@ struct SettingsView: View {
                                     .foregroundColor(.green)
                                 Text("Pro")
                                     .fontWeight(.medium)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Color.textPrimary)
                             } else {
                                 Image(systemName: "circle")
                                     .foregroundColor(.gray)
@@ -220,11 +274,11 @@ struct SettingsView: View {
                         
                         HStack {
                             Text("Expires")
-                                .foregroundStyle(.gray)
+                                .foregroundStyle(Color.textSecondary)
                             Spacer()
                             Text(expirationDate, style: .date)
                                 .font(.subheadline)
-                                .foregroundStyle(licenseManager.isExpiringSoon ? .orange : .white)
+                                .foregroundStyle(licenseManager.isExpiringSoon ? .orange : Color.textPrimary)
                         }
                         .padding(.vertical, 4)
                         
@@ -328,11 +382,11 @@ struct SettingsSection<Content: View>: View {
             content
         }
         .padding()
-        .background(Color.white.opacity(0.05))
+        .background(Color.bgCard)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                .stroke(Color.borderCard, lineWidth: 1)
         )
     }
 }
@@ -344,15 +398,15 @@ struct SettingsRow: View {
     var body: some View {
         HStack {
             Text(title)
-                .foregroundStyle(.gray)
+                .foregroundStyle(Color.textSecondary)
             Spacer()
             Text(value)
                 .font(.caption)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.white.opacity(0.1))
+                .background(Color.bgHover)
                 .cornerRadius(4)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
         }
     }
 }
@@ -364,7 +418,7 @@ struct ToggleRow: View {
     var body: some View {
         HStack {
             Text(title)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
             Spacer()
             Toggle("", isOn: $isOn)
                 .labelsHidden()
@@ -383,9 +437,17 @@ struct RadioButton: View {
                 Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
                     .foregroundStyle(isSelected ? Color.appRed : .gray)
                 Text(title)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.textPrimary)
             }
         }
         .buttonStyle(.plain)
     }
+}
+
+enum AppTheme: String, CaseIterable, Identifiable {
+    case light = "Light"
+    case dark = "Dark"
+    case system = "System"
+    
+    var id: String { rawValue }
 }

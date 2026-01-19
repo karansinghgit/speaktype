@@ -36,14 +36,14 @@ class AudioRecordingService: NSObject, ObservableObject {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleDeviceChange),
-            name: NSNotification.Name.AVCaptureDeviceWasConnected,
+            name: AVCaptureDevice.wasConnectedNotification,
             object: nil
         )
         
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleDeviceChange),
-            name: NSNotification.Name.AVCaptureDeviceWasDisconnected,
+            name: AVCaptureDevice.wasDisconnectedNotification,
             object: nil
         )
     }
@@ -55,7 +55,7 @@ class AudioRecordingService: NSObject, ObservableObject {
     
     func fetchAvailableDevices() {
         let discoverySession = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [AVCaptureDevice.DeviceType.builtInMicrophone, AVCaptureDevice.DeviceType.externalUnknown],
+            deviceTypes: [.microphone],
             mediaType: .audio,
             position: .unspecified
         )

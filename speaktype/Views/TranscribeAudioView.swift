@@ -38,7 +38,7 @@ struct TranscribeAudioView: View {
                     
                     Text("Drop audio or video file here")
                         .font(.headline)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.textPrimary)
                     
                     Button(action: {
                         showFileImporter = true
@@ -46,14 +46,14 @@ struct TranscribeAudioView: View {
                         Label("Upload Audio File", systemImage: "square.and.arrow.up")
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(Color.white.opacity(0.1))
-                            .foregroundStyle(.white)
+                            .background(Color.bgHover)
+                            .foregroundStyle(Color.textPrimary)
                             .cornerRadius(8)
                     }
                     .buttonStyle(.plain)
                     
                     Text("or")
-                        .foregroundStyle(.gray)
+                        .foregroundStyle(Color.textSecondary)
                     
                     if audioRecorder.isRecording {
                         Button(action: {
@@ -82,8 +82,8 @@ struct TranscribeAudioView: View {
                             Text("Start Recording")
                                 .frame(minWidth: 120)
                                 .padding()
-                                .background(Color.gray.opacity(0.2))
-                                .foregroundStyle(.white)
+                                .background(Color.bgHover)
+                                .foregroundStyle(Color.textPrimary)
                                 .cornerRadius(8)
                         }
                         .buttonStyle(.plain)
@@ -93,10 +93,10 @@ struct TranscribeAudioView: View {
                         ScrollView {
                             Text(transcribedText)
                                 .padding()
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.textPrimary)
                         }
                         .frame(height: 100)
-                        .background(Color.black.opacity(0.3))
+                        .background(Color.bgCard)
                         .cornerRadius(8)
                         
                         HStack {

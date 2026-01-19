@@ -14,6 +14,7 @@ struct DashboardView: View {
     // Trial & License
     @EnvironmentObject var trialManager: TrialManager
     @EnvironmentObject var licenseManager: LicenseManager
+    @Environment(\.colorScheme) var colorScheme
     
     @AppStorage("selectedModelVariant") private var selectedModel: String = "openai_whisper-base"
     @State private var showFileImporter = false
@@ -91,28 +92,36 @@ struct DashboardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     
                     // Main Content Layout
-                    HStack(alignment: .top, spacing: 24) {
-                        // Left Column: Stats & Graph
+                    ViewThatFits(in: .horizontal) {
+                        // Wide Layout
+                        HStack(alignment: .top, spacing: 24) {
+                            // Left Column: Stats & Graph
+                            VStack(spacing: 24) {
+                                ProductivityCard(
+                                    transcriptionCount: transcriptionCountToday,
+                                    wordsTranscribed: totalWordsTranscribed,
+                                    timeSaved: timeSavedMinutes,
+                                    weeklyData: weeklyData
+                                )
+                            }
+                            
+                            // Right Column: Tips (Fixed Width)
+                            TipsCard()
+                                .frame(width: 300)
+                        }
+                        
+                        // Narrow Layout (Vertical Stack)
                         VStack(spacing: 24) {
-                            // Main Productivity Card
                             ProductivityCard(
                                 transcriptionCount: transcriptionCountToday,
                                 wordsTranscribed: totalWordsTranscribed,
                                 timeSaved: timeSavedMinutes,
                                 weeklyData: weeklyData
                             )
+                            
+                            TipsCard()
+                                .frame(maxWidth: .infinity)
                         }
-                        .background(GeometryReader { geo in
-                            Color.clear.preference(key: HeightPreferenceKey.self, value: geo.size.height)
-                        })
-                        
-                        // Right Column: Tips (Fixed Width, Height Matched)
-                        TipsCard()
-                            .frame(width: 300)
-                            .frame(height: leftColumnHeight > 0 ? leftColumnHeight : nil)
-                    }
-                    .onPreferenceChange(HeightPreferenceKey.self) { height in
-                        leftColumnHeight = height
                     }
                     
                     // Recent Transcriptions
@@ -283,101 +292,38 @@ struct ProductivityCard: View {
     let timeSaved: Int
     let weeklyData: [(day: String, count: Int)]
     
+    @Environment(\.colorScheme) var colorScheme
+    
     var body: some View {
-        HStack(alignment: .bottom, spacing: 32) {
-            // Left: Stats
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 12) {
-                    Image(systemName: "waveform.path.ecg")
-                        .font(.title)
-                        .foregroundStyle(.red)
-                    Text("Today's Productivity")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                }
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text("\(transcriptionCount)")
-                            .font(.system(size: 42, weight: .bold))
-                            .foregroundStyle(.white)
-                        Text("Transcriptions Today")
-                            .font(.body)
-                            .foregroundStyle(.gray)
-                    }
-                    
-                    HStack(spacing: 8) {
-                        Image(systemName: "clock.fill")
-                            .foregroundStyle(.blue)
-                        Text("\(wordsTranscribed)")
-                            .fontWeight(.bold)
-                            .foregroundStyle(.white)
-                        Text("words")
-                            .foregroundStyle(.gray)
-                    }
-                    
-                    HStack(spacing: 8) {
-                        Text("≈")
-                            .foregroundStyle(.gray)
-                        Text("\(timeSaved) min")
-                            .fontWeight(.bold)
-                            .foregroundStyle(.white)
-                        Text("saved")
-                            .foregroundStyle(.gray)
-                    }
-                }
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .bottom, spacing: 32) {
+                leftStatsSection
+                Spacer()
+                rightGraphSection
             }
             
-            Spacer()
-            
-            // Right: Graph
-            HStack(alignment: .bottom, spacing: 12) {
-                let maxCount = weeklyData.map { $0.count }.max() ?? 1
-                let normalizedMax = max(Double(maxCount), 5.0) // prevent div by zero and tiny bars
-                
-                ForEach(weeklyData, id: \.day) { data in
-                    VStack {
-                        // Bar
-                        GeometryReader { geo in
-                            let height = max(Double(data.count) / normalizedMax * geo.size.height, 10.0)
-                            
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color.green.opacity(0.8), Color.blue.opacity(0.8)],
-                                        startPoint: .bottom,
-                                        endPoint: .top
-                                    )
-                                )
-                                .frame(height: height)
-                                .frame(maxWidth: .infinity, alignment: .bottom)
-                                .position(x: geo.size.width / 2, y: geo.size.height - height / 2)
-                        }
-                        .frame(width: 20, height: 100) // Fixed graph height
-                        
-                        // Label
-                        Text(data.day)
-                            .font(.caption)
-                            .foregroundStyle(.gray)
-                    }
-                }
+            VStack(alignment: .leading, spacing: 32) {
+                leftStatsSection
+                rightGraphSection
+                    .frame(height: 150) // Slightly taller graph when stacked
             }
         }
         .padding(32)
         .background(
             ZStack {
-                Color.black.opacity(0.6)
-                // subtle glow
-                RadialGradient(
-                    colors: [Color.red.opacity(0.2), Color.clear],
-                    center: .topLeading,
-                    startRadius: 0,
-                    endRadius: 300
-                )
+                Color.bgCard
+                // subtle glow - conditional for dark mode only
+                if colorScheme == .dark {
+                    RadialGradient(
+                        colors: [Color.accentRed.opacity(0.15), Color.clear],
+                        center: .topLeading,
+                        startRadius: 0,
+                        endRadius: 300
+                    )
+                }
             }
         )
-        .background(.ultraThinMaterial)
+        // .background(.ultraThinMaterial) // Removed to ensure clean color mapping
         .cornerRadius(24)
         .overlay(
             RoundedRectangle(cornerRadius: 24)
@@ -402,6 +348,94 @@ struct ProductivityCard: View {
                 )
                 .frame(height: 1)
                 .offset(y: 1)
+        }
+    }
+    
+    // MARK: - Subviews
+    
+    private var leftStatsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                Image(systemName: "waveform.path.ecg")
+                    .font(.title)
+                    .foregroundStyle(.red)
+                Text("Today's Productivity")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text("\(transcriptionCount)")
+                        .font(.system(size: 42, weight: .bold))
+                        .foregroundStyle(Color.textPrimary)
+                        .minimumScaleFactor(0.8)
+                    Text("Transcriptions Today")
+                        .font(.body)
+                        .foregroundStyle(.gray)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                
+                HStack(spacing: 8) {
+                    Image(systemName: "clock.fill")
+                    .foregroundStyle(.blue)
+                    Text("\(wordsTranscribed)")
+                        .fontWeight(.bold)
+                        .foregroundStyle(Color.textPrimary)
+                    Text("words")
+                        .foregroundStyle(.gray)
+                }
+                
+                HStack(spacing: 8) {
+                    Text("≈")
+                    .foregroundStyle(.gray)
+                    Text("\(timeSaved) min")
+                        .fontWeight(.bold)
+                        .foregroundStyle(Color.textPrimary)
+                    Text("saved")
+                        .foregroundStyle(.gray)
+                }
+            }
+        }
+    }
+    
+    private var rightGraphSection: some View {
+        HStack(alignment: .bottom, spacing: 12) {
+            let maxCount = weeklyData.map { $0.count }.max() ?? 1
+            let normalizedMax = max(Double(maxCount), 5.0) // prevent div by zero and tiny bars
+            
+            ForEach(weeklyData, id: \.day) { data in
+                VStack {
+                    // Bar
+                    GeometryReader { geo in
+                        let height = max(Double(data.count) / normalizedMax * geo.size.height, 10.0)
+                        
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.green.opacity(0.8), Color.blue.opacity(0.8)],
+                                    startPoint: .bottom,
+                                    endPoint: .top
+                                )
+                            )
+                            .frame(height: height)
+                            .frame(maxWidth: .infinity, alignment: .bottom)
+                            .position(x: geo.size.width / 2, y: geo.size.height - height / 2)
+                    }
+                    .frame(width: 20, height: 100) // Fixed graph height
+                    
+                    // Label
+                    Text(data.day)
+                        .font(.caption)
+                        .foregroundStyle(.gray)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                }
+            }
         }
     }
 }
@@ -434,9 +468,7 @@ struct MetricCard: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-         // Rectangular, darker
-        .background(Color.black.opacity(0.4))
-        .background(.ultraThinMaterial)
+        .background(Color.bgCard)
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
@@ -540,6 +572,7 @@ struct RecentTranscriptionRow: View {
 // MARK: - Tips & Tutorial Card
 
 struct TipsCard: View {
+    @Environment(\.colorScheme) var colorScheme
     @State private var isMaximized = false
     
     var body: some View {
@@ -552,6 +585,8 @@ struct TipsCard: View {
                     .font(.title3)
                     .fontWeight(.bold)
                     .foregroundStyle(Color.textPrimary)
+                    .minimumScaleFactor(0.8)
+                    .lineLimit(1)
             }
             
             // Video Player
@@ -627,20 +662,23 @@ struct TipsCard: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity) // Allow full width in column
-        // Updated Background to match ProductivityCard (Dark + Yellow Glow)
+        // Updated Background to match ProductivityCard
         .background(
             ZStack {
-                Color.black.opacity(0.6)
+                Color.bgCard
                 // subtle yellow glow for "Tips"
-                RadialGradient(
-                    colors: [Color.yellow.opacity(0.15), Color.clear],
-                    center: .topLeading,
-                    startRadius: 0,
-                    endRadius: 300
-                )
+                // subtle yellow glow for "Tips" - conditional for dark mode only
+                if colorScheme == .dark {
+                    RadialGradient(
+                        colors: [Color.yellow.opacity(0.15), Color.clear],
+                        center: .topLeading,
+                        startRadius: 0,
+                        endRadius: 300
+                    )
+                }
             }
         )
-        .background(.ultraThinMaterial)
+        // .background(.ultraThinMaterial)
         .cornerRadius(24) // Match ProductivityCard
         .overlay(
             RoundedRectangle(cornerRadius: 24)

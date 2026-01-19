@@ -7,6 +7,7 @@ class AudioRecordingService: NSObject, ObservableObject {
 
     @Published var isRecording = false
     @Published var audioLevel: Float = 0.0
+    @Published var audioFrequency: Float = 0.0 // Normalized 0...1 representation of pitch
     @Published var availableDevices: [AVCaptureDevice] = []
     @Published var selectedDeviceId: String? {
         didSet {
@@ -128,6 +129,7 @@ class AudioRecordingService: NSObject, ObservableObject {
             
             DispatchQueue.main.async {
                 self.audioLevel = 0.0
+                self.audioFrequency = 0.0
             }
             
             isRecording = true
@@ -144,6 +146,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         isRecording = false // Stop capturing new frames immediately
         DispatchQueue.main.async {
             self.audioLevel = 0.0
+            self.audioFrequency = 0.0
         }
         
         return await withCheckedContinuation { continuation in
@@ -239,28 +242,52 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
         guard samplesToRead > 0 else { return }
         
         var sumSquares: Float = 0.0
+        var zeroCrossings: Int = 0
+        var previousSample: Float = 0.0
         
         if (asbd.mFormatFlags & kAudioFormatFlagIsFloat) != 0 {
             // Float32 Processing (Standard on Mac)
             let actualData = data.assumingMemoryBound(to: Float.self)
+            previousSample = actualData[0]
+            
             for i in 0..<samplesToRead {
                 let sample = actualData[i * stride]
                 sumSquares += sample * sample
+                
+                // Zero Crossing Check
+                if (previousSample > 0 && sample <= 0) || (previousSample <= 0 && sample > 0) {
+                    zeroCrossings += 1
+                }
+                previousSample = sample
             }
         } else {
             // Int16 Processing (Fallback)
             if asbd.mBitsPerChannel == 16 {
                 let actualData = data.assumingMemoryBound(to: Int16.self)
+                previousSample = Float(actualData[0])
+                
                 for i in 0..<samplesToRead {
                     let sample = Float(actualData[i * stride]) / 32768.0
                     sumSquares += sample * sample
+                    
+                    if (previousSample > 0 && sample <= 0) || (previousSample <= 0 && sample > 0) {
+                        zeroCrossings += 1
+                    }
+                    previousSample = sample
                 }
             } else if asbd.mBitsPerChannel == 32 {
                  // Int32 Processing
                  let actualData = data.assumingMemoryBound(to: Int32.self)
+                 previousSample = Float(actualData[0])
+                 
                  for i in 0..<samplesToRead {
                      let sample = Float(actualData[i * stride]) / 2147483648.0
                      sumSquares += sample * sample
+                     
+                     if (previousSample > 0 && sample <= 0) || (previousSample <= 0 && sample > 0) {
+                         zeroCrossings += 1
+                     }
+                     previousSample = sample
                  }
             }
         }
@@ -272,8 +299,8 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
         let dB = 20 * log10(rms > 0 ? rms : 0.0001)
         
         // Normalize to 0...1 for UI
-        // Raised noise floor to -35.0 dB to strictly ignore ambient noise
-        let lowerLimit: Float = -35.0
+        // Tuned to -50.0 dB for smoother response (less jittery than -60)
+        let lowerLimit: Float = -50.0
         let upperLimit: Float = 0.0
         
         // Clamp
@@ -282,13 +309,32 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
         // Linear mapping
         var normalizedLevel = (clamped - lowerLimit) / (upperLimit - lowerLimit)
         
-        // Signal Gate: Force silence if below a threshold
-        if normalizedLevel < 0.1 {
+        // Signal Gate: Minimal gate to avoid absolute zero, but allow quiet sounds
+        if normalizedLevel < 0.01 {
             normalizedLevel = 0
+            zeroCrossings = 0
         }
+        
+        // Calculate approximate frequency from ZCR
+        // Frequency = (Zero Crossings * Sample Rate) / (2 * N)
+        // Note: 'stride' reduces effective sample rate for this calculation, so we adjust
+        let effectiveSampleRate = Float(asbd.mSampleRate) / Float(stride)
+        let _ = (Float(zeroCrossings) * effectiveSampleRate) / (2.0 * Float(samplesToRead))
+        
+        // Normalize Frequency for UI (0...1)
+        // Human voice fundamental freq is roughly 85Hz - 255Hz, harmonics go higher.
+        // Let's map 0-3000Hz (speech range) to 0-1 for visualization
+        // But ZCR is noisy, so we just want "more zcr" = "higher pitch"
+        // Let's just normalize ZCR relative to the number of samples
+        let zcr = Float(zeroCrossings) / Float(samplesToRead)
+        
+        // Empirically, ZCR for speech varies. Let's amplify likely speech range.
+        var normalizedFreq = zcr * 5.0 // Gain to make changes visible
+        normalizedFreq = max(0.0, min(1.0, normalizedFreq))
         
         DispatchQueue.main.async {
              self.audioLevel = normalizedLevel
+             self.audioFrequency = normalizedFreq
         }
     }
 }

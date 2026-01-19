@@ -42,8 +42,8 @@ class MiniRecorderWindowController: NSObject {
     
     // Stop recording - trigger transcription and paste
     func stopRecording() {
-        // 1. Hide recorder immediately
-        panel?.orderOut(nil)
+        // 1. Hide recorder immediately - REMOVED so it shows "Transcribing..."
+        // panel?.orderOut(nil)
         
         // 2. Return focus to previous app
         lastActiveApp?.activate(options: .activateIgnoringOtherApps)
@@ -68,7 +68,7 @@ class MiniRecorderWindowController: NSObject {
         hostingController = NSHostingController(rootView: AnyView(recorderView.background(Color.clear)))
         
         let p = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 60),
+            contentRect: NSRect(x: 0, y: 0, width: 220, height: 50),
             styleMask: [.nonactivatingPanel, .fullSizeContentView, .borderless],
             backing: .buffered,
             defer: false
@@ -81,7 +81,7 @@ class MiniRecorderWindowController: NSObject {
         p.titleVisibility = .hidden
         p.titlebarAppearsTransparent = true
         p.isMovableByWindowBackground = true
-        p.hasShadow = true
+        p.hasShadow = false // Disable system shadow to avoid transparency artifacts (View has its own shadow)
         
         // Window Behavior
         p.level = .floating

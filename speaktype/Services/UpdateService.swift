@@ -10,6 +10,9 @@ class UpdateService: ObservableObject {
     @Published var isCheckingForUpdates = false
     @Published var lastCheckDate: Date?
     
+    // Publisher to request UI display (e.g. show update window)
+    let showUpdateWindowPublisher = PassthroughSubject<AppVersion, Never>()
+    
     // User Defaults keys
     private let lastCheckDateKey = "lastUpdateCheckDate"
     private let skippedVersionKey = "skippedVersion"
@@ -30,28 +33,41 @@ class UpdateService: ObservableObject {
             isCheckingForUpdates = true
         }
         
-        // In production, this would fetch from your server
-        // For now, we'll use mock data to demonstrate
-        let mockUpdate = AppVersion.mockUpdate
-        let currentVersion = AppVersion.currentVersion
-        
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-        
-        await MainActor.run {
-            // Check if there's a newer version available
-            if AppVersion.isNewerVersion(mockUpdate.version, than: currentVersion) {
-                // Don't show if user skipped this version, unless it's a manual check
-                if !silent || !isVersionSkipped(mockUpdate.version) {
-                    self.availableUpdate = mockUpdate
-                }
-            } else {
-                self.availableUpdate = nil
-            }
+        do {
+            // Fetch latest release from GitHub
+            // Note: Public repo access requires no auth token for simple GET
+            // If hitting rate limits, might need to handle 403 or add an optional token
+            let url = URL(string: "https://api.github.com/repos/karansinghgit/speaktype/releases/latest")!
+            var request = URLRequest(url: url)
+            request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
             
-            self.isCheckingForUpdates = false
-            self.lastCheckDate = Date()
-            saveLastCheckDate()
+            let (data, _) = try await URLSession.shared.data(for: request)
+            let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+            let releaseVersion = AppVersion(from: release)
+            let currentVersion = AppVersion.currentVersion
+            
+            await MainActor.run {
+                // Check if there's a newer version available
+                if AppVersion.isNewerVersion(releaseVersion.version, than: currentVersion) {
+                    // Don't show if user skipped this version, unless it's a manual check
+                    if !silent || !self.isVersionSkipped(releaseVersion.version) {
+                        self.availableUpdate = releaseVersion
+                        // Notify UI to show update window
+                        self.showUpdateWindowPublisher.send(releaseVersion)
+                    }
+                } else {
+                    self.availableUpdate = nil
+                }
+                
+                self.isCheckingForUpdates = false
+                self.lastCheckDate = Date()
+                self.saveLastCheckDate()
+            }
+        } catch {
+            print("Failed to check for updates: \(error)")
+            await MainActor.run {
+                self.isCheckingForUpdates = false
+            }
         }
     }
     

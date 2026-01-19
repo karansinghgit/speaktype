@@ -25,7 +25,38 @@ struct AppVersion: Codable, Equatable {
     }
 }
 
-/// Mock data for testing - In production, this would be fetched from your server
+extension AppVersion {
+    init(from release: GitHubRelease) {
+        // Remove 'v' prefix if present (e.g. "v1.0.1" -> "1.0.1")
+        let cleanVersion = release.tagName.replacingOccurrences(of: "v", with: "")
+        
+        self.version = cleanVersion
+        self.buildNumber = "0" // GitHub releases usually don't have build numbers, assume 0 or handle differently
+        self.releaseNotes = release.body.components(separatedBy: "\n").filter { !$0.isEmpty }
+        self.downloadURL = release.htmlUrl
+        self.isRequired = false
+        
+        let formatter = ISO8601DateFormatter()
+        self.releaseDate = formatter.date(from: release.publishedAt) ?? Date()
+    }
+}
+
+/// Structure to decode GitHub API response
+struct GitHubRelease: Codable {
+    let tagName: String
+    let body: String
+    let htmlUrl: String
+    let publishedAt: String
+    
+    enum CodingKeys: String, CodingKey {
+        case tagName = "tag_name"
+        case body
+        case htmlUrl = "html_url"
+        case publishedAt = "published_at"
+    }
+}
+
+// MARK: - Mock Data (for Previews)
 extension AppVersion {
     static let mockUpdate = AppVersion(
         version: "1.67",
@@ -43,3 +74,4 @@ extension AppVersion {
         releaseDate: Date()
     )
 }
+

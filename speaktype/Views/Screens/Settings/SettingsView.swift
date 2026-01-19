@@ -221,6 +221,13 @@ struct SettingsView: View {
                     // Auto-update toggle
                     ToggleRow(title: "Automatically check for updates", isOn: $autoUpdate)
                         .padding(.vertical, 4)
+                        .onChange(of: autoUpdate) { newValue in
+                            if newValue {
+                                Task {
+                                    await updateService.checkForUpdates(silent: true)
+                                }
+                            }
+                        }
                     
                     Text("The app will check for updates every 24 hours and notify you when a new version is available.")
                         .font(.caption2)

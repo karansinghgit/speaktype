@@ -48,6 +48,7 @@ struct speaktypeApp: App {
             .tint(.appRed)
         }
         .defaultSize(width: 1200, height: 800)
+        .windowStyle(.hiddenTitleBar)
         .handlesExternalEvents(matching: ["main-dashboard", "open"]) // Only open for matching IDs
         .commands {
              SidebarCommands()

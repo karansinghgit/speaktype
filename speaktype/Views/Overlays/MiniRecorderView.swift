@@ -7,7 +7,9 @@ struct MiniRecorderView: View {
     @ObservedObject private var audioRecorder = AudioRecordingService.shared
     @State private var whisperService = WhisperService()
     @State private var isListening = false
+
     @State private var isProcessing = false
+    @State private var statusMessage = "Transcribing..."
     var onCommit: ((String) -> Void)?
     var onCancel: (() -> Void)?
     
@@ -41,8 +43,8 @@ struct MiniRecorderView: View {
             backgroundView
             
             if isProcessing {
-                Text("Transcribing...")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                Text(statusMessage)
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white)
                     .transition(.opacity)
             } else {
@@ -118,22 +120,21 @@ struct MiniRecorderView: View {
     // MARK: - Subviews
     
     private var stopButton: some View {
-        Button(action: {
-            handleHotkeyTrigger()
-        }) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10) // Squircle
-                    .fill(Color(red: 1.0, green: 0.2, blue: 0.2)) // Bright Red
-                    .frame(width: 32, height: 32) // Smaller button
-                    .shadow(color: Color.red.opacity(0.4), radius: 4, x: 0, y: 0)
-                
-                // Inner square icon
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.black.opacity(0.4))
-                    .frame(width: 10, height: 10)
-            }
+        ZStack {
+            RoundedRectangle(cornerRadius: 10) // Squircle
+                .fill(Color(red: 1.0, green: 0.2, blue: 0.2)) // Bright Red
+                .frame(width: 32, height: 32) // Smaller button
+                .shadow(color: Color.red.opacity(0.4), radius: 4, x: 0, y: 0)
+            
+            // Inner square icon
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color.black.opacity(0.4))
+                .frame(width: 10, height: 10)
         }
-        .buttonStyle(.plain)
+        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .onTapGesture {
+            handleHotkeyTrigger()
+        }
     }
     
     private var backgroundView: some View {
@@ -202,6 +203,7 @@ struct MiniRecorderView: View {
             await MainActor.run {
                 isListening = false
                 isProcessing = true
+                statusMessage = "Transcribing..."
             }
             
             await processRecording(url: url)
@@ -211,9 +213,11 @@ struct MiniRecorderView: View {
     private func processRecording(url: URL) async {
         do {
              if !whisperService.isInitialized || whisperService.currentModelVariant != selectedModel {
+                 await MainActor.run { statusMessage = "Loading Model..." }
                  try? await whisperService.loadModel(variant: selectedModel)
              }
              
+             await MainActor.run { statusMessage = "Transcribing..." }
              let text = try await whisperService.transcribe(audioFile: url)
              
              guard !text.isEmpty else {
@@ -236,7 +240,16 @@ struct MiniRecorderView: View {
                  isProcessing = false
              }
         } catch {
-             await MainActor.run { isProcessing = false }
+             print("Transcription process failed: \(error)")
+             await MainActor.run { 
+                 statusMessage = "Error: \(error.localizedDescription)"
+                 // Hide after delay
+                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                     if self.statusMessage.contains("Error") {
+                        self.isProcessing = false
+                     }
+                 }
+             }
         }
     }
     

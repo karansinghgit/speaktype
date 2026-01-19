@@ -217,18 +217,23 @@ struct ModelRow: View {
     }
     
     private var downloadingButton: some View {
-        HStack(spacing: 6) {
-            Text("Downloading...")
-                .font(.subheadline)
-                .fontWeight(.medium)
-            Image(systemName: "info.circle")
-                .font(.subheadline)
+        Button(action: {
+            downloadService.cancelDownload(for: model.variant)
+        }) {
+            HStack(spacing: 6) {
+                Text("Cancel")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Image(systemName: "xmark.circle")
+                    .font(.subheadline)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.red.opacity(0.8))
+            .foregroundStyle(.white)
+            .cornerRadius(20)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color.blue)
-        .foregroundStyle(.white)
-        .cornerRadius(20)
+        .buttonStyle(.plain)
     }
     
     private var downloadButton: some View {

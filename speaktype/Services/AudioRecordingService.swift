@@ -19,7 +19,7 @@ class AudioRecordingService: NSObject, ObservableObject {
     private var audioOutput: AVCaptureAudioDataOutput?
     private var assetWriter: AVAssetWriter?
     private var assetWriterInput: AVAssetWriterInput?
-    private var recordingStartTime: Date?
+    public private(set) var recordingStartTime: Date?
     private var currentFileURL: URL?
     private var isSessionStarted = false
     

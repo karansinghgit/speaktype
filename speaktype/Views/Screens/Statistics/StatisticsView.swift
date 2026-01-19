@@ -11,7 +11,10 @@ import Charts
 
 struct StatisticsView: View {
     @StateObject private var historyService = HistoryService.shared
+    @ObservedObject private var audioRecorder = AudioRecordingService.shared
     @State private var selectedPeriod: StatisticsPeriod = .week
+    @State private var timer: Timer? = nil
+    @State private var timeTrigger = Date()
     
     var body: some View {
         ScrollView {
@@ -24,6 +27,21 @@ struct StatisticsView: View {
             }
         }
         .background(Color.clear)
+        .onAppear {
+            startTimer()
+        }
+        .onDisappear {
+            stopTimer()
+        }
+        .onChange(of: audioRecorder.isRecording) { isRecording in
+            if isRecording {
+                startTimer()
+            } else {
+                stopTimer()
+                // Force one last update
+                timeTrigger = Date()
+            }
+        }
     }
     
     // MARK: - View Components
@@ -342,9 +360,23 @@ struct StatisticsView: View {
             startDate = calendar.date(byAdding: .day, value: -364, to: now)!
         }
         
-        let totalSeconds = historyService.items
+        var totalSeconds = historyService.items
             .filter { $0.date >= startDate }
             .reduce(0.0) { $0 + $1.duration }
+            
+        // Add current recording duration if active
+        if audioRecorder.isRecording, let recordingStart = audioRecorder.recordingStartTime {
+            let currentDuration = timeTrigger.timeIntervalSince(recordingStart)
+            // Only add if start date falls within period (usually true for 'now')
+            if recordingStart >= startDate {
+                totalSeconds += currentDuration
+            }
+        }
+        
+        // Formatting Logic
+        if totalSeconds < 60 {
+             return "\(Int(totalSeconds))s"
+        }
         
         let minutes = Int(totalSeconds) / 60
         let hours = minutes / 60
@@ -355,6 +387,18 @@ struct StatisticsView: View {
         } else {
             return "\(remainingMinutes)m"
         }
+    }
+    
+    private func startTimer() {
+        stopTimer()
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            timeTrigger = Date()
+        }
+    }
+    
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
     }
     
     private func averageWordsPerTranscription(for period: StatisticsPeriod) -> Int {

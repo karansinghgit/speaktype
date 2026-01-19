@@ -151,12 +151,24 @@ struct StatisticsView: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: .automatic) { value in
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                    .foregroundStyle(Color.white.opacity(0.1))
-                AxisValueLabel()
-                    .font(.caption)
-                    .foregroundStyle(.gray)
+            if selectedPeriod == .year {
+                 // For year (monthly view), show months
+                AxisMarks(values: .automatic) { value in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                        .foregroundStyle(Color.white.opacity(0.1))
+                    AxisValueLabel()
+                        .font(.caption)
+                        .foregroundStyle(.gray)
+                }
+            } else {
+                // For week/month (daily view), stride to avoid overlap
+                AxisMarks(values: .stride(by: selectedPeriod == .month ? .day : .day, count: selectedPeriod == .month ? 7 : 1)) { value in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                        .foregroundStyle(Color.white.opacity(0.1))
+                    AxisValueLabel()
+                        .font(.caption)
+                        .foregroundStyle(.gray)
+                }
             }
         }
         .chartYAxis {
@@ -209,38 +221,77 @@ struct StatisticsView: View {
     private func dailyData(for period: StatisticsPeriod) -> [DailyWordCount] {
         let calendar = Calendar.current
         let now = Date()
-        let startDate: Date
         
         switch period {
         case .week:
-            startDate = calendar.date(byAdding: .day, value: -6, to: now)!
+            let startDate = calendar.date(byAdding: .day, value: -6, to: now)!
+            return generateDailyData(from: startDate, to: now)
+            
         case .month:
-            startDate = calendar.date(byAdding: .day, value: -29, to: now)!
+            let startDate = calendar.date(byAdding: .day, value: -29, to: now)!
+            return generateDailyData(from: startDate, to: now)
+            
         case .year:
-            startDate = calendar.date(byAdding: .day, value: -364, to: now)!
+            // For Year view, we aggregate by Month
+            let startDate = calendar.date(byAdding: .day, value: -364, to: now)!
+            return generateMonthlyData(from: startDate, to: now)
         }
-        
-        // Group items by day
+    }
+    
+    private func generateDailyData(from startDate: Date, to endDate: Date) -> [DailyWordCount] {
+        let calendar = Calendar.current
         var dailyCounts: [Date: Int] = [:]
         
         for item in historyService.items {
             guard item.date >= startDate else { continue }
-            
             let day = calendar.startOfDay(for: item.date)
             let wordCount = item.transcript.components(separatedBy: .whitespacesAndNewlines)
                 .filter { !$0.isEmpty }.count
             dailyCounts[day, default: 0] += wordCount
         }
         
-        // Create array for all days in period
         var result: [DailyWordCount] = []
         var currentDate = calendar.startOfDay(for: startDate)
-        let endDate = calendar.startOfDay(for: now)
+        let end = calendar.startOfDay(for: endDate)
         
-        while currentDate <= endDate {
-            let wordCount = dailyCounts[currentDate] ?? 0
-            result.append(DailyWordCount(date: currentDate, wordCount: wordCount))
+        while currentDate <= end {
+            let count = dailyCounts[currentDate] ?? 0
+            result.append(DailyWordCount(date: currentDate, wordCount: count, isMonthly: false))
             currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate)!
+        }
+        return result
+    }
+    
+    private func generateMonthlyData(from startDate: Date, to endDate: Date) -> [DailyWordCount] {
+        let calendar = Calendar.current
+        var monthlyCounts: [String: Int] = [:] // Key: "yyyy-MM"
+        
+        // Group items by month
+        for item in historyService.items {
+            guard item.date >= startDate else { continue }
+            
+            let components = calendar.dateComponents([.year, .month], from: item.date)
+            let key = "\(components.year!)-\(components.month!)"
+            
+            let wordCount = item.transcript.components(separatedBy: .whitespacesAndNewlines)
+                .filter { !$0.isEmpty }.count
+            
+            monthlyCounts[key, default: 0] += wordCount
+        }
+        
+        // Generate last 12 months buckets
+        var result: [DailyWordCount] = []
+        var currentDate = calendar.date(from: calendar.dateComponents([.year, .month], from: startDate))!
+        let end = calendar.date(from: calendar.dateComponents([.year, .month], from: endDate))!
+        
+        while currentDate <= end {
+            let components = calendar.dateComponents([.year, .month], from: currentDate)
+            let key = "\(components.year!)-\(components.month!)"
+            let count = monthlyCounts[key] ?? 0
+            
+            result.append(DailyWordCount(date: currentDate, wordCount: count, isMonthly: true))
+            
+            currentDate = calendar.date(byAdding: .month, value: 1, to: currentDate)!
         }
         
         return result
@@ -339,10 +390,15 @@ struct DailyWordCount: Identifiable {
     let id = UUID()
     let date: Date
     let wordCount: Int
+    let isMonthly: Bool
     
     var dateString: String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
+        if isMonthly {
+            formatter.dateFormat = "MMM"
+        } else {
+            formatter.dateFormat = "MMM d"
+        }
         return formatter.string(from: date)
     }
 }

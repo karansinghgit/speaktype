@@ -8,6 +8,8 @@ struct DashboardView: View {
     @StateObject private var historyService = HistoryService.shared
     @StateObject private var audioRecorder = AudioRecordingService()
     @State private var whisperService = WhisperService()
+    @State private var leftColumnHeight: CGFloat = 0
+
     
     // Trial & License
     @EnvironmentObject var trialManager: TrialManager
@@ -49,7 +51,21 @@ struct DashboardView: View {
         default: return "Welcome back,"
         }
     }
-    
+
+    var weeklyData: [(day: String, count: Int)] {
+        let calendar = Calendar.current
+        let today = Date()
+        // Last 5 days including today
+        return (0..<5).reversed().map { i in
+            let date = calendar.date(byAdding: .day, value: -i, to: today) ?? today
+            let count = historyService.items.filter { calendar.isDate($0.date, inSameDayAs: date) }.count
+            let formatter = DateFormatter()
+            formatter.dateFormat = "E" // Mon, Tue
+            let dayStr = formatter.string(from: date).prefix(1).uppercased() // M, T
+            return (String(dayStr), count)
+        }
+    }
+
     var body: some View {
         ZStack {
             // Background is now provided by MainView
@@ -74,52 +90,29 @@ struct DashboardView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     
-                    // Split Layout: Metrics (Left) + Tips (Right)
+                    // Main Content Layout
                     HStack(alignment: .top, spacing: 24) {
-                        // Left Column: Stats Grid
-                        LazyVGrid(columns: [
-                            GridItem(.flexible(), spacing: 20),
-                            GridItem(.flexible(), spacing: 20)
-                        ], spacing: 20) {
-                            // Card 1: Transcriptions Today
-                            MetricCard(
-                                title: "Transcriptions Today",
-                                value: "\(transcriptionCountToday)",
-                                unit: "",
-                                icon: "waveform",
-                                color: .accentRed
-                            )
-                            
-                            // Card 2: Words Transcribed
-                            MetricCard(
-                                title: "Words Transcribed",
-                                value: "\(totalWordsTranscribed)",
-                                unit: "words",
-                                icon: "doc.text",
-                                color: .accentBlue
-                            )
-                            
-                            // Card 3: Time Saved
-                            MetricCard(
-                                title: "Est. Time Saved",
-                                value: formatTimeSaved(minutes: timeSavedMinutes),
-                                unit: "",
-                                icon: "clock.fill",
-                                color: .accentBlue // Theme Blue (Time)
-                            )
-                            
-                            // Card 4: Total Recording Time
-                            MetricCard(
-                                title: "Total Recorded",
-                                value: formatDurationHighLevel(totalDurationSeconds),
-                                unit: "",
-                                icon: "mic.fill",
-                                color: .accentRed // Theme Red (Recording)
+                        // Left Column: Stats & Graph
+                        VStack(spacing: 24) {
+                            // Main Productivity Card
+                            ProductivityCard(
+                                transcriptionCount: transcriptionCountToday,
+                                wordsTranscribed: totalWordsTranscribed,
+                                timeSaved: timeSavedMinutes,
+                                weeklyData: weeklyData
                             )
                         }
+                        .background(GeometryReader { geo in
+                            Color.clear.preference(key: HeightPreferenceKey.self, value: geo.size.height)
+                        })
                         
-                        // Right Column: Tips Section
+                        // Right Column: Tips (Fixed Width, Height Matched)
                         TipsCard()
+                            .frame(width: 300)
+                            .frame(height: leftColumnHeight > 0 ? leftColumnHeight : nil)
+                    }
+                    .onPreferenceChange(HeightPreferenceKey.self) { height in
+                        leftColumnHeight = height
                     }
                     
                     // Recent Transcriptions
@@ -282,7 +275,177 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Recent Transcription Row (SpeakType Style)
+// MARK: - New Productivity Card
+
+struct ProductivityCard: View {
+    let transcriptionCount: Int
+    let wordsTranscribed: Int
+    let timeSaved: Int
+    let weeklyData: [(day: String, count: Int)]
+    
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 32) {
+            // Left: Stats
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 12) {
+                    Image(systemName: "waveform.path.ecg")
+                        .font(.title)
+                        .foregroundStyle(.red)
+                    Text("Today's Productivity")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text("\(transcriptionCount)")
+                            .font(.system(size: 42, weight: .bold))
+                            .foregroundStyle(.white)
+                        Text("Transcriptions Today")
+                            .font(.body)
+                            .foregroundStyle(.gray)
+                    }
+                    
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock.fill")
+                            .foregroundStyle(.blue)
+                        Text("\(wordsTranscribed)")
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                        Text("words")
+                            .foregroundStyle(.gray)
+                    }
+                    
+                    HStack(spacing: 8) {
+                        Text("≈")
+                            .foregroundStyle(.gray)
+                        Text("\(timeSaved) min")
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                        Text("saved")
+                            .foregroundStyle(.gray)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Right: Graph
+            HStack(alignment: .bottom, spacing: 12) {
+                let maxCount = weeklyData.map { $0.count }.max() ?? 1
+                let normalizedMax = max(Double(maxCount), 5.0) // prevent div by zero and tiny bars
+                
+                ForEach(weeklyData, id: \.day) { data in
+                    VStack {
+                        // Bar
+                        GeometryReader { geo in
+                            let height = max(Double(data.count) / normalizedMax * geo.size.height, 10.0)
+                            
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.green.opacity(0.8), Color.blue.opacity(0.8)],
+                                        startPoint: .bottom,
+                                        endPoint: .top
+                                    )
+                                )
+                                .frame(height: height)
+                                .frame(maxWidth: .infinity, alignment: .bottom)
+                                .position(x: geo.size.width / 2, y: geo.size.height - height / 2)
+                        }
+                        .frame(width: 20, height: 100) // Fixed graph height
+                        
+                        // Label
+                        Text(data.day)
+                            .font(.caption)
+                            .foregroundStyle(.gray)
+                    }
+                }
+            }
+        }
+        .padding(32)
+        .background(
+            ZStack {
+                Color.black.opacity(0.6)
+                // subtle glow
+                RadialGradient(
+                    colors: [Color.red.opacity(0.2), Color.clear],
+                    center: .topLeading,
+                    startRadius: 0,
+                    endRadius: 300
+                )
+            }
+        )
+        .background(.ultraThinMaterial)
+        .cornerRadius(24)
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(
+                    LinearGradient(
+                        colors: [.white.opacity(0.2), .white.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        // Top accent line
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [.clear, .red.opacity(0.8), .clear],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 1)
+                .offset(y: 1)
+        }
+    }
+}
+
+// MARK: - Updated Metric Card
+
+struct MetricCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let iconColor: Color
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(iconColor)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.gray)
+                
+                Text(value)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.white)
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+         // Rectangular, darker
+        .background(Color.black.opacity(0.4))
+        .background(.ultraThinMaterial)
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Recent Transcription Row (Unchanged styling, ensuring correct layout)
 
 struct RecentTranscriptionRow: View {
     let item: HistoryItem
@@ -374,59 +537,6 @@ struct RecentTranscriptionRow: View {
     }
 }
 
-// MARK: - Metric Card Component
-
-struct MetricCard: View {
-    let title: String
-    let value: String
-    let unit: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 32, weight: .medium)) // Smaller Icon
-                .foregroundStyle(color)
-                .frame(width: 40)
-            
-            VStack(alignment: .leading, spacing: 4) { // Increased spacing
-                Text(title)
-                    .font(.title3) // Increased from headline
-                    .fontWeight(.medium)
-                    .foregroundStyle(Color.textMuted)
-                    .lineLimit(2) // Allow wrapping
-                    .minimumScaleFactor(0.8)
-                
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(value)
-                        .font(.system(size: 34, weight: .bold)) // Smaller Value
-                        .foregroundStyle(Color.textPrimary)
-                    
-                    if !unit.isEmpty {
-                        Text(unit)
-                            .font(.title3)
-                            .foregroundStyle(Color.textMuted)
-                    }
-                }
-            }
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(minHeight: 110) // Rectangular shape
-        .background(.ultraThinMaterial)
-        .background(Color.bgCard.opacity(0.4))
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
-    }
-}
-
-
-
 // MARK: - Tips & Tutorial Card
 
 struct TipsCard: View {
@@ -476,9 +586,9 @@ struct TipsCard: View {
                                          Spacer()
                                          Button(action: { isMaximized = false }) {
                                              Image(systemName: "xmark.circle.fill")
-                                                 .font(.largeTitle)
-                                                 .foregroundStyle(.white)
-                                                 .padding()
+                                             .font(.largeTitle)
+                                             .foregroundStyle(.white)
+                                             .padding()
                                          }
                                          .buttonStyle(.plain)
                                          .keyboardShortcut(.escape, modifiers: [])
@@ -516,14 +626,41 @@ struct TipsCard: View {
                 .foregroundStyle(Color.textSecondary)
         }
         .padding(24)
-        .frame(width: 260) // Reduced width to give more space to Metrics
+        .frame(maxWidth: .infinity) // Allow full width in column
+        // Updated Background to match ProductivityCard (Dark + Yellow Glow)
+        .background(
+            ZStack {
+                Color.black.opacity(0.6)
+                // subtle yellow glow for "Tips"
+                RadialGradient(
+                    colors: [Color.yellow.opacity(0.15), Color.clear],
+                    center: .topLeading,
+                    startRadius: 0,
+                    endRadius: 300
+                )
+            }
+        )
         .background(.ultraThinMaterial)
-        .background(Color.bgCard.opacity(0.4))
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
+        .cornerRadius(24) // Match ProductivityCard
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(
+                    LinearGradient(
+                        colors: [.white.opacity(0.2), .white.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
     }
 }
+
+// MARK: - Preference Key
+struct HeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+

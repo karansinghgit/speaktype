@@ -306,7 +306,7 @@ struct PermissionsSettingsTab: View {
                     VStack(spacing: 12) {
                         SettingsPermissionItem(
                             icon: "mic.fill",
-                            color: .accentSuccess,
+                            color: Color.textSecondary,
                             title: "Microphone Access",
                             desc: "Record your voice for transcription",
                             isGranted: micStatus == .authorized,
@@ -315,7 +315,7 @@ struct PermissionsSettingsTab: View {
                         
                         SettingsPermissionItem(
                             icon: "hand.raised.fill",
-                            color: .accentSuccess,
+                            color: Color.textSecondary,
                             title: "Accessibility Access",
                             desc: "Paste transcribed text directly",
                             isGranted: accessibilityStatus,
@@ -478,7 +478,7 @@ struct SettingsPermissionItem: View {
             
             if isGranted {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Color.accentSuccess)
+                    .foregroundStyle(Color.textSecondary)
                     .font(.title3)
             } else {
                 Button("Enable") {

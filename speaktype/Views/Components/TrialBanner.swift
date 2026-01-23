@@ -29,56 +29,28 @@ struct TrialBanner: View {
     }
     
     private var expiredBanner: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "xmark.circle")
-                .font(.system(size: 18))
-                .foregroundStyle(Color.accentError)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Trial Expired")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.textPrimary)
-                
-                Text("Upgrade to continue using all features")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.textSecondary)
-            }
-            
-            Spacer()
-            
+        BannerContainer(
+            icon: "xmark.circle",
+            iconColor: .accentError,
+            title: "Trial Expired",
+            subtitle: "Upgrade to continue using all features",
+            backgroundColor: Color.accentError.opacity(0.05),
+            borderColor: Color.accentError.opacity(0.2)
+        ) {
             HStack(spacing: 8) {
                 if !licenseManager.isPro {
                     Button(action: { showLicenseSheet = true }) {
                         Text("Enter License")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color.textPrimary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.bgHover)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.stSecondary)
                 }
                 
                 Button(action: { openPurchaseURL() }) {
                     Text("Buy License")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.accentPrimary)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.stPrimary)
             }
         }
-        .padding(16)
-        .background(Color.accentError.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.accentError.opacity(0.2), lineWidth: 1)
-        )
         .sheet(isPresented: $showLicenseSheet) {
             LicenseView()
                 .environmentObject(licenseManager)
@@ -86,79 +58,35 @@ struct TrialBanner: View {
     }
     
     private func expiringSoonBanner(days: Int) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 18))
-                .foregroundStyle(Color.accentWarning)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Trial Ending Soon")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.textPrimary)
-                
-                Text("\(days) day\(days == 1 ? "" : "s") remaining")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.textSecondary)
-            }
-            
-            Spacer()
-            
+        BannerContainer(
+            icon: "exclamationmark.triangle",
+            iconColor: .accentWarning,
+            title: "Trial Ending Soon",
+            subtitle: "\(days) day\(days == 1 ? "" : "s") remaining",
+            backgroundColor: Color.accentWarning.opacity(0.05),
+            borderColor: Color.accentWarning.opacity(0.2)
+        ) {
             Button(action: { openPurchaseURL() }) {
                 Text("Upgrade")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.accentPrimary)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.stPrimary)
         }
-        .padding(16)
-        .background(Color.accentWarning.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.accentWarning.opacity(0.2), lineWidth: 1)
-        )
     }
     
     private func activeTrialBanner(days: Int) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "clock")
-                .font(.system(size: 18))
-                .foregroundStyle(Color.accentPrimary)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Free Trial Active")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.textPrimary)
-                
-                Text("\(days) day\(days == 1 ? "" : "s") remaining · Full access")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.textSecondary)
-            }
-            
-            Spacer()
-            
+        BannerContainer(
+            icon: "clock",
+            iconColor: .accentPrimary,
+            title: "Free Trial Active",
+            subtitle: "\(days) day\(days == 1 ? "" : "s") remaining · Full access",
+            backgroundColor: Color.bgHover,
+            borderColor: Color.border
+        ) {
             Button(action: { openPurchaseURL() }) {
                 Text("Upgrade")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.accentPrimary)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.stPrimary)
         }
-        .padding(16)
-        .background(Color.bgSelected.opacity(0.3))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.border, lineWidth: 1)
-        )
     }
     
     private func openPurchaseURL() {
@@ -171,6 +99,47 @@ struct TrialBanner: View {
                 NSWorkspace.shared.open(url)
             }
         }
+    }
+}
+
+// MARK: - Banner Container Component
+
+private struct BannerContainer<Actions: View>: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let subtitle: String
+    let backgroundColor: Color
+    let borderColor: Color
+    @ViewBuilder let actions: () -> Actions
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(iconColor)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(Typography.labelMedium)
+                    .foregroundStyle(Color.textPrimary)
+                
+                Text(subtitle)
+                    .font(Typography.caption)
+                    .foregroundStyle(Color.textSecondary)
+            }
+            
+            Spacer()
+            
+            actions()
+        }
+        .padding(16)
+        .background(backgroundColor)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(borderColor, lineWidth: 1)
+        )
     }
 }
 
@@ -188,4 +157,3 @@ struct TrialBanner: View {
     .padding()
     .background(Color.bgApp)
 }
-

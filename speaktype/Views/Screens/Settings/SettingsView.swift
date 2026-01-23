@@ -2,98 +2,126 @@ import SwiftUI
 import KeyboardShortcuts
 import AVFoundation
 
-
-// import LaunchAtLogin // Uncomment when package added
-// import KeyboardShortcuts // Uncomment when package added
-
 struct SettingsView: View {
-    @AppStorage("soundFeedback") private var soundFeedback = true
-    @AppStorage("muteSystemAudio") private var muteSystemAudio = true
-    @AppStorage("restoreClipboard") private var restoreClipboard = false
-    @AppStorage("powerMode") private var powerMode = false
-    @AppStorage("experimentalFeatures") private var experimentalFeatures = false
-    @AppStorage("hideDockIcon") private var hideDockIcon = false
+    @State private var selectedTab: SettingsTab = .general
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header with tabs
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Settings")
+                    .font(Typography.displayLarge)
+                    .foregroundStyle(Color.textPrimary)
+                
+                // Tab bar
+                HStack(spacing: 0) {
+                    ForEach(SettingsTab.allCases) { tab in
+                        SettingsTabButton(
+                            tab: tab,
+                            isSelected: selectedTab == tab,
+                            action: { selectedTab = tab }
+                        )
+                    }
+                    Spacer()
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .padding(.bottom, 16)
+            
+            // Tab content
+            switch selectedTab {
+            case .general:
+                GeneralSettingsTab()
+            case .audio:
+                AudioSettingsTab()
+            case .permissions:
+                PermissionsSettingsTab()
+            }
+        }
+        .background(Color.clear)
+    }
+}
+
+enum SettingsTab: String, CaseIterable, Identifiable {
+    case general = "General"
+    case audio = "Audio"
+    case permissions = "Permissions"
+    
+    var id: String { rawValue }
+    
+    var icon: String {
+        switch self {
+        case .general: return "gearshape"
+        case .audio: return "mic"
+        case .permissions: return "shield"
+        }
+    }
+}
+
+struct SettingsTabButton: View {
+    let tab: SettingsTab
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 13))
+                Text(tab.rawValue)
+                    .font(Typography.bodyMedium)
+            }
+            .foregroundStyle(isSelected ? Color.textPrimary : Color.textMuted)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(isSelected ? Color.bgHover : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - General Settings Tab
+
+struct GeneralSettingsTab: View {
     @AppStorage("appTheme") private var appTheme: AppTheme = .system
- 
     @AppStorage("autoUpdate") private var autoUpdate = true
-    @AppStorage("showAnnouncements") private var showAnnouncements = true
-    @AppStorage("customCancelShortcut") private var customCancelShortcut = false
-    @AppStorage("middleClickToggle") private var middleClickToggle = false
-    @AppStorage("appleScriptPaste") private var appleScriptPaste = false
-    @AppStorage("recorderStyle") private var recorderStyle: Int = 1 // 0: Notch, 1: Mini
-    // hotkey1 removed as it was unused and confusing
     @AppStorage("selectedHotkey") private var selectedHotkey: HotkeyOption = .fn
-    @AppStorage("customRecordingPath") private var customRecordingPath: String = ""
     
     @StateObject private var updateService = UpdateService.shared
-    @State private var showUpdateSheet = false
-    // selectedHotkey moved to AppStorage
-    @StateObject private var audioRecorder = AudioRecordingService.shared
-    
-    // License Management
     @EnvironmentObject var licenseManager: LicenseManager
+    
+    @State private var showUpdateSheet = false
     @State private var showLicenseSheet = false
     @State private var showDeactivateAlert = false
-
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                // Appearance Section
+            VStack(spacing: 20) {
+                // Appearance
                 SettingsSection {
-                    HStack {
-                        Image(systemName: "paintpalette.fill")
-                            .foregroundStyle(Color.appRed)
-                        Text("Appearance")
-                            .font(.headline)
-                            .foregroundStyle(Color.textPrimary)
-                        Spacer()
-                    }
-                    .padding(.bottom, 8)
+                    SettingsSectionHeader(icon: "paintpalette", title: "Appearance", subtitle: "Choose your preferred theme")
                     
-                    Text("Choose your preferred theme")
-                        .font(.caption)
-                        .foregroundStyle(Color.textSecondary)
-                    
-                    Divider().background(Color.borderSubtle)
-                    
-                    HStack(spacing: 20) {
+                    HStack(spacing: 16) {
                         ForEach(AppTheme.allCases) { theme in
                             RadioButton(
                                 title: theme.rawValue,
                                 isSelected: appTheme == theme,
-                                action: {
-                                    withAnimation(.easeInOut) {
-                                        appTheme = theme
-                                    }
-                                }
+                                action: { appTheme = theme }
                             )
                         }
                     }
-                    .padding(.vertical, 8)
+                    .padding(.top, 8)
                 }
-
-                // Shortcuts Section
+                
+                // Shortcuts
                 SettingsSection {
+                    SettingsSectionHeader(icon: "command", title: "Shortcuts", subtitle: "Configure recording hotkeys")
+                    
                     HStack {
-                        Image(systemName: "command.circle")
-                            .foregroundStyle(Color.appRed)
-                        Text("SpeakType Shortcuts")
-                            .font(.headline)
-                            .foregroundStyle(Color.textPrimary)
-                        Spacer()
-                    }
-                    .padding(.bottom, 8)
-                    
-                    Text("Choose how you want to trigger SpeakType")
-                        .font(.caption)
-                        .foregroundStyle(.gray)
-                    
-                    Divider().background(Color.gray.opacity(0.3))
-                    
-                    // Hotkey Selection Dropdown
-                    HStack {
-                        Text("Hotkey 1")
+                        Text("Primary Hotkey")
+                            .font(Typography.bodyMedium)
                             .foregroundStyle(Color.textPrimary)
                         Spacer()
                         Menu {
@@ -103,249 +131,96 @@ struct SettingsView: View {
                                 }
                             }
                         } label: {
-                            HStack {
+                            HStack(spacing: 6) {
                                 Text(selectedHotkey.displayName)
-                                    .foregroundStyle(Color.textPrimary)
-                                Spacer()
+                                    .font(Typography.bodySmall)
                                 Image(systemName: "chevron.up.chevron.down")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(Color.textSecondary)
+                                    .font(.system(size: 9))
                             }
+                            .foregroundStyle(Color.textPrimary)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(Color.bgCard)
-                            .clipShape(Capsule())
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.primary.opacity(0.15), lineWidth: 1)
-                            )
+                            .background(Color.bgHover)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
                         }
                         .menuStyle(.borderlessButton)
-                        .frame(width: 140)
                     }
-                    .padding(.vertical, 4)
                     
-                    Divider().background(Color.gray.opacity(0.3))
+                    Divider().background(Color.border)
                     
-                    // Custom Shortcut
                     HStack {
                         Text("Custom Shortcut")
-                            .foregroundStyle(.gray)
+                            .font(Typography.bodyMedium)
+                            .foregroundStyle(Color.textSecondary)
                         Spacer()
                         KeyboardShortcuts.Recorder(for: .toggleRecord)
                     }
-                    .padding(.vertical, 8)
                     
-                    Text("Quick tap to start hands-free recording (tap again to stop). Press and hold for push-to-talk.")
-                        .font(.caption2)
-                        .foregroundStyle(Color.textSecondary)
+                    Text("Quick tap to start hands-free recording. Press and hold for push-to-talk.")
+                        .font(Typography.caption)
+                        .foregroundStyle(Color.textMuted)
+                        .padding(.top, 4)
                 }
                 
-
-                
-
-                
-                // Software Update Section
+                // Updates
                 SettingsSection {
+                    SettingsSectionHeader(icon: "arrow.down.circle", title: "Updates", subtitle: "SpeakType \(AppVersion.currentVersion)")
+                    
                     HStack {
-                        Image(systemName: "arrow.down.circle")
-                            .foregroundStyle(Color.appRed)
-                        VStack(alignment: .leading) {
-                            Text("Software Update")
-                                .font(.headline)
-                                .foregroundStyle(Color.textPrimary)
-                            Text("Keep your app up to date")
-                                .font(.caption)
-                                .foregroundStyle(Color.textSecondary)
-                        }
-                        Spacer()
-                    }
-                    .padding(.bottom, 8)
-                    
-                    Divider().background(Color.gray.opacity(0.3))
-                    
-                    // Current version info
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Current Version")
-                                .font(.caption)
-                                .foregroundStyle(Color.textSecondary)
-                            Text("SpeakType \(AppVersion.currentVersion) (Build \(AppVersion.currentBuildNumber))")
-                                .font(.subheadline)
-                                .foregroundStyle(Color.textPrimary)
-                        }
-                        
-                        Spacer()
-                        
-                        Button(action: {
-                            Task {
-                                await updateService.checkForUpdates()
-                                if updateService.availableUpdate != nil {
-                                    showUpdateSheet = true
-                                }
-                            }
-                        }) {
-                            HStack(spacing: 6) {
-                                if updateService.isCheckingForUpdates {
-                                    ProgressView()
-                                        .scaleEffect(0.7)
-                                        .frame(width: 16, height: 16)
-                                } else {
-                                    Image(systemName: "arrow.clockwise")
-                                        .font(.subheadline)
-                                }
-                                Text(updateService.isCheckingForUpdates ? "Checking..." : "Check for Updates")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(Color.blue)
-                            .foregroundStyle(.white)
-                            .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(updateService.isCheckingForUpdates)
-                    }
-                    .padding(.vertical, 8)
-                    
-                    // Last check time
-                    if let lastCheck = updateService.lastCheckDate {
-                        Text("Last checked: \(lastCheck, style: .relative) ago")
-                            .font(.caption2)
-                            .foregroundStyle(.gray)
-                    }
-                    
-                    Divider().background(Color.gray.opacity(0.3))
-                    
-                    // Auto-update toggle
-                    ToggleRow(title: "Automatically check for updates", isOn: $autoUpdate)
-                        .padding(.vertical, 4)
-                        .onChange(of: autoUpdate) { newValue in
-                            if newValue {
-                                Task {
-                                    await updateService.checkForUpdates(silent: true)
-                                }
-                            }
-                        }
-                    
-                    Text("The app will check for updates every 24 hours and notify you when a new version is available.")
-                        .font(.caption2)
-                        .foregroundStyle(.gray)
-                }
-                
-                // License Section
-                SettingsSection {
-                    HStack {
-                        Image(systemName: "key.fill")
-                            .foregroundStyle(Color.appRed)
-                        Text("License")
-                            .font(.headline)
+                        Text("Automatically check for updates")
+                            .font(Typography.bodyMedium)
                             .foregroundStyle(Color.textPrimary)
                         Spacer()
+                        Toggle("", isOn: $autoUpdate)
+                            .labelsHidden()
                     }
-                    .padding(.bottom, 8)
                     
-                    Text("Manage your SpeakType Pro license")
-                        .font(.caption)
-                        .foregroundStyle(Color.textSecondary)
-                    
-                    Divider().background(Color.gray.opacity(0.3))
-                    
-                    // License Status
-                    HStack {
-                        Text("Status")
-                            .foregroundStyle(.gray)
-                        Spacer()
+                    Button(action: {
+                        Task {
+                            await updateService.checkForUpdates()
+                            if updateService.availableUpdate != nil {
+                                showUpdateSheet = true
+                            }
+                        }
+                    }) {
                         HStack(spacing: 6) {
-                            if licenseManager.isPro {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                                Text("Pro")
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(Color.textPrimary)
+                            if updateService.isCheckingForUpdates {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                    .frame(width: 14, height: 14)
                             } else {
-                                Image(systemName: "circle")
-                                    .foregroundColor(.gray)
-                                Text("Free")
-                                    .foregroundStyle(.gray)
+                                Image(systemName: "arrow.clockwise")
                             }
-                        }
-                        .font(.subheadline)
-                    }
-                    .padding(.vertical, 4)
-                    
-                    // Expiration Date (if applicable)
-                    if let expirationDate = licenseManager.expirationDate {
-                        Divider().background(Color.gray.opacity(0.3))
-                        
-                        HStack {
-                            Text("Expires")
-                                .foregroundStyle(Color.textSecondary)
-                            Spacer()
-                            Text(expirationDate, style: .date)
-                                .font(.subheadline)
-                                .foregroundStyle(licenseManager.isExpiringSoon ? .orange : Color.textPrimary)
-                        }
-                        .padding(.vertical, 4)
-                        
-                        if licenseManager.isExpiringSoon,
-                           let days = licenseManager.daysUntilExpiration {
-                            HStack(spacing: 4) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundColor(.orange)
-                                Text("Expires in \(days) days")
-                                    .font(.caption2)
-                                    .foregroundStyle(.orange)
-                            }
+                            Text(updateService.isCheckingForUpdates ? "Checking..." : "Check for Updates")
                         }
                     }
+                    .buttonStyle(.stSecondary)
+                    .disabled(updateService.isCheckingForUpdates)
+                }
+                
+                // License
+                SettingsSection {
+                    SettingsSectionHeader(
+                        icon: "key",
+                        title: "License",
+                        subtitle: licenseManager.isPro ? "Pro Active" : "Free Plan"
+                    )
                     
-                    Divider().background(Color.gray.opacity(0.3))
-                    
-                    // Action Buttons
                     if licenseManager.isPro {
-                        Button(action: {
-                            showDeactivateAlert = true
-                        }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "xmark.circle")
-                                Text("Deactivate License")
-                            }
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .frame(maxWidth: .infinity)
-                            .background(Color.red.opacity(0.2))
-                            .foregroundStyle(.red)
-                            .cornerRadius(8)
+                        Button(action: { showDeactivateAlert = true }) {
+                            Text("Deactivate License")
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.stSecondary)
                     } else {
-                        Button(action: {
-                            showLicenseSheet = true
-                        }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "key.fill")
-                                Text("Activate License")
-                            }
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .frame(maxWidth: .infinity)
-                            .background(Color.blue)
-                            .foregroundStyle(.white)
-                            .cornerRadius(8)
+                        Button(action: { showLicenseSheet = true }) {
+                            Text("Activate License")
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.stPrimary)
                     }
                 }
             }
-            .padding()
+            .padding(24)
         }
-        .background(Color.clear)
         .sheet(isPresented: $showUpdateSheet) {
             if let update = updateService.availableUpdate {
                 UpdateSheet(update: update)
@@ -358,23 +233,157 @@ struct SettingsView: View {
         .alert("Deactivate License", isPresented: $showDeactivateAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Deactivate", role: .destructive) {
-                Task {
-                    try? await licenseManager.deactivateLicense()
-                }
+                Task { try? await licenseManager.deactivateLicense() }
             }
         } message: {
-            Text("Are you sure you want to deactivate your Pro license? You can reactivate it at any time.")
-        }
-        .onAppear {
-            // Check if there's already an available update
-            if updateService.availableUpdate != nil {
-                showUpdateSheet = true
-            }
+            Text("Are you sure you want to deactivate your Pro license?")
         }
     }
+}
 
+// MARK: - Audio Settings Tab
+
+struct AudioSettingsTab: View {
+    @StateObject private var audioRecorder = AudioRecordingService.shared
     
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                SettingsSection {
+                    SettingsSectionHeader(icon: "mic", title: "Input Device", subtitle: "Select your microphone")
+                    
+                    VStack(spacing: 8) {
+                        if audioRecorder.availableDevices.isEmpty {
+                            Text("No input devices found")
+                                .font(Typography.bodyMedium)
+                                .foregroundStyle(Color.textMuted)
+                                .padding(.vertical, 20)
+                        } else {
+                            ForEach(audioRecorder.availableDevices, id: \.uniqueID) { device in
+                                DeviceRow(
+                                    name: device.localizedName,
+                                    isActive: audioRecorder.selectedDeviceId == device.uniqueID,
+                                    isSelected: audioRecorder.selectedDeviceId == device.uniqueID
+                                )
+                                .onTapGesture {
+                                    audioRecorder.selectedDeviceId = device.uniqueID
+                                }
+                            }
+                        }
+                    }
+                    
+                    Button(action: { audioRecorder.fetchAvailableDevices() }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Refresh Devices")
+                        }
+                    }
+                    .buttonStyle(.stSecondary)
+                    .padding(.top, 8)
+                }
+            }
+            .padding(24)
+        }
+        .onAppear {
+            audioRecorder.fetchAvailableDevices()
+        }
+    }
+}
 
+// MARK: - Permissions Settings Tab
+
+struct PermissionsSettingsTab: View {
+    @State private var micStatus: AVAuthorizationStatus = .notDetermined
+    @State private var accessibilityStatus: Bool = false
+    @State private var timer: Timer?
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                SettingsSection {
+                    SettingsSectionHeader(icon: "shield", title: "App Permissions", subtitle: "Required for full functionality")
+                    
+                    VStack(spacing: 12) {
+                        SettingsPermissionItem(
+                            icon: "mic.fill",
+                            color: .accentSuccess,
+                            title: "Microphone Access",
+                            desc: "Record your voice for transcription",
+                            isGranted: micStatus == .authorized,
+                            action: { openSettings(for: "Privacy_Microphone") }
+                        )
+                        
+                        SettingsPermissionItem(
+                            icon: "hand.raised.fill",
+                            color: .accentSuccess,
+                            title: "Accessibility Access",
+                            desc: "Paste transcribed text directly",
+                            isGranted: accessibilityStatus,
+                            action: {
+                                ClipboardService.shared.requestAccessibilityPermission()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    openSettings(for: "Privacy_Accessibility")
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+            .padding(24)
+        }
+        .onAppear {
+            checkPermissions()
+            startPolling()
+        }
+        .onDisappear {
+            timer?.invalidate()
+        }
+    }
+    
+    private func startPolling() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            checkPermissions()
+        }
+    }
+    
+    private func checkPermissions() {
+        micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        accessibilityStatus = AXIsProcessTrusted()
+    }
+    
+    private func openSettings(for pane: String) {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+}
+
+// MARK: - Supporting Components
+
+struct SettingsSectionHeader: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(Color.accentPrimary)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(Typography.headlineSmall)
+                    .foregroundStyle(Color.textPrimary)
+                Text(subtitle)
+                    .font(Typography.caption)
+                    .foregroundStyle(Color.textMuted)
+            }
+            
+            Spacer()
+        }
+        .padding(.bottom, 12)
+    }
 }
 
 struct SettingsSection<Content: View>: View {
@@ -385,37 +394,10 @@ struct SettingsSection<Content: View>: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             content
         }
-        .padding(20)
-        .background(Color.bgCard)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.border, lineWidth: 1)
-        )
-        .cardShadow()
-    }
-}
-
-struct SettingsRow: View {
-    let title: String
-    let value: String
-    
-    var body: some View {
-        HStack {
-            Text(title)
-                .foregroundStyle(Color.textSecondary)
-            Spacer()
-            Text(value)
-                .font(.caption)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.bgHover)
-                .cornerRadius(4)
-                .foregroundStyle(Color.textPrimary)
-        }
+        .themedCard(padding: 20)
     }
 }
 
@@ -426,6 +408,7 @@ struct ToggleRow: View {
     var body: some View {
         HStack {
             Text(title)
+                .font(Typography.bodyMedium)
                 .foregroundStyle(Color.textPrimary)
             Spacer()
             Toggle("", isOn: $isOn)
@@ -444,12 +427,12 @@ struct RadioButton: View {
             HStack(spacing: 8) {
                 ZStack {
                     Circle()
-                        .strokeBorder(isSelected ? Color.navyInk : Color.textMuted, lineWidth: 1.5)
+                        .strokeBorder(isSelected ? Color.accentPrimary : Color.textMuted, lineWidth: 1.5)
                         .frame(width: 18, height: 18)
                     
                     if isSelected {
                         Circle()
-                            .fill(Color.navyInk)
+                            .fill(Color.accentPrimary)
                             .frame(width: 10, height: 10)
                     }
                 }
@@ -460,6 +443,53 @@ struct RadioButton: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct SettingsPermissionItem: View {
+    let icon: String
+    let color: Color
+    let title: String
+    let desc: String
+    let isGranted: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.12))
+                    .frame(width: 40, height: 40)
+                Image(systemName: icon)
+                    .foregroundStyle(color)
+                    .font(.system(size: 16))
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(Typography.bodyMedium)
+                    .foregroundStyle(Color.textPrimary)
+                Text(desc)
+                    .font(Typography.caption)
+                    .foregroundStyle(Color.textMuted)
+            }
+            
+            Spacer()
+            
+            if isGranted {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Color.accentSuccess)
+                    .font(.title3)
+            } else {
+                Button("Enable") {
+                    action()
+                }
+                .buttonStyle(.stSecondary)
+            }
+        }
+        .padding(14)
+        .background(Color.bgHover.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
 

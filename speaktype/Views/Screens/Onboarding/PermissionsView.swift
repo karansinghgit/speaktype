@@ -11,20 +11,20 @@ struct PermissionsView: View {
         ScrollView {
             VStack(spacing: 30) {
                 // Header
-                VStack(spacing: 15) {
+                VStack(spacing: 12) {
                     Image(systemName: "shield.fill")
-                        .font(.system(size: 40))
-                        .foregroundStyle(Color.appRed)
+                        .font(.system(size: 36))
+                        .foregroundStyle(Color.accentPrimary)
                     
                     Text("App Permissions")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        .font(Typography.displayLarge)
                         .foregroundStyle(Color.textPrimary)
                     
                     Text("Manage permissions to ensure full functionality")
+                        .font(Typography.bodyMedium)
                         .foregroundStyle(Color.textSecondary)
                 }
-                .padding(.top, 40)
+                .padding(.top, 32)
                 
                 // Permission Items
                 VStack(spacing: 16) {
@@ -100,7 +100,7 @@ struct PermissionRow: View {
         HStack(spacing: 20) {
             ZStack {
                 Circle()
-                    .fill(color.opacity(0.2))
+                    .fill(color.opacity(0.15))
                     .frame(width: 44, height: 44)
                 Image(systemName: icon)
                     .foregroundStyle(color)
@@ -109,20 +109,25 @@ struct PermissionRow: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.headline)
+                    .font(Typography.headlineSmall)
                     .foregroundStyle(Color.textPrimary)
                 Text(desc)
-                    .font(.caption)
+                    .font(Typography.bodySmall)
                     .foregroundStyle(Color.textSecondary)
             }
             
             Spacer()
             
-            Button("Manage") {
-                action()
+            Button(action: action) {
+                Text("Manage")
+                    .font(Typography.bodySmall)
+                    .foregroundStyle(Color.textSecondary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.bgHover)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
-            .buttonStyle(.bordered)
-            .tint(Color.gray)
+            .buttonStyle(.plain)
             
             if isGranted {
                 Image(systemName: "checkmark.seal.fill")
@@ -130,12 +135,6 @@ struct PermissionRow: View {
                     .font(.title2)
             }
         }
-        .padding(16)
-        .background(Color.bgCard)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.borderCard, lineWidth: 1)
-        )
+        .themedCard(padding: 20)
     }
 }

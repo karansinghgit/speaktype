@@ -11,17 +11,25 @@ struct TranscribeAudioView: View {
     @State private var showFileImporter = false
     
     var body: some View {
-        VStack(spacing: 30) {
-            // Header removed for cleaner look
-            Spacer().frame(height: 20)
+        VStack(spacing: 24) {
+            // Header
+            VStack(spacing: 12) {
+                Text("Transcribe Audio")
+                    .font(Typography.displayLarge)
+                    .foregroundStyle(Color.textPrimary)
+                
+                Text("Upload an audio or video file to transcribe")
+                    .font(Typography.bodyMedium)
+                    .foregroundStyle(Color.textSecondary)
+            }
+            .padding(.top, 32)
             
             // Main Drop Zone / Action Area
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [10]))
-                    .foregroundStyle(Color.gray.opacity(0.3))
-                    .frame(maxWidth: .infinity, maxHeight: 400)
-                    // Make the entire area tappable for file picker
+                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [8]))
+                    .foregroundStyle(Color.border)
+                    .frame(maxWidth: .infinity, maxHeight: 360)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         showFileImporter = true
@@ -33,27 +41,26 @@ struct TranscribeAudioView: View {
                 
                 VStack(spacing: 20) {
                     Image(systemName: "arrow.down.doc")
-                        .font(.system(size: 50))
-                        .foregroundStyle(.gray)
+                        .font(.system(size: 40))
+                        .foregroundStyle(Color.textMuted)
                     
                     Text("Drop audio or video file here")
-                        .font(.headline)
+                        .font(Typography.headlineSmall)
                         .foregroundStyle(Color.textPrimary)
                     
                     Button(action: {
                         showFileImporter = true
                     }) {
-                        Label("Upload Audio File", systemImage: "square.and.arrow.up")
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.bgHover)
-                            .foregroundStyle(Color.textPrimary)
-                            .cornerRadius(8)
+                        HStack(spacing: 8) {
+                            Image(systemName: "square.and.arrow.up")
+                            Text("Upload Audio File")
+                        }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.stSecondary)
                     
                     Text("or")
-                        .foregroundStyle(Color.textSecondary)
+                        .font(Typography.bodySmall)
+                        .foregroundStyle(Color.textMuted)
                     
                     if audioRecorder.isRecording {
                         Button(action: {
@@ -63,63 +70,87 @@ struct TranscribeAudioView: View {
                                 }
                             }
                         }) {
-                            Text("Stop Recording")
-                                .frame(minWidth: 120)
-                                .padding()
-                                .background(Color.appRed)
-                                .foregroundStyle(.white)
-                                .cornerRadius(8)
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 8, height: 8)
+                                Text("Stop Recording")
+                            }
+                            .font(Typography.bodyMedium)
+                            .frame(minWidth: 140)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(Color.accentError)
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                         .buttonStyle(.plain)
                     } else if isTranscribing {
-                        ProgressView("Transcribing...")
-                            .tint(.white)
-                            .foregroundStyle(.white)
+                        VStack(spacing: 8) {
+                            ProgressView()
+                            Text("Transcribing...")
+                                .font(Typography.bodySmall)
+                                .foregroundStyle(Color.textSecondary)
+                        }
                     } else {
                         Button(action: {
                             audioRecorder.startRecording()
                         }) {
-                            Text("Start Recording")
-                                .frame(minWidth: 120)
-                                .padding()
-                                .background(Color.bgHover)
-                                .foregroundStyle(Color.textPrimary)
-                                .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    
-                    if !transcribedText.isEmpty {
-                        ScrollView {
-                            Text(transcribedText)
-                                .padding()
-                                .foregroundStyle(Color.textPrimary)
-                        }
-                        .frame(height: 100)
-                        .background(Color.bgCard)
-                        .cornerRadius(8)
-                        
-                        HStack {
-                            Button("Copy Text") {
-                                ClipboardService.shared.copy(text: transcribedText)
+                            HStack(spacing: 8) {
+                                Image(systemName: "mic.fill")
+                                Text("Start Recording")
                             }
-                            .buttonStyle(.plain)
-                            .padding(8)
-                            .background(Color.gray.opacity(0.2))
-                            .cornerRadius(6)
-                            
-                            Button("Paste (Simulate)") {
-                                ClipboardService.shared.paste()
-                            }
-                            .buttonStyle(.plain)
-                            .padding(8)
-                            .background(Color.gray.opacity(0.2))
-                            .cornerRadius(6)
                         }
+                        .buttonStyle(.stPrimary)
                     }
                 }
             }
-            .padding()
+            .padding(.horizontal, 24)
+            
+            // Transcription Result
+            if !transcribedText.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Transcription")
+                        .font(Typography.headlineSmall)
+                        .foregroundStyle(Color.textPrimary)
+                    
+                    ScrollView {
+                        Text(transcribedText)
+                            .font(Typography.bodyMedium)
+                            .foregroundStyle(Color.textPrimary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(16)
+                    }
+                    .frame(height: 120)
+                    .background(Color.bgHover)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            ClipboardService.shared.copy(text: transcribedText)
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "doc.on.doc")
+                                Text("Copy")
+                            }
+                        }
+                        .buttonStyle(.stSecondary)
+                        
+                        Button(action: {
+                            ClipboardService.shared.paste()
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "doc.on.clipboard")
+                                Text("Paste")
+                            }
+                        }
+                        .buttonStyle(.stSecondary)
+                    }
+                }
+                .themedCard()
+                .padding(.horizontal, 24)
+            }
             
             Spacer()
         }

@@ -47,21 +47,21 @@ struct StatisticsView: View {
     // MARK: - View Components
     
     private var headerSection: some View {
-        VStack(spacing: 15) {
+        VStack(spacing: 12) {
             Image(systemName: "chart.bar.fill")
-                .font(.system(size: 40))
-                .foregroundStyle(Color.appRed)
+                .font(.system(size: 36))
+                .foregroundStyle(Color.accentPrimary)
             
             Text("Statistics")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+                .font(Typography.displayLarge)
                 .foregroundStyle(Color.textPrimary)
             
             Text("Track your transcription activity")
-                .foregroundStyle(.gray)
+                .font(Typography.bodyMedium)
+                .foregroundStyle(Color.textSecondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 40)
+        .padding(.top, 32)
     }
     
     private var periodSelector: some View {
@@ -89,14 +89,14 @@ struct StatisticsView: View {
                     icon: "doc.text",
                     title: "Total Words",
                     value: "\(totalWords(for: selectedPeriod))",
-                    color: Color(hex: "A62D35")
+                    color: Color.chartRed
                 )
                 
                 SummaryCard(
                     icon: "calendar",
                     title: "Daily Average",
                     value: "\(dailyAverage(for: selectedPeriod))",
-                    color: Color(hex: "2D5DA6")
+                    color: Color.chartBlue
                 )
                 
                 SummaryCard(
@@ -113,14 +113,14 @@ struct StatisticsView: View {
                     icon: "doc.text",
                     title: "Total Words",
                     value: "\(totalWords(for: selectedPeriod))",
-                    color: Color(hex: "A62D35")
+                    color: Color.chartRed
                 )
                 
                 SummaryCard(
                     icon: "calendar",
                     title: "Daily Average",
                     value: "\(dailyAverage(for: selectedPeriod))",
-                    color: Color(hex: "2D5DA6")
+                    color: Color.chartBlue
                 )
                 
                 SummaryCard(
@@ -137,9 +137,8 @@ struct StatisticsView: View {
     private var barChartSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Words Transcribed Per Day")
-                .font(.headline)
+                .font(Typography.headlineMedium)
                 .foregroundStyle(Color.textPrimary)
-                .padding(.horizontal, 40)
             
             if dailyData(for: selectedPeriod).isEmpty {
                 emptyChartView
@@ -147,13 +146,7 @@ struct StatisticsView: View {
                 chartView
             }
         }
-        .padding(.vertical, 20)
-        .background(Color.bgCard)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.borderCard, lineWidth: 1)
-        )
+        .themedCard(padding: 20)
         .padding(.horizontal, 40)
     }
     
@@ -187,7 +180,7 @@ struct StatisticsView: View {
                 )
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [Color(hex: "A62D35"), Color(hex: "2D5DA6")],
+                        colors: [Color.chartRed, Color.chartBlue],
                         startPoint: .bottom,
                         endPoint: .top
                     )
@@ -232,7 +225,7 @@ struct StatisticsView: View {
     private var detailsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Details")
-                .font(.headline)
+                .font(Typography.headlineMedium)
                 .foregroundStyle(Color.textPrimary)
             
             ViewThatFits(in: .horizontal) {
@@ -249,7 +242,7 @@ struct StatisticsView: View {
             }
             
             Divider()
-                .background(Color.white.opacity(0.1))
+                .background(Color.border)
             
             ViewThatFits(in: .horizontal) {
                 HStack {
@@ -264,13 +257,7 @@ struct StatisticsView: View {
                 }
             }
         }
-        .padding(24)
-        .background(Color.bgCard)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.borderCard, lineWidth: 1)
-        )
+        .themedCard()
         .padding(.horizontal, 40)
         .padding(.bottom, 40)
     }
@@ -506,21 +493,15 @@ struct SummaryCard: View {
             }
             
             Text(value)
-                .font(.system(size: 32, weight: .bold))
+                .font(Typography.statValue)
                 .foregroundStyle(Color.textPrimary)
             
             Text(title)
-                .font(.subheadline)
-                .foregroundStyle(.gray)
+                .font(Typography.bodySmall)
+                .foregroundStyle(Color.textSecondary)
         }
-        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.bgCard)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.borderCard, lineWidth: 1)
-        )
+        .themedCard(padding: 20)
     }
 }
 
@@ -531,10 +512,10 @@ struct StatRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(.caption)
-                .foregroundStyle(.gray)
+                .font(Typography.labelSmall)
+                .foregroundStyle(Color.textSecondary)
             Text(value)
-                .font(.headline)
+                .font(Typography.headlineSmall)
                 .foregroundStyle(Color.textPrimary)
         }
     }
@@ -548,30 +529,21 @@ struct PeriodButton: View {
     var body: some View {
         Button(action: action) {
             Text(period.rawValue)
-                .font(.subheadline)
+                .font(Typography.bodyMedium)
                 .fontWeight(isSelected ? .semibold : .medium)
-                .foregroundStyle(isSelected ? .white : .gray)
+                .foregroundStyle(isSelected ? .white : Color.textSecondary)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
-                .background(buttonBackground)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isSelected ? Color.accentPrimary : Color.bgCard)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isSelected ? Color.clear : Color.border, lineWidth: 1)
+                )
         }
         .buttonStyle(.plain)
-    }
-    
-    private var buttonBackground: some View {
-        RoundedRectangle(cornerRadius: 8)
-            .fill(isSelected ? 
-                  AnyShapeStyle(LinearGradient(
-                    colors: [Color(hex: "A62D35"), Color(hex: "2D5DA6")],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                  )) : 
-                  AnyShapeStyle(Color.bgCard)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? Color.clear : Color.borderCard, lineWidth: 1)
-            )
     }
 }
 

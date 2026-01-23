@@ -8,21 +8,21 @@ struct AudioInputView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
                 // Header
-                VStack(spacing: 15) {
+                VStack(spacing: 12) {
                     Image(systemName: "waveform")
-                        .font(.system(size: 40))
-                        .foregroundStyle(Color.appRed)
+                        .font(.system(size: 36))
+                        .foregroundStyle(Color.accentPrimary)
                     
                     Text("Audio Input")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        .font(Typography.displayLarge)
                         .foregroundStyle(Color.textPrimary)
                     
                     Text("Configure your microphone preferences")
-                        .foregroundStyle(.gray)
+                        .font(Typography.bodyMedium)
+                        .foregroundStyle(Color.textSecondary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.top, 40)
+                .padding(.top, 32)
                 
                 // Input Mode Section Removed
 
@@ -34,25 +34,29 @@ struct AudioInputView: View {
                 VStack(alignment: .leading, spacing: 15) {
                     HStack {
                         Text("Available Devices")
-                            .font(.headline)
+                            .font(Typography.headlineMedium)
                             .foregroundStyle(Color.textPrimary)
                         Spacer()
                         Button(action: {
                             audioRecorder.fetchAvailableDevices()
                         }) {
-                            HStack {
+                            HStack(spacing: 6) {
                                 Image(systemName: "arrow.clockwise")
                                 Text("Refresh")
                             }
-                            .font(.subheadline)
-                            .foregroundStyle(.gray)
+                            .font(Typography.bodySmall)
+                            .foregroundStyle(Color.textSecondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.bgHover)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
                         }
                         .buttonStyle(.plain)
                     }
                     
                     Text("Note: SpeakType will use the selected device for all recordings.")
-                        .font(.caption)
-                        .foregroundStyle(.gray)
+                        .font(Typography.bodySmall)
+                        .foregroundStyle(Color.textSecondary)
                     
                     VStack(spacing: 12) {
                         if audioRecorder.availableDevices.isEmpty {
@@ -94,11 +98,11 @@ struct DeviceRow: View {
     var body: some View {
         HStack {
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isSelected ? Color.appRed : .gray)
+                .foregroundStyle(isSelected ? Color.accentPrimary : Color.textMuted)
                 .font(.title3)
             
             Text(name)
-                .font(.body)
+                .font(Typography.bodyMedium)
                 .foregroundStyle(Color.textPrimary)
             
             Spacer()
@@ -108,20 +112,21 @@ struct DeviceRow: View {
                     Image(systemName: "waveform")
                     Text("Active")
                 }
-                .font(.caption)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.green.opacity(0.2))
-                .foregroundStyle(.green)
-                .cornerRadius(12)
+                .font(Typography.labelSmall)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.accentSuccess.opacity(0.15))
+                .foregroundStyle(Color.accentSuccess)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
-        .padding()
-        .background(isSelected ? Color.appRed.opacity(0.05) : Color.bgCard)
-        .cornerRadius(12)
+        .padding(16)
+        .background(isSelected ? Color.bgSelected : Color.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isSelected ? Color.appRed.opacity(0.5) : Color.white.opacity(0.1), lineWidth: 1)
+                .stroke(isSelected ? Color.bgSelected : Color.border, lineWidth: 1)
         )
+        .cardShadow()
     }
 }

@@ -33,48 +33,46 @@ struct AIModelsView: View {
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("AI Models")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+                .font(Typography.displayLarge)
                 .foregroundStyle(Color.textPrimary)
             
             Text("Manage your local transcription models powered by WhisperKit.")
-                .font(.body)
-                .foregroundStyle(.gray)
+                .font(Typography.cardDescription)
+                .foregroundStyle(Color.textSecondary)
         }
     }
     
     private var currentModelCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Default Model")
-                .font(.headline)
-                .foregroundStyle(.gray)
+                .font(Typography.labelMedium)
+                .foregroundStyle(Color.textSecondary)
             
             Text(selectedModelName)
-                .font(.title2)
-                .fontWeight(.bold)
+                .font(Typography.headlineMedium)
                 .foregroundStyle(Color.textPrimary)
         }
-        .padding()
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.bgCard)
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.borderCard, lineWidth: 1)
+                .stroke(Color.border, lineWidth: 1)
         )
+        .cardShadow()
     }
     
     private var modelsListSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Available Models")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(Typography.displaySmall)
                     .foregroundStyle(Color.textPrimary)
                 Spacer()
             }
             
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 ForEach($models) { $model in
                     ModelRow(model: $model, selectedModel: $selectedModel)
                 }

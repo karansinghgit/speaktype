@@ -2,38 +2,20 @@ import SwiftUI
 
 struct SidebarView: View {
     @Binding var selection: SidebarItem?
-    @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
         VStack(spacing: 0) {
-            // Logo Header
-            HStack(spacing: 10) {
-                Image("AppLogo")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 28, height: 28)
-                
-                Text("SpeakType")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.textPrimary)
-                
-                // Badge like Flow's "Basic"
-                Text("Pro")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Color.textMuted)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.bgHover)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 20)
-            .padding(.bottom, 20)
+            // Space for traffic lights
+            Spacer()
+                .frame(height: SidebarConstants.topInset)
             
-            // Navigation - no divider, seamless
-            VStack(spacing: 2) {
+            // Logo Header
+            SidebarHeader()
+                .padding(.horizontal, SidebarConstants.horizontalPadding)
+                .padding(.bottom, SidebarConstants.headerBottomPadding)
+            
+            // Navigation Items
+            VStack(spacing: SidebarConstants.itemSpacing) {
                 ForEach(SidebarItem.allCases) { item in
                     SidebarButton(
                         item: item,
@@ -42,57 +24,58 @@ struct SidebarView: View {
                     )
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, SidebarConstants.itemHorizontalPadding)
             
             Spacer()
             
-            // Bottom section like Flow
-            VStack(spacing: 0) {
-                // Upgrade prompt
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Try SpeakType Pro")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.textPrimary)
-                    
-                    Text("Unlimited transcriptions")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.textSecondary)
-                    
-                    Button(action: {}) {
-                        Text("Upgrade")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color.textPrimary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.bgHover)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 4)
-                }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.bgCard)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.border, lineWidth: 1)
-                )
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
-                
-                // Bottom links
-                VStack(spacing: 0) {
-                    SidebarBottomLink(icon: "gearshape", title: "Settings")
-                    SidebarBottomLink(icon: "questionmark.circle", title: "Help")
-                }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 16)
-            }
+            // Upgrade Card
+            SidebarPromoCard()
+                .padding(.horizontal, SidebarConstants.itemHorizontalPadding)
+                .padding(.bottom, SidebarConstants.bottomPadding)
         }
-        .frame(width: 220)
-        .background(Color.bgSidebar)
-        // No border - seamless with content
+        .frame(width: SidebarConstants.width)
+    }
+}
+
+// MARK: - Constants
+
+private enum SidebarConstants {
+    static let width: CGFloat = 220
+    static let topInset: CGFloat = 52
+    static let horizontalPadding: CGFloat = 18
+    static let itemHorizontalPadding: CGFloat = 12
+    static let headerBottomPadding: CGFloat = 24
+    static let itemSpacing: CGFloat = 2
+    static let bottomPadding: CGFloat = 20
+    static let iconSize: CGFloat = 16
+    static let itemVerticalPadding: CGFloat = 10
+    static let itemCornerRadius: CGFloat = 8
+}
+
+// MARK: - Components
+
+private struct SidebarHeader: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image("AppLogo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 24, height: 24)
+            
+            Text("SpeakType")
+                .font(Typography.sidebarLogo)
+                .foregroundStyle(Color.textPrimary)
+            
+            Text("Pro")
+                .font(Typography.sidebarBadge)
+                .foregroundStyle(Color.textMuted)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(Color.bgHover)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+            
+            Spacer()
+        }
     }
 }
 
@@ -104,75 +87,72 @@ struct SidebarButton: View {
     
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Image(systemName: item.icon)
-                    .font(.system(size: 15))
-                    .foregroundStyle(isSelected ? Color.textPrimary : Color.sidebarItem)
-                    .frame(width: 22)
+                    .font(.system(size: SidebarConstants.iconSize))
+                    .foregroundStyle(isSelected ? Color.textPrimary : Color.textMuted)
+                    .frame(width: 20)
                 
                 Text(item.rawValue)
-                    .font(Typography.sidebarItem)
-                    .foregroundStyle(isSelected ? Color.textPrimary : Color.sidebarItem)
+                    .font(isSelected ? Typography.sidebarItemActive : Typography.sidebarItem)
+                    .foregroundStyle(isSelected ? Color.textPrimary : Color.textSecondary)
                 
                 Spacer()
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, SidebarConstants.itemVerticalPadding)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(
-                        isSelected 
-                            ? Color.bgSelected
-                            : (isHovered ? Color.bgHover : Color.clear)
-                    )
+                RoundedRectangle(cornerRadius: SidebarConstants.itemCornerRadius)
+                    .fill(isSelected ? Color.bgSelected : (isHovered ? Color.bgHover : Color.clear))
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.15)) {
+            withAnimation(.easeOut(duration: 0.1)) {
                 isHovered = hovering
             }
         }
     }
 }
 
-struct SidebarBottomLink: View {
-    let icon: String
-    let title: String
-    @State private var isHovered = false
-    
+private struct SidebarPromoCard: View {
     var body: some View {
-        Button(action: {}) {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.sidebarItem)
-                    .frame(width: 20)
-                
-                Text(title)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.sidebarItem)
-                
-                Spacer()
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text("Try SpeakType Pro")
+                    .font(Typography.sidebarPromoTitle)
+                    .foregroundStyle(Color.textPrimary)
+                Text("✨")
+                    .font(.system(size: 12))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isHovered ? Color.bgHover : Color.clear)
-            )
+            
+            Text("Upgrade for unlimited words")
+                .font(Typography.sidebarPromoSubtitle)
+                .foregroundStyle(Color.textMuted)
+            
+            Button(action: {}) {
+                Text("Upgrade to Pro")
+                    .font(Typography.sidebarPromoButton)
+                    .foregroundStyle(Color.textPrimary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Color.bgCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.border, lineWidth: 0.5)
+                    )
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 8)
         }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            isHovered = hovering
-        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-// Enum definition needs to be here if it was in the deleted file, 
-// otherwise if it was in MainView.swift or another file, I shouldn't duplicate it.
-// Checking previous steps, SidebarItem was in SidebarView.swift. So I must include it.
+// MARK: - Sidebar Items
 
 enum SidebarItem: String, CaseIterable, Identifiable {
     case dashboard = "Dashboard"
@@ -180,21 +160,17 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case history = "History"
     case statistics = "Statistics"
     case aiModels = "AI Models"
-    case permissions = "Permissions"
-    case audioInput = "Audio Input"
     case settings = "Settings"
     
     var id: String { rawValue }
     
     var icon: String {
         switch self {
-        case .dashboard: return "circle.grid.2x2"
+        case .dashboard: return "square.grid.2x2"
         case .transcribeAudio: return "waveform"
         case .history: return "doc.text"
-        case .statistics: return "chart.bar.fill"
+        case .statistics: return "chart.bar"
         case .aiModels: return "cpu"
-        case .permissions: return "shield"
-        case .audioInput: return "mic"
         case .settings: return "gearshape"
         }
     }

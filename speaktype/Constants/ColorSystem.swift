@@ -28,10 +28,16 @@ extension Color {
             : NSColor(hex: "FAF9F7")
     }))
     
+    static let bgContent = Color(nsColor: NSColor(name: "bgContent", dynamicProvider: { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "1A1A1A")
+            : NSColor(hex: "FFFFFF")  // White content area like Flow
+    }))
+    
     static let bgSidebar = Color(nsColor: NSColor(name: "bgSidebar", dynamicProvider: { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
             ? NSColor(hex: "1A1A1A")
-            : NSColor(hex: "FAF9F7")  // Same as bgApp - seamless
+            : NSColor(hex: "F5F4F2")  // Slightly warmer than content
     }))
     
     static let bgSurface = Color(nsColor: NSColor(name: "bgSurface", dynamicProvider: { appearance in
@@ -128,6 +134,11 @@ extension Color {
     static let accentError = Color(hex: "EF4444")
     static let accentBlue = Color(hex: "3B82F6")
     
+    // Chart colors
+    static let chartRed = Color(hex: "A62D35")
+    static let chartBlue = Color(hex: "2D5DA6")
+    static let chartGreen = Color(hex: "22C55E")
+    
     // Legacy
     static let navyInk = Color(hex: "2C2C54")
     static let navyLight = Color(hex: "3D3D6B")
@@ -175,7 +186,7 @@ extension Color {
 }
 
 
-// MARK: - Shadow Modifiers (Soft, like Flow)
+// MARK: - Shadow Modifiers
 
 extension View {
     func cardShadow() -> some View {
@@ -192,5 +203,100 @@ extension View {
         self
             .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 4)
             .shadow(color: .black.opacity(0.02), radius: 2, x: 0, y: 1)
+    }
+}
+
+// MARK: - Reusable Card Modifier
+
+struct ThemedCardModifier: ViewModifier {
+    var padding: CGFloat = 24
+    var cornerRadius: CGFloat = 12
+    
+    func body(content: Content) -> some View {
+        content
+            .padding(padding)
+            .background(Color.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.border, lineWidth: 1)
+            )
+            .cardShadow()
+    }
+}
+
+extension View {
+    /// Standard card with padding, background, border, and shadow
+    func themedCard(padding: CGFloat = 24, cornerRadius: CGFloat = 12) -> some View {
+        modifier(ThemedCardModifier(padding: padding, cornerRadius: cornerRadius))
+    }
+}
+
+// MARK: - Reusable Button Styles
+
+struct STButtonPrimary: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Typography.bodyMedium)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Color.accentPrimary)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .opacity(configuration.isPressed ? 0.8 : 1)
+    }
+}
+
+struct STButtonSecondary: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Typography.bodyMedium)
+            .foregroundStyle(Color.textPrimary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Color.bgHover)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .opacity(configuration.isPressed ? 0.8 : 1)
+    }
+}
+
+struct STButtonGhost: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Typography.bodySmall)
+            .foregroundStyle(Color.textSecondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(configuration.isPressed ? Color.bgHover : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+extension ButtonStyle where Self == STButtonPrimary {
+    static var stPrimary: STButtonPrimary { STButtonPrimary() }
+}
+
+extension ButtonStyle where Self == STButtonSecondary {
+    static var stSecondary: STButtonSecondary { STButtonSecondary() }
+}
+
+extension ButtonStyle where Self == STButtonGhost {
+    static var stGhost: STButtonGhost { STButtonGhost() }
+}
+
+// MARK: - Selection State Helper
+
+struct SelectionBackground: View {
+    let isSelected: Bool
+    let isHovered: Bool
+    var cornerRadius: CGFloat = 8
+    
+    var body: some View {
+        RoundedRectangle(cornerRadius: cornerRadius)
+            .fill(
+                isSelected
+                    ? Color.bgSelected
+                    : (isHovered ? Color.bgHover : Color.clear)
+            )
     }
 }

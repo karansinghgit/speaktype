@@ -12,8 +12,7 @@ struct HistoryView: View {
             // Header
             HStack {
                 Text("History")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(Typography.displayLarge)
                     .foregroundStyle(Color.textPrimary)
                 
                 Spacer()
@@ -22,9 +21,18 @@ struct HistoryView: View {
                     Button(role: .destructive) {
                         showDeleteAlert = true
                     } label: {
-                        Label("Clear History", systemImage: "trash")
-                            .foregroundStyle(.red)
+                        HStack(spacing: 6) {
+                            Image(systemName: "trash")
+                            Text("Clear")
+                        }
+                        .font(Typography.bodySmall)
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.red.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 24)
@@ -316,20 +324,20 @@ struct HistoryView: View {
                                 }
                             }
                             .background(Color.bgCard)
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.borderCard, lineWidth: 1)
+                                    .stroke(Color.border, lineWidth: 1)
                             )
+                            .cardShadow()
                         }
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
                 }
+                }
             }
-        }
-
-        .background(Color.clear) // Transparent to show main gradient
+        .background(Color.clear)
         .overlay(alignment: .bottom) {
             if showCopyToast {
                 HStack(spacing: 8) {

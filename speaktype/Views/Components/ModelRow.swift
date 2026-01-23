@@ -28,140 +28,103 @@ struct ModelRow: View {
         downloadService.downloadError[model.variant]
     }
     
-    var ratingColor: Color {
-        switch model.rating {
-        case "Best", "Excellent": return .purple
-        case "Great", "Good": return .green
-        case "Standard": return .blue
-        case "Basic": return .gray
-        default: return Color.textPrimary
-        }
-    }
-    
     // MARK: - Body
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 // Model Info
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 10) {
                     // Model Name
                     Text(model.name)
-                        .font(.title3)
-                        .fontWeight(.semibold)
+                        .font(Typography.cardTitle)
                         .foregroundStyle(Color.textPrimary)
                     
                     // Model Details - Icons and stats
-                    HStack(spacing: 12) {
-                        // Multilingual icon
-                        HStack(spacing: 4) {
-                            Image(systemName: "globe")
-                                .font(.caption)
-                            Text("Multilingual")
-                                .font(.caption)
-                        }
-                        .foregroundStyle(.gray)
+                    HStack(spacing: 14) {
+                        ModelMetaItem(icon: "globe", text: "Multilingual")
+                        ModelMetaItem(icon: "arrow.down.circle", text: model.size)
                         
-                        // Size icon
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.down.circle")
-                                .font(.caption)
-                            Text(model.size)
-                                .font(.caption)
-                        }
-                        .foregroundStyle(.gray)
-                        
-                        // Speed rating (showing dots)
+                        // Speed rating
                         HStack(spacing: 4) {
                             Text("Speed")
-                                .font(.caption)
-                            HStack(spacing: 2) {
-                                ForEach(0..<3) { i in
-                                    Circle()
-                                        .fill(i < Int(model.speed / 3.3) ? Color.yellow : Color.gray.opacity(0.3))
-                                        .frame(width: 4, height: 4)
-                                }
-                            }
+                                .font(Typography.cardMeta)
+                            RatingDots(value: model.speed, maxValue: 10, color: .orange)
                             Text(String(format: "%.1f", model.speed))
-                                .font(.caption)
+                                .font(Typography.cardMetaBold)
                         }
-                        .foregroundStyle(.gray)
+                        .foregroundStyle(Color.textMuted)
                         
                         // Accuracy rating
                         HStack(spacing: 4) {
                             Text("Accuracy")
-                                .font(.caption)
-                            HStack(spacing: 2) {
-                                ForEach(0..<3) { i in
-                                    Circle()
-                                        .fill(i < Int(model.accuracy / 3.3) ? Color.green : Color.gray.opacity(0.3))
-                                        .frame(width: 4, height: 4)
-                                }
-                            }
+                                .font(Typography.cardMeta)
+                            RatingDots(value: model.accuracy, maxValue: 10, color: .green)
                             Text(String(format: "%.1f", model.accuracy))
-                                .font(.caption)
+                                .font(Typography.cardMetaBold)
                         }
-                        .foregroundStyle(.gray)
+                        .foregroundStyle(Color.textMuted)
                     }
                     
                     // Description
                     Text(model.details)
-                        .font(.subheadline)
-                        .foregroundStyle(.gray)
-                        .padding(.top, 4)
+                        .font(Typography.cardDescription)
+                        .foregroundStyle(Color.textSecondary)
                 }
                 
                 Spacer()
                 
-                // Action button (top right)
+                // Action button
                 actionButton
             }
-            .padding()
+            .padding(18)
             
-            // Download progress section (only shown when downloading)
+            // Download progress
             if isDownloading {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Downloading \(model.variant) Model")
-                            .font(.subheadline)
-                            .foregroundStyle(.gray)
-                        
-                        Spacer()
-                        
-                        Text("\(Int(progress * 100))%")
-                            .font(.subheadline)
-                            .foregroundStyle(.gray)
-                    }
-                    
-                    // Blue progress bar
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            // Background track
-                            Rectangle()
-                                .fill(Color.bgHover)
-                                .frame(height: 4)
-                            
-                            // Progress fill
-                            Rectangle()
-                                .fill(Color.blue)
-                                .frame(width: geometry.size.width * progress, height: 4)
-                        }
-                    }
-                    .frame(height: 4)
-                }
-                .padding(.horizontal)
-                .padding(.bottom)
+                downloadProgressSection
             }
         }
         .background(Color.bgCard)
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isActive ? Color.green.opacity(0.5) : Color.borderCard, lineWidth: 1)
+                .stroke(isActive ? Color.accentSuccess.opacity(0.5) : Color.border, lineWidth: 1)
         )
+        .cardShadow()
     }
     
     // MARK: - Subviews
+    
+    private var downloadProgressSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Downloading \(model.variant)")
+                    .font(Typography.cardMeta)
+                    .foregroundStyle(Color.textSecondary)
+                
+                Spacer()
+                
+                Text("\(Int(progress * 100))%")
+                    .font(Typography.cardMetaBold)
+                    .foregroundStyle(Color.textSecondary)
+            }
+            
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.bgHover)
+                        .frame(height: 4)
+                    
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.accentBlue)
+                        .frame(width: geometry.size.width * progress, height: 4)
+                }
+            }
+            .frame(height: 4)
+        }
+        .padding(.horizontal, 18)
+        .padding(.bottom, 18)
+    }
     
     @ViewBuilder
     private var actionButton: some View {
@@ -175,40 +138,40 @@ struct ModelRow: View {
     }
     
     private var downloadedActions: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             if isActive {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.subheadline)
+                        .font(.system(size: 12))
                     Text("Selected")
-                        .font(.subheadline)
+                        .font(Typography.buttonLabelSmall)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 14)
                 .padding(.vertical, 8)
-                .background(Color.green.opacity(0.2))
-                .foregroundStyle(Color.green)
-                .cornerRadius(20)
+                .background(Color.accentSuccess.opacity(0.15))
+                .foregroundStyle(Color.accentSuccess)
+                .clipShape(Capsule())
             } else {
                 Button("Use") {
                     selectedModel = model.variant
                 }
-                .padding(.horizontal, 16)
+                .font(Typography.buttonLabelSmall)
+                .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background(Color.bgHover)
                 .foregroundStyle(Color.textPrimary)
-                .cornerRadius(20)
+                .clipShape(Capsule())
                 .buttonStyle(.plain)
             }
             
-            // Delete button (Only available when downloaded)
             Button(action: {
                 Task {
                     _ = await downloadService.deleteModel(variant: model.variant)
                 }
             }) {
                 Image(systemName: "trash")
-                    .font(.subheadline)
-                    .foregroundStyle(.gray)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.textMuted)
                     .padding(8)
             }
             .buttonStyle(.plain)
@@ -222,16 +185,15 @@ struct ModelRow: View {
         }) {
             HStack(spacing: 6) {
                 Text("Cancel")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(Typography.buttonLabelSmall)
                 Image(systemName: "xmark.circle")
-                    .font(.subheadline)
+                    .font(.system(size: 12))
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(Color.red.opacity(0.8))
+            .background(Color.accentError)
             .foregroundStyle(.white)
-            .cornerRadius(20)
+            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -242,18 +204,54 @@ struct ModelRow: View {
         }) {
             HStack(spacing: 6) {
                 Text("Download")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(Typography.buttonLabel)
                 Image(systemName: "arrow.down.circle")
-                    .font(.subheadline)
+                    .font(.system(size: 12))
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Color.blue)
+            .padding(.vertical, 9)
+            .background(Color.accentBlue)
             .foregroundStyle(.white)
-            .cornerRadius(20)
+            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Supporting Components
+
+private struct ModelMetaItem: View {
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 11))
+            Text(text)
+                .font(Typography.cardMeta)
+        }
+        .foregroundStyle(Color.textMuted)
+    }
+}
+
+private struct RatingDots: View {
+    let value: Double
+    let maxValue: Double
+    let color: Color
+    
+    private var filledDots: Int {
+        Int((value / maxValue) * 3)
+    }
+    
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(0..<3) { i in
+                Circle()
+                    .fill(i < filledDots ? color : Color.textMuted.opacity(0.3))
+                    .frame(width: 5, height: 5)
+            }
+        }
     }
 }
 
@@ -261,22 +259,11 @@ struct ModelRow: View {
 
 #Preview {
     VStack(spacing: 16) {
-        // Normal state
         ModelRow(
             model: .constant(AIModel.availableModels[0]),
             selectedModel: .constant("openai_whisper-base")
         )
-        
-        // Downloading state (simulated)
-        ModelRow(
-            model: .constant(AIModel.availableModels[0]),
-            selectedModel: .constant("openai_whisper-base")
-        )
-        .onAppear {
-            ModelDownloadService.shared.isDownloading["openai_whisper-large-v3_turbo"] = true
-            ModelDownloadService.shared.downloadProgress["openai_whisper-large-v3_turbo"] = 0.04
-        }
     }
     .padding()
-    .background(Color.black)
+    .background(Color.bgApp)
 }

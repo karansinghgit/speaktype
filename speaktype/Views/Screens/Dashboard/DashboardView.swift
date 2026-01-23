@@ -14,7 +14,6 @@ struct DashboardView: View {
     // Trial & License
     @EnvironmentObject var trialManager: TrialManager
     @EnvironmentObject var licenseManager: LicenseManager
-    @Environment(\.colorScheme) var colorScheme
     
     @AppStorage("selectedModelVariant") private var selectedModel: String = "openai_whisper-base"
     @State private var showFileImporter = false
@@ -138,25 +137,12 @@ struct DashboardView: View {
                         
                         Button(action: { selection = .history }) {
                             Text("View all transcriptions")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .background(Color.accentPrimary)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.stPrimary)
                         .padding(.top, 8)
                     }
                 }
-                .padding(24)
-                .background(Color.bgCard)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.border, lineWidth: 1)
-                )
-                .cardShadow()
+                .themedCard()
             }
             .padding(20)
         }
@@ -319,7 +305,7 @@ struct ProductivityCard: View {
                             .frame(width: 24, height: max(CGFloat(data.count) / CGFloat(maxCount) * 50, 6))
                         
                         Text(data.day)
-                            .font(.system(size: 10))
+                            .font(Typography.captionSmall)
                             .foregroundStyle(Color.textMuted)
                     }
                 }
@@ -328,14 +314,7 @@ struct ProductivityCard: View {
             }
             .padding(.top, 4)
         }
-        .padding(24)
-        .background(Color.bgCard)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.border, lineWidth: 1)
-        )
-        .cardShadow()
+        .themedCard()
     }
 }
 
@@ -348,15 +327,15 @@ struct StatPill: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(label)
-                .font(.system(size: 13))
+                .font(Typography.bodySmall)
                 .foregroundStyle(Color.textMuted)
             
             Text("→")
-                .font(.system(size: 12))
+                .font(Typography.caption)
                 .foregroundStyle(Color.textMuted)
             
             Text(value)
-                .font(.system(size: 13, weight: .medium))
+                .font(Typography.labelMedium)
                 .foregroundStyle(Color.textPrimary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
@@ -375,10 +354,10 @@ struct StatItem: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value)
-                .font(.system(size: 16, weight: .medium))
+                .font(Typography.titleLarge)
                 .foregroundStyle(Color.textPrimary)
             Text(label)
-                .font(.system(size: 11))
+                .font(Typography.captionSmall)
                 .foregroundStyle(Color.textMuted)
         }
     }
@@ -395,28 +374,23 @@ struct MetricCard: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 16))
+                .font(.title3)
                 .foregroundStyle(iconColor)
                 .frame(width: 24)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 11))
+                    .font(Typography.captionSmall)
                     .foregroundStyle(Color.textMuted)
                 
                 Text(value)
-                    .font(.system(size: 18, weight: .medium))
+                    .font(Typography.headlineMedium)
                     .foregroundStyle(Color.textPrimary)
             }
             
             Spacer()
         }
-        .padding(16)
-        .background(Color.bgCard)
-        .overlay(
-            Rectangle()
-                .stroke(Color.border, lineWidth: 1)
-        )
+        .themedCard(padding: 16)
     }
 }
 
@@ -430,7 +404,7 @@ struct RecentTranscriptionRow: View {
         HStack(spacing: 12) {
             // Preview text in a pill
             Text(item.transcript.isEmpty ? "Empty" : String(item.transcript.prefix(30)))
-                .font(.system(size: 13))
+                .font(Typography.bodySmall)
                 .foregroundStyle(Color.textPrimary)
                 .lineLimit(1)
                 .padding(.horizontal, 12)
@@ -439,12 +413,12 @@ struct RecentTranscriptionRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             
             Text("→")
-                .font(.system(size: 12))
+                .font(Typography.caption)
                 .foregroundStyle(Color.textMuted)
             
             // Full transcript preview
             Text(item.transcript.isEmpty ? "No content" : item.transcript)
-                .font(.system(size: 13))
+                .font(Typography.bodySmall)
                 .foregroundStyle(Color.textSecondary)
                 .lineLimit(1)
             
@@ -452,7 +426,7 @@ struct RecentTranscriptionRow: View {
             
             // Time ago
             Text(timeAgo(item.date))
-                .font(.system(size: 12))
+                .font(Typography.caption)
                 .foregroundStyle(Color.textMuted)
         }
         .padding(.vertical, 8)
@@ -480,8 +454,6 @@ struct RecentTranscriptionRow: View {
 // MARK: - Tips Card (Flow-style)
 
 struct TipsCard: View {
-    @State private var isMaximized = false
-    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Header with serif
@@ -494,79 +466,27 @@ struct TipsCard: View {
                 .foregroundStyle(Color.textSecondary)
                 .lineSpacing(4)
             
-            // Video
-            if let videoURL = Bundle.main.url(forResource: "tutorial", withExtension: "mp4") {
-                VideoPlayer(player: AVPlayer(url: videoURL))
-                    .aspectRatio(16/9, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.border, lineWidth: 1)
-                    )
-                    .overlay(alignment: .topTrailing) {
-                        Button(action: { isMaximized = true }) {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.system(size: 11))
-                                .foregroundStyle(Color.textPrimary)
-                                .padding(8)
-                                .background(Color.bgCard)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                        .buttonStyle(.plain)
-                        .padding(8)
-                    }
-                    .sheet(isPresented: $isMaximized) {
-                        ZStack {
-                            Color.ink.ignoresSafeArea()
-                            VideoPlayer(player: AVPlayer(url: videoURL))
-                                .aspectRatio(16/9, contentMode: .fit)
-                                
-                            VStack {
-                                HStack {
-                                    Spacer()
-                                    Button(action: { isMaximized = false }) {
-                                        Image(systemName: "xmark")
-                                            .font(.system(size: 14, weight: .medium))
-                                            .foregroundStyle(.white)
-                                            .padding(12)
-                                            .background(Color.white.opacity(0.1))
-                                            .clipShape(Circle())
-                                    }
-                                    .buttonStyle(.plain)
-                                    .keyboardShortcut(.escape, modifiers: [])
-                                }
-                                .padding()
-                                Spacer()
-                            }
-                        }
-                        .frame(minWidth: 800, minHeight: 600)
-                    }
-            } else {
-                // Placeholder with mic icon like Flow
-                VStack(spacing: 12) {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(Color.textMuted)
-                    
-                    Text("Take a quick note with your voice")
-                        .font(Typography.bodyMedium)
-                        .foregroundStyle(Color.textMuted)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 40)
-                .background(Color.bgHover)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+            // Placeholder with mic icon like Flow
+            VStack(spacing: 12) {
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(Color.textMuted)
+                
+                Text("Take a quick note with your voice")
+                    .font(Typography.bodyMedium)
+                    .foregroundStyle(Color.textMuted)
+                
+                Text("Press ⌘+Shift+Space to start recording")
+                    .font(Typography.caption)
+                    .foregroundStyle(Color.textMuted.opacity(0.7))
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 32)
+            .background(Color.bgHover)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
-        .padding(24)
         .frame(maxWidth: .infinity)
-        .background(Color.bgCard)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.border, lineWidth: 1)
-        )
-        .cardShadow()
+        .themedCard()
     }
 }
 

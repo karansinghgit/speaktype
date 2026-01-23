@@ -18,13 +18,15 @@ struct StatisticsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 30) {
+            VStack(alignment: .leading, spacing: 24) {
                 headerSection
-                periodSelector
                 summaryCards
                 barChartSection
                 detailsSection
             }
+            .padding(.horizontal, 24)
+            .padding(.top, 20)
+            .padding(.bottom, 24)
         }
         .background(Color.clear)
         .onAppear {
@@ -47,98 +49,84 @@ struct StatisticsView: View {
     // MARK: - View Components
     
     private var headerSection: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "chart.bar.fill")
-                .font(.system(size: 36))
-                .foregroundStyle(Color.accentPrimary)
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Statistics")
+                    .font(Typography.displayLarge)
+                    .foregroundStyle(Color.textPrimary)
+                
+                Text("\(totalWords(for: selectedPeriod)) words this \(selectedPeriod.rawValue.lowercased())")
+                    .font(Typography.bodySmall)
+                    .foregroundStyle(Color.textSecondary)
+            }
             
-            Text("Statistics")
-                .font(Typography.displayLarge)
-                .foregroundStyle(Color.textPrimary)
+            Spacer()
             
-            Text("Track your transcription activity")
-                .font(Typography.bodyMedium)
-                .foregroundStyle(Color.textSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 32)
-    }
-    
-    private var periodSelector: some View {
-        HStack(spacing: 12) {
-            ForEach(StatisticsPeriod.allCases) { period in
-                PeriodButton(
-                    period: period,
-                    isSelected: selectedPeriod == period,
-                    action: {
-                        withAnimation {
-                            selectedPeriod = period
+            // Period selector
+            HStack(spacing: 8) {
+                ForEach(StatisticsPeriod.allCases) { period in
+                    PeriodButton(
+                        period: period,
+                        isSelected: selectedPeriod == period,
+                        action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                selectedPeriod = period
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
-        .padding(.horizontal, 40)
     }
     
     private var summaryCards: some View {
-        ViewThatFits(in: .horizontal) {
-            // Wide Layout
-            HStack(spacing: 16) {
-                SummaryCard(
-                    icon: "doc.text",
-                    title: "Total Words",
-                    value: "\(totalWords(for: selectedPeriod))",
-                    color: Color.chartRed
-                )
-                
-                SummaryCard(
-                    icon: "calendar",
-                    title: "Daily Average",
-                    value: "\(dailyAverage(for: selectedPeriod))",
-                    color: Color.chartBlue
-                )
-                
-                SummaryCard(
-                    icon: "chart.line.uptrend.xyaxis",
-                    title: "Best Day",
-                    value: "\(bestDay(for: selectedPeriod))",
-                    color: Color.green
-                )
-            }
+        HStack(spacing: 16) {
+            StatCard(
+                icon: "doc.text.fill",
+                label: "Total Words",
+                value: "\(totalWords(for: selectedPeriod))"
+            )
             
-            // Narrow Layout (Vertical)
-            VStack(spacing: 16) {
-                SummaryCard(
-                    icon: "doc.text",
-                    title: "Total Words",
-                    value: "\(totalWords(for: selectedPeriod))",
-                    color: Color.chartRed
-                )
-                
-                SummaryCard(
-                    icon: "calendar",
-                    title: "Daily Average",
-                    value: "\(dailyAverage(for: selectedPeriod))",
-                    color: Color.chartBlue
-                )
-                
-                SummaryCard(
-                    icon: "chart.line.uptrend.xyaxis",
-                    title: "Best Day",
-                    value: "\(bestDay(for: selectedPeriod))",
-                    color: Color.green
-                )
-            }
+            StatCard(
+                icon: "calendar",
+                label: "Daily Average",
+                value: "\(dailyAverage(for: selectedPeriod))"
+            )
+            
+            StatCard(
+                icon: "chart.line.uptrend.xyaxis",
+                label: "Best Day",
+                value: "\(bestDay(for: selectedPeriod))"
+            )
+            
+            StatCard(
+                icon: "number",
+                label: "Transcriptions",
+                value: "\(transcriptionCount(for: selectedPeriod))"
+            )
         }
-        .padding(.horizontal, 40)
     }
     
     private var barChartSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Words Transcribed Per Day")
-                .font(Typography.headlineMedium)
-                .foregroundStyle(Color.textPrimary)
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Activity")
+                    .font(Typography.headlineLarge)
+                    .foregroundStyle(Color.textPrimary)
+                
+                Spacer()
+                
+                if !dailyData(for: selectedPeriod).isEmpty {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(transcriptionCount(for: selectedPeriod)) transcriptions")
+                            .font(Typography.labelSmall)
+                            .foregroundStyle(Color.textSecondary)
+                        Text(formattedDuration(for: selectedPeriod))
+                            .font(Typography.captionSmall)
+                            .foregroundStyle(Color.textMuted)
+                    }
+                }
+            }
             
             if dailyData(for: selectedPeriod).isEmpty {
                 emptyChartView
@@ -146,29 +134,34 @@ struct StatisticsView: View {
                 chartView
             }
         }
-        .themedCard(padding: 20)
-        .padding(.horizontal, 40)
+        .padding(24)
+        .background(Color.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.border.opacity(0.5), lineWidth: 1)
+        )
+        .cardShadow()
     }
     
     private var emptyChartView: some View {
         VStack(spacing: 16) {
             Image(systemName: "chart.bar.xaxis")
-                .font(.system(size: 50))
-                .foregroundStyle(.gray.opacity(0.5))
+                .font(.system(size: 48))
+                .foregroundStyle(Color.textMuted.opacity(0.4))
             
-            Text("No transcriptions yet")
-                .font(.headline)
-                .foregroundStyle(.gray)
-            
-            Text("Start recording to see your statistics")
-                .font(.subheadline)
-                .foregroundStyle(.gray.opacity(0.7))
+            VStack(spacing: 6) {
+                Text("No activity yet")
+                    .font(Typography.headlineMedium)
+                    .foregroundStyle(Color.textPrimary)
+                
+                Text("Your transcription statistics will appear here")
+                    .font(Typography.bodySmall)
+                    .foregroundStyle(Color.textSecondary)
+            }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 300)
-        .background(Color.bgCard)
-        .cornerRadius(12)
-        .padding(.horizontal, 40)
+        .frame(height: 280)
     }
     
     private var chartView: some View {
@@ -178,14 +171,8 @@ struct StatisticsView: View {
                     x: .value("Date", data.dateString),
                     y: .value("Words", data.wordCount)
                 )
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color.chartRed, Color.chartBlue],
-                        startPoint: .bottom,
-                        endPoint: .top
-                    )
-                )
-                .cornerRadius(6)
+                .foregroundStyle(Color.textSecondary.opacity(0.3))
+                .cornerRadius(8)
             }
         }
         .chartXAxis {
@@ -193,73 +180,54 @@ struct StatisticsView: View {
                  // For year (monthly view), show months
                 AxisMarks(values: .automatic) { value in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                        .foregroundStyle(Color.white.opacity(0.1))
+                        .foregroundStyle(Color.border.opacity(0.3))
                     AxisValueLabel()
-                        .font(.caption)
-                        .foregroundStyle(.gray)
+                        .font(Typography.captionSmall)
+                        .foregroundStyle(Color.textMuted)
                 }
             } else {
                 // For week/month (daily view), stride to avoid overlap
                 AxisMarks(values: .stride(by: selectedPeriod == .month ? .day : .day, count: selectedPeriod == .month ? 7 : 1)) { value in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                        .foregroundStyle(Color.white.opacity(0.1))
+                        .foregroundStyle(Color.border.opacity(0.3))
                     AxisValueLabel()
-                        .font(.caption)
-                        .foregroundStyle(.gray)
+                        .font(Typography.captionSmall)
+                        .foregroundStyle(Color.textMuted)
                 }
             }
         }
         .chartYAxis {
             AxisMarks(position: .leading) { value in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                    .foregroundStyle(Color.white.opacity(0.1))
+                    .foregroundStyle(Color.border.opacity(0.3))
                 AxisValueLabel()
-                    .font(.caption)
-                    .foregroundStyle(.gray)
+                    .font(Typography.captionSmall)
+                    .foregroundStyle(Color.textMuted)
             }
         }
-        .frame(height: 300)
-        .padding(.horizontal, 40)
+        .frame(height: 280)
     }
     
     private var detailsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Details")
-                .font(Typography.headlineMedium)
-                .foregroundStyle(Color.textPrimary)
+        HStack(spacing: 16) {
+            DetailCard(
+                icon: "number",
+                label: "Avg. words per note",
+                value: "\(averageWordsPerTranscription(for: selectedPeriod))"
+            )
             
-            ViewThatFits(in: .horizontal) {
-                HStack {
-                    StatRow(label: "Total Transcriptions", value: "\(transcriptionCount(for: selectedPeriod))")
-                    Spacer()
-                    StatRow(label: "Total Duration", value: formattedDuration(for: selectedPeriod))
-                }
-                
-                VStack(alignment: .leading, spacing: 16) {
-                    StatRow(label: "Total Transcriptions", value: "\(transcriptionCount(for: selectedPeriod))")
-                    StatRow(label: "Total Duration", value: formattedDuration(for: selectedPeriod))
-                }
-            }
+            DetailCard(
+                icon: "star.fill",
+                label: "Most active day",
+                value: mostActiveDay(for: selectedPeriod)
+            )
             
-            Divider()
-                .background(Color.border)
-            
-            ViewThatFits(in: .horizontal) {
-                HStack {
-                    StatRow(label: "Average Words Per Transcription", value: "\(averageWordsPerTranscription(for: selectedPeriod))")
-                    Spacer()
-                    StatRow(label: "Most Active Day", value: mostActiveDay(for: selectedPeriod))
-                }
-                
-                VStack(alignment: .leading, spacing: 16) {
-                    StatRow(label: "Average Words Per Transcription", value: "\(averageWordsPerTranscription(for: selectedPeriod))")
-                    StatRow(label: "Most Active Day", value: mostActiveDay(for: selectedPeriod))
-                }
-            }
+            DetailCard(
+                icon: "clock",
+                label: "Total duration",
+                value: formattedDuration(for: selectedPeriod)
+            )
         }
-        .themedCard()
-        .padding(.horizontal, 40)
-        .padding(.bottom, 40)
     }
     
     // MARK: - Data Calculations
@@ -477,47 +445,68 @@ struct DailyWordCount: Identifiable {
 
 // MARK: - Supporting Views
 
-struct SummaryCard: View {
+struct StatCard: View {
     let icon: String
-    let title: String
-    let value: String
-    let color: Color
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundStyle(color)
-                Spacer()
-            }
-            
-            Text(value)
-                .font(Typography.statValue)
-                .foregroundStyle(Color.textPrimary)
-            
-            Text(title)
-                .font(Typography.bodySmall)
-                .foregroundStyle(Color.textSecondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .themedCard(padding: 20)
-    }
-}
-
-struct StatRow: View {
     let label: String
     let value: String
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(Typography.labelSmall)
-                .foregroundStyle(Color.textSecondary)
+        VStack(alignment: .leading, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(Color.textMuted)
+            
             Text(value)
-                .font(Typography.headlineSmall)
+                .font(.system(size: 32, weight: .light, design: .serif))
                 .foregroundStyle(Color.textPrimary)
+            
+            Text(label)
+                .font(Typography.captionSmall)
+                .foregroundStyle(Color.textSecondary)
+                .textCase(.uppercase)
+                .tracking(0.5)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .background(Color.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.border.opacity(0.5), lineWidth: 1)
+        )
+    }
+}
+
+struct DetailCard: View {
+    let icon: String
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(Color.textMuted)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(Typography.captionSmall)
+                    .foregroundStyle(Color.textSecondary)
+                Text(value)
+                    .font(Typography.labelMedium)
+                    .foregroundStyle(Color.textPrimary)
+            }
+            
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.border.opacity(0.5), lineWidth: 1)
+        )
     }
 }
 
@@ -529,19 +518,12 @@ struct PeriodButton: View {
     var body: some View {
         Button(action: action) {
             Text(period.rawValue)
-                .font(Typography.bodyMedium)
-                .fontWeight(isSelected ? .semibold : .medium)
-                .foregroundStyle(isSelected ? .white : Color.textSecondary)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(isSelected ? Color.accentPrimary : Color.bgCard)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(isSelected ? Color.clear : Color.border, lineWidth: 1)
-                )
+                .font(Typography.labelMedium)
+                .foregroundStyle(isSelected ? Color.textPrimary : Color.textMuted)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(isSelected ? Color.bgHover : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
     }

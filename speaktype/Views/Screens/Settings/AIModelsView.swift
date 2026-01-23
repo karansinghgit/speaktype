@@ -18,12 +18,14 @@ struct AIModelsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 30) {
+            VStack(alignment: .leading, spacing: 24) {
                 headerSection
                 currentModelCard
                 modelsListSection
             }
-            .padding(30)
+            .padding(.horizontal, 24)
+            .padding(.top, 20)
+            .padding(.bottom, 24)
         }
         .background(Color.clear)
     }
@@ -31,13 +33,13 @@ struct AIModelsView: View {
     // MARK: - Subviews
     
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 4) {
             Text("AI Models")
                 .font(Typography.displayLarge)
                 .foregroundStyle(Color.textPrimary)
             
             Text("Manage your local transcription models powered by WhisperKit.")
-                .font(Typography.cardDescription)
+                .font(Typography.bodySmall)
                 .foregroundStyle(Color.textSecondary)
         }
     }
@@ -45,8 +47,10 @@ struct AIModelsView: View {
     private var currentModelCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Default Model")
-                .font(Typography.labelMedium)
+                .font(Typography.captionSmall)
                 .foregroundStyle(Color.textSecondary)
+                .textCase(.uppercase)
+                .tracking(0.5)
             
             Text(selectedModelName)
                 .font(Typography.headlineMedium)
@@ -58,19 +62,16 @@ struct AIModelsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.border, lineWidth: 1)
+                .stroke(Color.border.opacity(0.5), lineWidth: 1)
         )
         .cardShadow()
     }
     
     private var modelsListSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Available Models")
-                    .font(Typography.displaySmall)
-                    .foregroundStyle(Color.textPrimary)
-                Spacer()
-            }
+            Text("Available Models")
+                .font(Typography.headlineLarge)
+                .foregroundStyle(Color.textPrimary)
             
             VStack(spacing: 12) {
                 ForEach($models) { $model in

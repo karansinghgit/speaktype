@@ -88,7 +88,7 @@ struct ModelRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isActive ? Color.accentSuccess.opacity(0.5) : Color.border, lineWidth: 1)
+                .stroke(isActive ? Color.textPrimary.opacity(0.3) : Color.border.opacity(0.5), lineWidth: 1)
         )
         .cardShadow()
     }
@@ -116,7 +116,7 @@ struct ModelRow: View {
                         .frame(height: 4)
                     
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.accentBlue)
+                        .fill(Color.textSecondary.opacity(0.4))
                         .frame(width: geometry.size.width * progress, height: 4)
                 }
             }
@@ -148,8 +148,8 @@ struct ModelRow: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
-                .background(Color.accentSuccess.opacity(0.15))
-                .foregroundStyle(Color.accentSuccess)
+                .background(Color.bgHover)
+                .foregroundStyle(Color.textPrimary)
                 .clipShape(Capsule())
             } else {
                 Button("Use") {
@@ -191,8 +191,8 @@ struct ModelRow: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(Color.accentError)
-            .foregroundStyle(.white)
+            .background(Color.textMuted.opacity(0.2))
+            .foregroundStyle(Color.textPrimary)
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -210,7 +210,7 @@ struct ModelRow: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 9)
-            .background(Color.accentBlue)
+            .background(Color.accentPrimary)
             .foregroundStyle(.white)
             .clipShape(Capsule())
         }

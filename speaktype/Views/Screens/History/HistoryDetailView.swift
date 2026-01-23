@@ -13,14 +13,13 @@ struct HistoryDetailView: View {
                 // Header with date and duration
                 HStack(alignment: .top) {
                     Text(item.date.formatted(date: .abbreviated, time: .shortened))
-                        .font(.caption)
+                        .font(Typography.caption)
                         .foregroundStyle(.gray)
                     
                     Spacer()
                     
                     Text(formatDuration(item.duration))
-                        .font(.caption)
-                        .fontWeight(.medium)
+                        .font(Typography.labelMedium)
                         .foregroundStyle(.blue)
                 }
                 
@@ -28,8 +27,7 @@ struct HistoryDetailView: View {
                 HStack {
                     // Original badge
                     Text("Original")
-                        .font(.caption)
-                        .fontWeight(.semibold)
+                        .font(Typography.badge)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(Color.blue)
@@ -44,10 +42,9 @@ struct HistoryDetailView: View {
                     }) {
                         HStack(spacing: 6) {
                             Image(systemName: "doc.on.doc")
-                                .font(.caption)
+                                .font(.system(size: 11))
                             Text("Copy")
-                                .font(.caption)
-                                .fontWeight(.medium)
+                                .font(Typography.labelMedium)
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
@@ -62,7 +59,7 @@ struct HistoryDetailView: View {
                 
                 // Transcript
                 Text(item.transcript)
-                    .font(.body)
+                    .font(Typography.bodyMedium)
                     .textSelection(.enabled)
                     .padding(.vertical, 8)
                 
@@ -75,17 +72,17 @@ struct HistoryDetailView: View {
                         HStack {
                             HStack(spacing: 6) {
                                 Image(systemName: "waveform")
-                                    .font(.caption)
+                                    .font(.system(size: 11))
                                     .foregroundStyle(.gray)
                                 Text("Recording")
-                                    .font(.caption)
+                                    .font(Typography.caption)
                                     .foregroundStyle(.gray)
                             }
                             
                             Spacer()
                             
                             Text(formatTime(audioPlayer.currentTime))
-                                .font(.caption)
+                                .font(Typography.caption)
                                 .foregroundStyle(.gray)
                                 .monospacedDigit()
                         }
@@ -149,11 +146,11 @@ struct HistoryDetailView: View {
                         Image(systemName: "waveform.circle")
                             .foregroundStyle(.gray)
                         Text("Audio Duration")
-                            .font(.subheadline)
+                            .font(Typography.bodySmall)
                             .foregroundStyle(.gray)
                         Spacer()
                         Text(formatDuration(item.duration))
-                            .font(.subheadline)
+                            .font(Typography.bodySmall)
                             .foregroundStyle(.white)
                     }
                     
@@ -163,11 +160,11 @@ struct HistoryDetailView: View {
                             Image(systemName: "cpu")
                                 .foregroundStyle(.gray)
                             Text("Transcription Model")
-                                .font(.subheadline)
+                                .font(Typography.bodySmall)
                                 .foregroundStyle(.gray)
                             Spacer()
                             Text(model)
-                                .font(.subheadline)
+                                .font(Typography.bodySmall)
                                 .foregroundStyle(.white)
                                 .lineLimit(1)
                         }
@@ -179,11 +176,11 @@ struct HistoryDetailView: View {
                             Image(systemName: "clock")
                                 .foregroundStyle(.gray)
                             Text("Transcription Time")
-                                .font(.subheadline)
+                                .font(Typography.bodySmall)
                                 .foregroundStyle(.gray)
                             Spacer()
                             Text(formatDuration(transcriptionTime))
-                                .font(.subheadline)
+                                .font(Typography.bodySmall)
                                 .foregroundStyle(.white)
                         }
                     }

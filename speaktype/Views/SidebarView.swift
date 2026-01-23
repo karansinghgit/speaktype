@@ -40,15 +40,15 @@ struct SidebarView: View {
 // MARK: - Constants
 
 private enum SidebarConstants {
-    static let width: CGFloat = 220
+    static let width: CGFloat = 260
     static let topInset: CGFloat = 52
-    static let horizontalPadding: CGFloat = 18
-    static let itemHorizontalPadding: CGFloat = 12
-    static let headerBottomPadding: CGFloat = 24
+    static let horizontalPadding: CGFloat = 20
+    static let itemHorizontalPadding: CGFloat = 14
+    static let headerBottomPadding: CGFloat = 28
     static let itemSpacing: CGFloat = 2
     static let bottomPadding: CGFloat = 20
-    static let iconSize: CGFloat = 16
-    static let itemVerticalPadding: CGFloat = 10
+    static let iconSize: CGFloat = 17
+    static let itemVerticalPadding: CGFloat = 11
     static let itemCornerRadius: CGFloat = 8
 }
 
@@ -56,23 +56,15 @@ private enum SidebarConstants {
 
 private struct SidebarHeader: View {
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 14) {
             Image("AppLogo")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 24, height: 24)
+                .frame(width: 48, height: 48)
             
             Text("SpeakType")
                 .font(Typography.sidebarLogo)
                 .foregroundStyle(Color.textPrimary)
-            
-            Text("Pro")
-                .font(Typography.sidebarBadge)
-                .foregroundStyle(Color.textMuted)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(Color.bgHover)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
             
             Spacer()
         }

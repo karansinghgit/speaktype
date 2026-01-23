@@ -21,10 +21,13 @@ class MiniRecorderWindowController: NSObject {
         if !panel.isVisible {
             print("Showing Mini Recorder Panel")
             
-            // Position above dock
+            // Force layout to ensure frame is correct
+            panel.layoutIfNeeded()
+            
+            // Position above dock with fixed width (panel width should be 220)
             if let screen = NSScreen.main {
                 let visibleFrame = screen.visibleFrame
-                let windowWidth = panel.frame.width
+                let windowWidth: CGFloat = 220 // Fixed width from setupPanel
                 let x = visibleFrame.midX - (windowWidth / 2)
                 let y = visibleFrame.minY + 50 // 50px padding above dock
                 panel.setFrameOrigin(NSPoint(x: x, y: y))
@@ -100,33 +103,50 @@ class MiniRecorderWindowController: NSObject {
             // 1. Copy to clipboard
             ClipboardService.shared.copy(text: text)
             
-            // 2. Ensure panel is closed
+            // 2. Close panel
             await MainActor.run {
-                 self.panel?.orderOut(nil)
+                self.panel?.orderOut(nil)
             }
             
-            // 3. Wait for focus switch
-            print("Waiting for focus switch...")
-            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2s wait for stability
+            // 3. Check accessibility and show alert if needed
+            let accessibilityTrusted = ClipboardService.shared.isAccessibilityTrusted
             
-            // 4. Robust Paste Routine
-            print("Attempting Paste Routine...")
-            
-            if ClipboardService.shared.isAccessibilityTrusted {
-                // User has permissions, but CGEvent is failing for them.
-                // Switch to AppleScript (System Events) as PRIMARY method. It's slower but 100% reliable.
-                print("✅ Accessibility Trusted. Using robust AppleScript paste.")
-                
-                // Small delay to ensure 'System Events' is ready
-                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
-                
+            if !accessibilityTrusted {
                 await MainActor.run {
-                    ClipboardService.shared.appleScriptPaste()
+                    self.showAccessibilityAlert()
                 }
-            } else {
-                // No permissions? Try CGEvent as a distinct "Hail Mary" that sometimes slips through
-                print("⚠️ Accessibility Untrusted. Trying CGEvent fallback.")
+                return
+            }
+            
+            // 4. Re-activate the target app
+            if let app = self.lastActiveApp {
+                await MainActor.run {
+                    app.activate(options: .activateIgnoringOtherApps)
+                }
+            }
+            
+            // 5. Wait for focus
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            
+            // 6. Paste using CGEvent (Accessibility permission only)
+            await MainActor.run {
                 ClipboardService.shared.paste()
+            }
+        }
+    }
+    
+    private func showAccessibilityAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Accessibility Permission Required"
+        alert.informativeText = "SpeakType needs Accessibility permission to automatically paste transcriptions into the active app.\n\nYour transcription has been copied to the clipboard.\n\nTo enable auto-paste, grant permission in:\nSystem Settings → Privacy & Security → Accessibility"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Open System Settings")
+        alert.addButton(withTitle: "OK")
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                NSWorkspace.shared.open(url)
             }
         }
     }

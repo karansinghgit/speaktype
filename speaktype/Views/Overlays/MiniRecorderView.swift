@@ -18,18 +18,18 @@ struct MiniRecorderView: View {
     // MARK: - State for Animation
     @State private var phase: CGFloat = 0
     
-    // Smooth out the raw audio level for cleaner wave height
-    private var normalizedAudioLevel: CGFloat {
+    // Calculate bar height based on audio level and position
+    private func barHeight(for index: Int) -> CGFloat {
         let level = CGFloat(audioRecorder.audioLevel)
-        // Reduced amplitude multiplier for smoother, less harsh waves
-        return max(2.0, sqrt(level) * 20.0) 
-    }
-    
-    // Map normalized frequency (0-1) to a visual frequency range
-    private var targetFrequency: CGFloat {
-        let baseFreq: CGFloat = 8.0
-        let range: CGFloat = 10.0 // Reduced range for less erratic movement
-        return baseFreq + (CGFloat(audioRecorder.audioFrequency) * range)
+        let baseHeight: CGFloat = 4
+        let maxHeight: CGFloat = 28
+        
+        // Create wave pattern that responds to audio
+        let waveOffset = sin(CGFloat(index) * 0.5 + phase) * 0.3
+        let audioMultiplier = sqrt(level) * (0.8 + waveOffset)
+        
+        let height = baseHeight + (maxHeight - baseHeight) * audioMultiplier
+        return max(baseHeight, min(height, maxHeight))
     }
     
     // Default Init for Preview
@@ -44,50 +44,23 @@ struct MiniRecorderView: View {
             
             if isProcessing {
                 Text(statusMessage)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(Typography.labelMedium)
                     .foregroundColor(.white)
                     .transition(.opacity)
             } else {
                 HStack(spacing: 12) {
                     stopButton
                     
-                    // Waveform Container
-                    ZStack {
-                        // Multiple waves for "water-like" effect
-                        HorizontalWave(
-                            phase: phase,
-                            amplitude: normalizedAudioLevel,
-                            frequency: targetFrequency
-                        )
-                        .stroke(
-                            LinearGradient(
-                                colors: [.cyan.opacity(0.5), .blue.opacity(0.5)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            lineWidth: 2
-                        )
-                        .offset(y: 1)
-
-                        HorizontalWave(
-                            phase: phase * 1.5 + 2,
-                            amplitude: normalizedAudioLevel * 0.8,
-                            frequency: targetFrequency * 1.2
-                        )
-                        .stroke(
-                            LinearGradient(
-                                colors: [.green, .yellow, .orange, .red],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            lineWidth: 3
-                        )
-                        // Slower animation response for smoother look
-                        .animation(.linear(duration: 0.2), value: audioRecorder.audioFrequency)
-                        .animation(.linear(duration: 0.2), value: audioRecorder.audioLevel)
+                    // Waveform - bar visualizer style
+                    HStack(spacing: 3) {
+                        ForEach(0..<20) { index in
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.white.opacity(0.7))
+                                .frame(width: 3, height: barHeight(for: index))
+                                .animation(.easeInOut(duration: 0.15), value: audioRecorder.audioLevel)
+                        }
                     }
-                    .frame(height: 30) // Compact waveform height
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .frame(height: 30)
                 }
                 .padding(.horizontal, 12)
                 .transition(.opacity)
@@ -107,14 +80,21 @@ struct MiniRecorderView: View {
         }
         .onAppear {
             initializedService()
-            // Slower, calmer phase animation
-            withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
-                phase = .pi * 2
+            // Animate phase for wave movement
+            withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                phase = .pi * 4
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
              // Ensure focus if needed
         }
+        .background(
+            KeyEventHandlerView(onEscape: {
+                if isListening {
+                    stopAndTranscribe()
+                }
+            })
+        )
     }
     
     // MARK: - Subviews
@@ -139,20 +119,13 @@ struct MiniRecorderView: View {
     
     private var backgroundView: some View {
         ZStack {
-            Color(nsColor: .windowBackgroundColor).opacity(0.8) // Native semi-transparent look
-            VisualEffectBlur(material: .hudWindow, blendingMode: .behindWindow, cornerRadius: 25) // Glass effect
-            Color.black.opacity(0.8) // Dark tin
+            // Dark background with blur
+            VisualEffectBlur(material: .hudWindow, blendingMode: .behindWindow, cornerRadius: 25)
+            Color.black.opacity(0.85)
             
             // Subtle border
             RoundedRectangle(cornerRadius: 25)
-                .stroke(
-                    LinearGradient(
-                        colors: [.white.opacity(0.15), .white.opacity(0.05)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1
-                )
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
         }
     }
     
@@ -175,7 +148,13 @@ struct MiniRecorderView: View {
     
     private func initializedService() {
         Task {
-            try? await whisperService.loadModel(variant: selectedModel)
+            debugLog("Initializing WhisperService with model: \(selectedModel)")
+            do {
+                try await whisperService.loadModel(variant: selectedModel)
+                debugLog("Model preloaded successfully")
+            } catch {
+                debugLog("Model preload failed: \(error.localizedDescription)")
+            }
         }
     }
     
@@ -188,15 +167,27 @@ struct MiniRecorderView: View {
     }
     
     private func startRecording() {
-        guard !isProcessing else { return }
+        guard !isProcessing else {
+            debugLog("Already processing, ignoring start request")
+            return
+        }
+        debugLog("Starting recording...")
         audioRecorder.startRecording()
         isListening = true
     }
     
     private func stopAndTranscribe() {
+        debugLog("stopAndTranscribe called")
         Task {
-            guard let url = await audioRecorder.stopRecording() else {
-                await MainActor.run { isListening = false }
+            let url = await audioRecorder.stopRecording()
+            debugLog("stopRecording returned: \(url?.absoluteString ?? "nil")")
+            
+            guard let url = url else {
+                debugLog("No recording URL, cancelling")
+                await MainActor.run { 
+                    isListening = false
+                    onCancel?()
+                }
                 return
             }
             
@@ -209,19 +200,60 @@ struct MiniRecorderView: View {
             await processRecording(url: url)
         }
     }
+    
+    private func debugLog(_ message: String) {
+        let logPath = "/tmp/speaktype_debug.log"
+        let logEntry = "[\(Date())] \(message)\n"
+        if let data = logEntry.data(using: .utf8) {
+            if FileManager.default.fileExists(atPath: logPath) {
+                if let handle = FileHandle(forWritingAtPath: logPath) {
+                    handle.seekToEndOfFile()
+                    handle.write(data)
+                    handle.closeFile()
+                }
+            } else {
+                FileManager.default.createFile(atPath: logPath, contents: data)
+            }
+        }
+    }
 
     private func processRecording(url: URL) async {
+        debugLog("processRecording started with url: \(url.lastPathComponent)")
         do {
+             // Ensure model is loaded before transcribing
              if !whisperService.isInitialized || whisperService.currentModelVariant != selectedModel {
+                 debugLog("Loading model: \(selectedModel)")
                  await MainActor.run { statusMessage = "Loading Model..." }
-                 try? await whisperService.loadModel(variant: selectedModel)
+                 do {
+                     try await whisperService.loadModel(variant: selectedModel)
+                     debugLog("Model loaded successfully")
+                 } catch {
+                     debugLog("Model load failed: \(error.localizedDescription)")
+                     await MainActor.run { 
+                         statusMessage = "Model load failed"
+                         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                             self.isProcessing = false
+                             self.onCancel?()
+                         }
+                     }
+                     return
+                 }
              }
              
+             debugLog("Starting transcription...")
              await MainActor.run { statusMessage = "Transcribing..." }
              let text = try await whisperService.transcribe(audioFile: url)
+             debugLog("Transcription result: \(text.prefix(50))...")
              
              guard !text.isEmpty else {
-                 await MainActor.run { isProcessing = false }
+                 debugLog("Empty text, cancelling")
+                 await MainActor.run { 
+                     statusMessage = "No speech detected"
+                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                         self.isProcessing = false
+                         self.onCancel?()
+                     }
+                 }
                  return
              }
              
@@ -235,19 +267,19 @@ struct MiniRecorderView: View {
                 transcriptionTime: nil
              )
              
+             debugLog("Calling onCommit...")
              await MainActor.run {
                  onCommit?(text)
                  isProcessing = false
              }
+             debugLog("onCommit called successfully")
         } catch {
-             print("Transcription process failed: \(error)")
+             debugLog("Error: \(error.localizedDescription)")
              await MainActor.run { 
-                 statusMessage = "Error: \(error.localizedDescription)"
-                 // Hide after delay
+                 statusMessage = "Transcription failed"
                  DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                     if self.statusMessage.contains("Error") {
-                        self.isProcessing = false
-                     }
+                     self.isProcessing = false
+                     self.onCancel?()
                  }
              }
         }
@@ -329,5 +361,37 @@ struct VisualEffectBlur: NSViewRepresentable {
         nsView.material = material
         nsView.blendingMode = blendingMode
         nsView.layer?.cornerRadius = cornerRadius
+    }
+}
+
+// MARK: - Key Event Handler
+
+struct KeyEventHandlerView: NSViewRepresentable {
+    let onEscape: () -> Void
+    
+    func makeNSView(context: Context) -> NSView {
+        let view = KeyCaptureView()
+        view.onEscape = onEscape
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if let view = nsView as? KeyCaptureView {
+            view.onEscape = onEscape
+        }
+    }
+    
+    class KeyCaptureView: NSView {
+        var onEscape: (() -> Void)?
+        
+        override var acceptsFirstResponder: Bool { true }
+        
+        override func keyDown(with event: NSEvent) {
+            if event.keyCode == 53 { // Escape key
+                onEscape?()
+            } else {
+                super.keyDown(with: event)
+            }
+        }
     }
 }

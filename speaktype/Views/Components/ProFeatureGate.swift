@@ -55,11 +55,10 @@ struct UpgradePromptView: View {
                 .foregroundStyle(.blue.gradient)
             
             Text(feature.displayName)
-                .font(.title2)
-                .fontWeight(.semibold)
+                .font(Typography.headlineLarge)
             
             Text(feature.description)
-                .font(.body)
+                .font(Typography.bodyMedium)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
@@ -85,8 +84,7 @@ struct UpgradePromptView: View {
 struct ProBadge: View {
     var body: some View {
         Text("PRO")
-            .font(.caption2)
-            .fontWeight(.bold)
+            .font(Typography.badge)
             .foregroundColor(.white)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
@@ -118,7 +116,7 @@ struct FeatureLockOverlay: View {
                     .foregroundColor(.white)
                 
                 Text("Pro Feature")
-                    .font(.headline)
+                    .font(Typography.labelMedium)
                     .foregroundColor(.white)
                 
                 Button("Unlock Now") {

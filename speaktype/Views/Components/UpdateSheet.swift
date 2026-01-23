@@ -22,12 +22,11 @@ struct UpdateSheet: View {
                 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("A new version of \(appName) is available!")
-                        .font(.title2)
-                        .fontWeight(.semibold)
+                        .font(Typography.headlineLarge)
                         .foregroundStyle(.primary)
                     
                     Text("\(appName) \(update.version) is now available—you have \(AppVersion.currentVersion). Would you like to download it now?")
-                        .font(.body)
+                        .font(Typography.bodyMedium)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -36,18 +35,17 @@ struct UpdateSheet: View {
             // What's New Section
             VStack(alignment: .leading, spacing: 16) {
                 Text("What's New in Version \(update.version)")
-                    .font(.title3)
-                    .fontWeight(.semibold)
+                    .font(Typography.headlineMedium)
                     .foregroundStyle(.primary)
                 
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(update.releaseNotes, id: \.self) { note in
                         HStack(alignment: .top, spacing: 8) {
                             Text("•")
-                                .font(.body)
+                                .font(Typography.bodyMedium)
                                 .foregroundStyle(.primary)
                             Text(note)
-                                .font(.body)
+                                .font(Typography.bodyMedium)
                                 .foregroundStyle(.primary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -64,7 +62,7 @@ struct UpdateSheet: View {
             HStack(spacing: 8) {
                 Toggle(isOn: $autoUpdate) {
                     Text("Automatically download and install updates in the future")
-                        .font(.subheadline)
+                        .font(Typography.bodySmall)
                         .foregroundStyle(.secondary)
                 }
                 .toggleStyle(.checkbox)
@@ -104,8 +102,7 @@ struct UpdateSheet: View {
 struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.body)
-            .fontWeight(.medium)
+            .font(Typography.labelMedium)
             .foregroundStyle(.white)
             .padding(.horizontal, 24)
             .padding(.vertical, 10)
@@ -118,7 +115,7 @@ struct PrimaryButtonStyle: ButtonStyle {
 struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.body)
+            .font(Typography.labelMedium)
             .foregroundStyle(.primary)
             .padding(.horizontal, 24)
             .padding(.vertical, 10)

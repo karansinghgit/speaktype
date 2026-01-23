@@ -64,11 +64,11 @@ struct WelcomePage: View {
             
             VStack(spacing: 16) {
                 Text("Welcome to SpeakType")
-                    .font(.system(size: 42, weight: .bold)) // Removed .rounded
+                    .font(Typography.displayLarge)
                     .foregroundStyle(Color.textPrimary)
                 
                 Text("Experience the power of local AI transcription. Secure, fast, and completely offline.")
-                    .font(.title3)
+                    .font(Typography.bodyLarge)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(Color.textSecondary)
                     .frame(maxWidth: 500)
@@ -82,8 +82,7 @@ struct WelcomePage: View {
             
             Button(action: action) {
                 Text("Get Started")
-                    .font(.headline)
-                    .fontWeight(.bold)
+                    .font(Typography.labelLarge)
                     .foregroundStyle(.white)
                     .frame(width: 200, height: 50)
                     .background(Color.accentRed)
@@ -104,10 +103,10 @@ struct PermissionsPage: View {
         VStack(spacing: 40) {
             VStack(spacing: 10) {
                 Text("Permissions Setup")
-                    .font(.system(size: 36, weight: .bold)) // Removed .rounded
+                    .font(Typography.displayMedium)
                     .foregroundStyle(Color.textPrimary)
                 Text("SpeakType needs access to your microphone and accessibility features to function.")
-                    .font(.body)
+                    .font(Typography.bodyMedium)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -139,8 +138,7 @@ struct PermissionsPage: View {
             Button(action: finishAction) {
                 HStack {
                     Text("Start Using SpeakType")
-                        .font(.title3)
-                        .fontWeight(.bold)
+                        .font(Typography.labelLarge)
                     if micStatus == .authorized && accessibilityStatus {
                         Image(systemName: "checkmark")
                     }
@@ -229,11 +227,11 @@ struct FeatureCard: View {
                 .clipShape(Circle())
             
             Text(title)
-                .font(.headline)
+                .font(Typography.labelMedium)
                 .foregroundStyle(Color.textPrimary)
             
             Text(description)
-                .font(.caption)
+                .font(Typography.captionSmall)
                 .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -269,10 +267,10 @@ struct OnboardingPermissionRow: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.headline)
+                    .font(Typography.labelMedium)
                     .foregroundStyle(Color.textPrimary)
                 Text(description)
-                    .font(.subheadline)
+                    .font(Typography.bodySmall)
                     .foregroundStyle(Color.textSecondary)
             }
             
@@ -281,8 +279,7 @@ struct OnboardingPermissionRow: View {
             if isGranted {
                 HStack {
                     Text("Granted")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .font(Typography.labelMedium)
                     Image(systemName: "checkmark.circle.fill")
                 }
                 .foregroundStyle(.green)
@@ -293,7 +290,7 @@ struct OnboardingPermissionRow: View {
             } else {
                 Button(action: action) {
                     Text("Allow Access")
-                        .fontWeight(.semibold)
+                        .font(Typography.labelMedium)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .background(Color.accentRed)

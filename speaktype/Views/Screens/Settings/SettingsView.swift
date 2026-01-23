@@ -98,12 +98,12 @@ struct GeneralSettingsTab: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
                 // Appearance
                 SettingsSection {
                     SettingsSectionHeader(icon: "paintpalette", title: "Appearance", subtitle: "Choose your preferred theme")
                     
-                    HStack(spacing: 16) {
+                    HStack(spacing: 20) {
                         ForEach(AppTheme.allCases) { theme in
                             RadioButton(
                                 title: theme.rawValue,
@@ -112,90 +112,102 @@ struct GeneralSettingsTab: View {
                             )
                         }
                     }
-                    .padding(.top, 8)
                 }
                 
                 // Shortcuts
                 SettingsSection {
                     SettingsSectionHeader(icon: "command", title: "Shortcuts", subtitle: "Configure recording hotkeys")
                     
-                    HStack {
-                        Text("Primary Hotkey")
-                            .font(Typography.bodyMedium)
-                            .foregroundStyle(Color.textPrimary)
-                        Spacer()
-                        Menu {
-                            ForEach(HotkeyOption.allCases) { option in
-                                Button(option.displayName) {
-                                    selectedHotkey = option
+                    VStack(spacing: 16) {
+                        HStack {
+                            Text("Primary Hotkey")
+                                .font(Typography.bodyMedium)
+                                .foregroundStyle(Color.textPrimary)
+                            Spacer()
+                            Menu {
+                                ForEach(HotkeyOption.allCases) { option in
+                                    Button(option.displayName) {
+                                        selectedHotkey = option
+                                    }
                                 }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Text(selectedHotkey.displayName)
+                                        .font(Typography.bodySmall)
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.system(size: 9))
+                                }
+                                .foregroundStyle(Color.textPrimary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(Color.bgHover)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
                             }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Text(selectedHotkey.displayName)
-                                    .font(Typography.bodySmall)
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .font(.system(size: 9))
-                            }
-                            .foregroundStyle(Color.textPrimary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.bgHover)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .menuStyle(.borderlessButton)
                         }
-                        .menuStyle(.borderlessButton)
+                        
+                        Divider()
+                            .background(Color.border.opacity(0.5))
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Custom Shortcut")
+                                    .font(Typography.bodyMedium)
+                                    .foregroundStyle(Color.textPrimary)
+                                Spacer()
+                                KeyboardShortcuts.Recorder(for: .toggleRecord)
+                            }
+                            
+                            Text("Quick tap to start hands-free recording. Press and hold for push-to-talk.")
+                                .font(Typography.captionSmall)
+                                .foregroundStyle(Color.textMuted)
+                        }
                     }
-                    
-                    Divider().background(Color.border)
-                    
-                    HStack {
-                        Text("Custom Shortcut")
-                            .font(Typography.bodyMedium)
-                            .foregroundStyle(Color.textSecondary)
-                        Spacer()
-                        KeyboardShortcuts.Recorder(for: .toggleRecord)
-                    }
-                    
-                    Text("Quick tap to start hands-free recording. Press and hold for push-to-talk.")
-                        .font(Typography.caption)
-                        .foregroundStyle(Color.textMuted)
-                        .padding(.top, 4)
                 }
                 
                 // Updates
                 SettingsSection {
                     SettingsSectionHeader(icon: "arrow.down.circle", title: "Updates", subtitle: "SpeakType \(AppVersion.currentVersion)")
                     
-                    HStack {
-                        Text("Automatically check for updates")
-                            .font(Typography.bodyMedium)
+                    VStack(spacing: 16) {
+                        HStack {
+                            Text("Automatically check for updates")
+                                .font(Typography.bodyMedium)
+                                .foregroundStyle(Color.textPrimary)
+                            Spacer()
+                            Toggle("", isOn: $autoUpdate)
+                                .labelsHidden()
+                        }
+                        
+                        Button(action: {
+                            Task {
+                                await updateService.checkForUpdates()
+                                if updateService.availableUpdate != nil {
+                                    showUpdateSheet = true
+                                }
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                if updateService.isCheckingForUpdates {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                        .frame(width: 14, height: 14)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 12))
+                                }
+                                Text(updateService.isCheckingForUpdates ? "Checking..." : "Check for Updates")
+                                    .font(Typography.labelMedium)
+                            }
                             .foregroundStyle(Color.textPrimary)
-                        Spacer()
-                        Toggle("", isOn: $autoUpdate)
-                            .labelsHidden()
-                    }
-                    
-                    Button(action: {
-                        Task {
-                            await updateService.checkForUpdates()
-                            if updateService.availableUpdate != nil {
-                                showUpdateSheet = true
-                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.bgHover)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
-                    }) {
-                        HStack(spacing: 6) {
-                            if updateService.isCheckingForUpdates {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                                    .frame(width: 14, height: 14)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                            }
-                            Text(updateService.isCheckingForUpdates ? "Checking..." : "Check for Updates")
-                        }
+                        .buttonStyle(.plain)
+                        .disabled(updateService.isCheckingForUpdates)
                     }
-                    .buttonStyle(.stSecondary)
-                    .disabled(updateService.isCheckingForUpdates)
                 }
                 
                 // License
@@ -209,11 +221,15 @@ struct GeneralSettingsTab: View {
                     if licenseManager.isPro {
                         Button(action: { showDeactivateAlert = true }) {
                             Text("Deactivate License")
+                                .font(Typography.labelMedium)
+                                .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.stSecondary)
                     } else {
                         Button(action: { showLicenseSheet = true }) {
                             Text("Activate License")
+                                .font(Typography.labelMedium)
+                                .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.stPrimary)
                     }
@@ -248,11 +264,11 @@ struct AudioSettingsTab: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
                 SettingsSection {
                     SettingsSectionHeader(icon: "mic", title: "Input Device", subtitle: "Select your microphone")
                     
-                    VStack(spacing: 8) {
+                    VStack(spacing: 12) {
                         if audioRecorder.availableDevices.isEmpty {
                             Text("No input devices found")
                                 .font(Typography.bodyMedium)
@@ -275,10 +291,17 @@ struct AudioSettingsTab: View {
                     Button(action: { audioRecorder.fetchAvailableDevices() }) {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 12))
                             Text("Refresh Devices")
+                                .font(Typography.labelMedium)
                         }
+                        .foregroundStyle(Color.textPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.bgHover)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
-                    .buttonStyle(.stSecondary)
+                    .buttonStyle(.plain)
                     .padding(.top, 8)
                 }
             }
@@ -299,11 +322,11 @@ struct PermissionsSettingsTab: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
                 SettingsSection {
                     SettingsSectionHeader(icon: "shield", title: "App Permissions", subtitle: "Required for full functionality")
                     
-                    VStack(spacing: 12) {
+                    VStack(spacing: 10) {
                         SettingsPermissionItem(
                             icon: "mic.fill",
                             color: Color.textSecondary,
@@ -366,23 +389,23 @@ struct SettingsSectionHeader: View {
     let subtitle: String
     
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundStyle(Color.accentPrimary)
+                .font(.system(size: 14))
+                .foregroundStyle(Color.textMuted)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(Typography.headlineSmall)
+                    .font(Typography.labelLarge)
                     .foregroundStyle(Color.textPrimary)
                 Text(subtitle)
-                    .font(Typography.caption)
+                    .font(Typography.captionSmall)
                     .foregroundStyle(Color.textMuted)
             }
             
             Spacer()
         }
-        .padding(.bottom, 12)
+        .padding(.bottom, 16)
     }
 }
 
@@ -394,10 +417,10 @@ struct SettingsSection<Content: View>: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             content
         }
-        .themedCard(padding: 20)
+        .themedCard(padding: 24)
     }
 }
 
@@ -456,21 +479,19 @@ struct SettingsPermissionItem: View {
     
     var body: some View {
         HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(color.opacity(0.12))
-                    .frame(width: 40, height: 40)
-                Image(systemName: icon)
-                    .foregroundStyle(color)
-                    .font(.system(size: 16))
-            }
+            Image(systemName: icon)
+                .foregroundStyle(Color.textMuted)
+                .font(.system(size: 16))
+                .frame(width: 32, height: 32)
+                .background(Color.bgHover)
+                .clipShape(Circle())
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(Typography.bodyMedium)
                     .foregroundStyle(Color.textPrimary)
                 Text(desc)
-                    .font(Typography.caption)
+                    .font(Typography.captionSmall)
                     .foregroundStyle(Color.textMuted)
             }
             
@@ -479,17 +500,27 @@ struct SettingsPermissionItem: View {
             if isGranted {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(Color.textSecondary)
-                    .font(.title3)
+                    .font(.system(size: 20))
             } else {
                 Button("Enable") {
                     action()
                 }
-                .buttonStyle(.stSecondary)
+                .font(Typography.labelSmall)
+                .foregroundStyle(Color.textPrimary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.bgHover)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .buttonStyle(.plain)
             }
         }
-        .padding(14)
-        .background(Color.bgHover.opacity(0.5))
+        .padding(16)
+        .background(Color.bgCard)
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.border.opacity(0.5), lineWidth: 1)
+        )
     }
 }
 

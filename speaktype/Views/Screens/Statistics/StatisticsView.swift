@@ -177,19 +177,28 @@ struct StatisticsView: View {
         }
         .chartXAxis {
             if selectedPeriod == .year {
-                 // For year (monthly view), show months
+                // For year (monthly view), show months
                 AxisMarks(values: .automatic) { value in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                        .foregroundStyle(Color.border.opacity(0.3))
+                        .foregroundStyle(Color.border.opacity(0.2))
+                    AxisValueLabel()
+                        .font(Typography.captionSmall)
+                        .foregroundStyle(Color.textMuted)
+                }
+            } else if selectedPeriod == .month {
+                // For month view, show every 7 days
+                AxisMarks(values: .stride(by: .day, count: 7)) { value in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                        .foregroundStyle(Color.border.opacity(0.2))
                     AxisValueLabel()
                         .font(Typography.captionSmall)
                         .foregroundStyle(Color.textMuted)
                 }
             } else {
-                // For week/month (daily view), stride to avoid overlap
-                AxisMarks(values: .stride(by: selectedPeriod == .month ? .day : .day, count: selectedPeriod == .month ? 7 : 1)) { value in
+                // For week view, show all days
+                AxisMarks { value in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                        .foregroundStyle(Color.border.opacity(0.3))
+                        .foregroundStyle(Color.border.opacity(0.2))
                     AxisValueLabel()
                         .font(Typography.captionSmall)
                         .foregroundStyle(Color.textMuted)
@@ -197,15 +206,19 @@ struct StatisticsView: View {
             }
         }
         .chartYAxis {
-            AxisMarks(position: .leading) { value in
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 5)) { value in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                    .foregroundStyle(Color.border.opacity(0.3))
+                    .foregroundStyle(Color.border.opacity(0.2))
                 AxisValueLabel()
                     .font(Typography.captionSmall)
                     .foregroundStyle(Color.textMuted)
             }
         }
+        .chartPlotStyle { plotArea in
+            plotArea.background(Color.clear)
+        }
         .frame(height: 280)
+        .padding(.top, 8)
     }
     
     private var detailsSection: some View {

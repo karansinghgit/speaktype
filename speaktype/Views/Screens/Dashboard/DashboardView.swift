@@ -68,49 +68,28 @@ struct DashboardView: View {
     }
 
     var body: some View {
-        ZStack {
-            // Background is now provided by MainView
-            Color.clear.ignoresSafeArea()
-            
-            ScrollView {
-                VStack(spacing: 32) {
-                    // Trial Banner (always show for non-Pro users)
-                    if !licenseManager.isPro {
-                        TrialBanner(status: trialManager.trialStatus)
-                    }
-                    
-                    // Header
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(timeBasedGreeting)
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.textPrimary)
-                        Text("Here's your productivity overview.")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    // Main Content Layout
-                    ViewThatFits(in: .horizontal) {
-                        // Wide Layout
-                        HStack(alignment: .top, spacing: 24) {
-                            // Left Column: Stats & Graph
-                            VStack(spacing: 24) {
-                                ProductivityCard(
-                                    transcriptionCount: transcriptionCountToday,
-                                    wordsTranscribed: totalWordsTranscribed,
-                                    timeSaved: timeSavedMinutes,
-                                    weeklyData: weeklyData
-                                )
-                            }
-                            
-                            // Right Column: Tips (Fixed Width)
-                            TipsCard()
-                                .frame(width: 300)
-                        }
-                        
-                        // Narrow Layout (Vertical Stack)
+        ScrollView {
+            VStack(spacing: 24) {
+                // Trial Banner
+                if !licenseManager.isPro {
+                    TrialBanner(status: trialManager.trialStatus)
+                }
+                
+                // Header - Serif headline like Flow
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(timeBasedGreeting)
+                        .font(Typography.displaySmall)  // Serif
+                        .foregroundStyle(Color.textPrimary)
+                    Text("Here's your productivity overview.")
+                        .font(Typography.bodyMedium)
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                // Main Content Layout
+                ViewThatFits(in: .horizontal) {
+                    // Wide Layout
+                    HStack(alignment: .top, spacing: 24) {
                         VStack(spacing: 24) {
                             ProductivityCard(
                                 transcriptionCount: transcriptionCountToday,
@@ -118,51 +97,68 @@ struct DashboardView: View {
                                 timeSaved: timeSavedMinutes,
                                 weeklyData: weeklyData
                             )
-                            
-                            TipsCard()
-                                .frame(maxWidth: .infinity)
-                        }
-                    }
-                    
-                    // Recent Transcriptions
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Text("Recent Transcriptions")
-                                .font(.headline)
-                                .foregroundStyle(Color.textPrimary)
-                            Spacer()
-                            Button("See All") {
-                                selection = .history
-                            }
-                            .font(.caption)
-                            .foregroundStyle(Color.textSecondary)
-                            .buttonStyle(.plain)
                         }
                         
-                        if historyService.items.isEmpty {
-                            Text("No recent activity")
-                                .font(.subheadline)
-                                .foregroundStyle(Color.textMuted)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .padding(.vertical, 32)
-                        } else {
-                            VStack(spacing: 8) {
-                                ForEach(historyService.items.prefix(5)) { item in
-                                    RecentTranscriptionRow(item: item)
-                                }
+                        TipsCard()
+                            .frame(width: 300)
+                    }
+                    
+                    // Narrow Layout
+                    VStack(spacing: 24) {
+                        ProductivityCard(
+                            transcriptionCount: transcriptionCountToday,
+                            wordsTranscribed: totalWordsTranscribed,
+                            timeSaved: timeSavedMinutes,
+                            weeklyData: weeklyData
+                        )
+                        
+                        TipsCard()
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                
+                // Recent Transcriptions - Flow style
+                VStack(alignment: .leading, spacing: 16) {
+                    // Header with serif
+                    Text("Recent transcriptions")
+                        .font(Typography.displaySmall)
+                        .foregroundStyle(Color.textPrimary)
+                    
+                    if historyService.items.isEmpty {
+                        Text("No transcriptions yet. Start speaking to create your first one.")
+                            .font(Typography.bodyMedium)
+                            .foregroundStyle(Color.textSecondary)
+                            .padding(.vertical, 20)
+                    } else {
+                        VStack(spacing: 8) {
+                            ForEach(historyService.items.prefix(5)) { item in
+                                RecentTranscriptionRow(item: item)
                             }
                         }
+                        
+                        Button(action: { selection = .history }) {
+                            Text("View all transcriptions")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(Color.accentPrimary)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 8)
                     }
-                    .padding(24)
-                    .background(Color.bgCard)
-                    .cornerRadius(16)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.borderCard, lineWidth: 1)
-                    )
                 }
-                .padding(20)
+                .padding(24)
+                .background(Color.bgCard)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.border, lineWidth: 1)
+                )
+                .cardShadow()
             }
+            .padding(20)
         }
         .fileImporter(
             isPresented: $showFileImporter,
@@ -284,7 +280,7 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - New Productivity Card
+// MARK: - Productivity Card (Flow-style)
 
 struct ProductivityCard: View {
     let transcriptionCount: Int
@@ -292,155 +288,103 @@ struct ProductivityCard: View {
     let timeSaved: Int
     let weeklyData: [(day: String, count: Int)]
     
-    @Environment(\.colorScheme) var colorScheme
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // Header with serif
+            Text("Your productivity today")
+                .font(Typography.displaySmall)
+                .foregroundStyle(Color.textPrimary)
+            
+            // Description
+            Text("You've transcribed \(wordsTranscribed) words, saving approximately \(timeSaved) minutes of typing.")
+                .font(Typography.bodyMedium)
+                .foregroundStyle(Color.textSecondary)
+                .lineSpacing(4)
+            
+            // Stats row - like Flow's snippet examples
+            HStack(spacing: 12) {
+                StatPill(label: "Transcriptions", value: "\(transcriptionCount)")
+                StatPill(label: "Words", value: "\(wordsTranscribed)")
+                StatPill(label: "Time saved", value: "\(timeSaved)m")
+            }
+            
+            // Mini chart
+            HStack(alignment: .bottom, spacing: 6) {
+                let maxCount = max(weeklyData.map { $0.count }.max() ?? 1, 1)
+                
+                ForEach(weeklyData, id: \.day) { data in
+                    VStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.accentPrimary.opacity(data.count > 0 ? 1 : 0.2))
+                            .frame(width: 24, height: max(CGFloat(data.count) / CGFloat(maxCount) * 50, 6))
+                        
+                        Text(data.day)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.textMuted)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding(.top, 4)
+        }
+        .padding(24)
+        .background(Color.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.border, lineWidth: 1)
+        )
+        .cardShadow()
+    }
+}
+
+// MARK: - Stat Pill (Flow-style)
+
+struct StatPill: View {
+    let label: String
+    let value: String
     
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .bottom, spacing: 32) {
-                leftStatsSection
-                Spacer()
-                rightGraphSection
-            }
+        HStack(spacing: 8) {
+            Text(label)
+                .font(.system(size: 13))
+                .foregroundStyle(Color.textMuted)
             
-            VStack(alignment: .leading, spacing: 32) {
-                leftStatsSection
-                rightGraphSection
-                    .frame(height: 150) // Slightly taller graph when stacked
-            }
-        }
-        .padding(32)
-        .background(
-            ZStack {
-                Color.bgCard
-                // subtle glow - conditional for dark mode only
-                if colorScheme == .dark {
-                    RadialGradient(
-                        colors: [Color.accentRed.opacity(0.15), Color.clear],
-                        center: .topLeading,
-                        startRadius: 0,
-                        endRadius: 300
-                    )
-                }
-            }
-        )
-        // .background(.ultraThinMaterial) // Removed to ensure clean color mapping
-        .cornerRadius(24)
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(
-                    LinearGradient(
-                        colors: [.white.opacity(0.2), .white.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-        // Top accent line
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [.clear, .red.opacity(0.8), .clear],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .frame(height: 1)
-                .offset(y: 1)
-        }
-    }
-    
-    // MARK: - Subviews
-    
-    private var leftStatsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 12) {
-                Image(systemName: "waveform.path.ecg")
-                    .font(.title)
-                    .foregroundStyle(.red)
-                Text("Today's Productivity")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundStyle(Color.textPrimary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
+            Text("→")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.textMuted)
             
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("\(transcriptionCount)")
-                        .font(.system(size: 42, weight: .bold))
-                        .foregroundStyle(Color.textPrimary)
-                        .minimumScaleFactor(0.8)
-                    Text("Transcriptions Today")
-                        .font(.body)
-                        .foregroundStyle(.gray)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-                
-                HStack(spacing: 8) {
-                    Image(systemName: "clock.fill")
-                    .foregroundStyle(.blue)
-                    Text("\(wordsTranscribed)")
-                        .fontWeight(.bold)
-                        .foregroundStyle(Color.textPrimary)
-                    Text("words")
-                        .foregroundStyle(.gray)
-                }
-                
-                HStack(spacing: 8) {
-                    Text("≈")
-                    .foregroundStyle(.gray)
-                    Text("\(timeSaved) min")
-                        .fontWeight(.bold)
-                        .foregroundStyle(Color.textPrimary)
-                    Text("saved")
-                        .foregroundStyle(.gray)
-                }
-            }
-        }
-    }
-    
-    private var rightGraphSection: some View {
-        HStack(alignment: .bottom, spacing: 12) {
-            let maxCount = weeklyData.map { $0.count }.max() ?? 1
-            let normalizedMax = max(Double(maxCount), 5.0) // prevent div by zero and tiny bars
-            
-            ForEach(weeklyData, id: \.day) { data in
-                VStack {
-                    // Bar
-                    GeometryReader { geo in
-                        let height = max(Double(data.count) / normalizedMax * geo.size.height, 10.0)
-                        
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.green.opacity(0.8), Color.blue.opacity(0.8)],
-                                    startPoint: .bottom,
-                                    endPoint: .top
-                                )
-                            )
-                            .frame(height: height)
-                            .frame(maxWidth: .infinity, alignment: .bottom)
-                            .position(x: geo.size.width / 2, y: geo.size.height - height / 2)
-                    }
-                    .frame(width: 20, height: 100) // Fixed graph height
-                    
-                    // Label
-                    Text(data.day)
-                        .font(.caption)
-                        .foregroundStyle(.gray)
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(1)
-                }
-            }
+            Text(value)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.textPrimary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.bgHover)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
         }
     }
 }
 
-// MARK: - Updated Metric Card
+// MARK: - Stat Item
+
+struct StatItem: View {
+    let value: String
+    let label: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Color.textPrimary)
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(Color.textMuted)
+        }
+    }
+}
+
+// MARK: - Metric Card (Clean)
 
 struct MetricCard: View {
     let title: String
@@ -449,248 +393,180 @@ struct MetricCard: View {
     let iconColor: Color
     
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.title2)
+                .font(.system(size: 16))
                 .foregroundStyle(iconColor)
+                .frame(width: 24)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundStyle(Color.gray)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.textMuted)
                 
                 Text(value)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundStyle(Color.white)
-            }
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.bgCard)
-        .cornerRadius(16)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
-    }
-}
-
-// MARK: - Recent Transcription Row (Unchanged styling, ensuring correct layout)
-
-struct RecentTranscriptionRow: View {
-    let item: HistoryItem
-    
-    private var itemIcon: String {
-        if item.transcript.localizedCaseInsensitiveContains("music") {
-            return "music.note"
-        } else if item.transcript.isEmpty {
-            return "doc.text"
-        } else {
-            return "mic.fill"
-        }
-    }
-    
-    private var itemTag: (text: String, color: Color, bg: Color)? {
-        if item.transcript.localizedCaseInsensitiveContains("music") {
-            return ("MUSIC", Color.badgeMusicText, Color.badgeMusicBg)
-        } else if item.transcript.isEmpty || item.transcript.count < 10 {
-            return ("INAUDIBLE", Color.badgeMutedText, Color.badgeMutedBg)
-        } else {
-            return ("VOICE", Color.badgeVoiceText, Color.badgeVoiceBg)
-        }
-    }
-    
-    private var accentColor: Color {
-        if item.transcript.localizedCaseInsensitiveContains("music") {
-            return Color.accentBlue
-        } else {
-            return Color.accentRed
-        }
-    }
-    
-    var body: some View {
-        HStack(spacing: 16) {
-            // Icon - Larger
-            Image(systemName: itemIcon)
-                .font(.title3)
-                .foregroundStyle(accentColor)
-                .frame(width: 28)
-            
-            // Content
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.transcript.isEmpty ? "No transcript" : item.transcript)
-                    .font(.body) // Larger font (was subheadline)
-                    .fontWeight(.medium)
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(Color.textPrimary)
-                    .lineLimit(1)
-                Text(item.date.formatted(date: .numeric, time: .shortened))
-                    .font(.subheadline) // Larger font (was caption2)
-                    .foregroundStyle(Color.textMuted)
             }
             
             Spacer()
-            
-            // Tag
-            if let tag = itemTag {
-                Text(tag.text)
-                    .font(.system(size: 11, weight: .bold)) // Slightly larger tag
-                    .foregroundStyle(tag.color)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(tag.bg)
-                    .cornerRadius(6)
-            }
-            
-            // Duration
-            Text(formatDuration(item.duration))
-                .font(.subheadline) // Larger time
-                .foregroundStyle(Color.textMuted)
-                .monospacedDigit()
         }
-        .padding(16) // Increased padding
-        .background(Color.bgHover)
-        .cornerRadius(12)
+        .padding(16)
+        .background(Color.bgCard)
         .overlay(
-            // Left border accent (like SpeedType)
             Rectangle()
-                .fill(accentColor)
-                .frame(width: 4) // Thicker accent
-                .cornerRadius(2)
-                .padding(.leading, 0),
-            alignment: .leading
+                .stroke(Color.border, lineWidth: 1)
         )
-    }
-    
-    private func formatDuration(_ duration: TimeInterval) -> String {
-        let seconds = Int(duration)
-        return "\(seconds) s"
     }
 }
 
-// MARK: - Tips & Tutorial Card
+// MARK: - Recent Transcription Row (Flow-style)
+
+struct RecentTranscriptionRow: View {
+    let item: HistoryItem
+    @State private var isHovered = false
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Preview text in a pill
+            Text(item.transcript.isEmpty ? "Empty" : String(item.transcript.prefix(30)))
+                .font(.system(size: 13))
+                .foregroundStyle(Color.textPrimary)
+                .lineLimit(1)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.bgHover)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            
+            Text("→")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.textMuted)
+            
+            // Full transcript preview
+            Text(item.transcript.isEmpty ? "No content" : item.transcript)
+                .font(.system(size: 13))
+                .foregroundStyle(Color.textSecondary)
+                .lineLimit(1)
+            
+            Spacer()
+            
+            // Time ago
+            Text(timeAgo(item.date))
+                .font(.system(size: 12))
+                .foregroundStyle(Color.textMuted)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isHovered ? Color.bgHover.opacity(0.5) : Color.clear)
+        )
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
+    }
+    
+    private func timeAgo(_ date: Date) -> String {
+        let seconds = Int(-date.timeIntervalSinceNow)
+        if seconds < 60 { return "just now" }
+        if seconds < 3600 { return "\(seconds / 60)m ago" }
+        if seconds < 86400 { return "\(seconds / 3600)h ago" }
+        return "\(seconds / 86400)d ago"
+    }
+}
+
+// MARK: - Tips Card (Flow-style)
 
 struct TipsCard: View {
-    @Environment(\.colorScheme) var colorScheme
     @State private var isMaximized = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: "lightbulb.fill")
-                    .foregroundStyle(.yellow)
-                    .font(.title3)
-                Text("Tips & Tutorials")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundStyle(Color.textPrimary)
-                    .minimumScaleFactor(0.8)
-                    .lineLimit(1)
-            }
+            // Header with serif
+            Text("Quick start guide")
+                .font(Typography.displaySmall)
+                .foregroundStyle(Color.textPrimary)
             
-            // Video Player
-            ZStack {
-                if let videoURL = Bundle.main.url(forResource: "tutorial", withExtension: "mp4") {
-                     VideoPlayer(player: AVPlayer(url: videoURL))
-                         .aspectRatio(16/9, contentMode: .fit)
-                         .cornerRadius(12)
-                         .overlay(alignment: .topTrailing) {
-                             Button(action: { isMaximized = true }) {
-                                 Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                     .font(.headline)
-                                     .foregroundStyle(.white)
-                                     .padding(8)
-                                     .background(.ultraThinMaterial)
-                                     .clipShape(Circle())
-                             }
-                             .buttonStyle(.plain)
-                             .padding(8)
-                             .help("Maximize Video")
-                         }
-                         .sheet(isPresented: $isMaximized) {
-                             ZStack {
-                                 Color.black.ignoresSafeArea()
-                                 VideoPlayer(player: AVPlayer(url: videoURL))
-                                     .aspectRatio(16/9, contentMode: .fit)
-                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                     
-                                 // Close button for maximized view
-                                 VStack {
-                                     HStack {
-                                         Spacer()
-                                         Button(action: { isMaximized = false }) {
-                                             Image(systemName: "xmark.circle.fill")
-                                             .font(.largeTitle)
-                                             .foregroundStyle(.white)
-                                             .padding()
-                                         }
-                                         .buttonStyle(.plain)
-                                         .keyboardShortcut(.escape, modifiers: [])
-                                     }
-                                     Spacer()
-                                 }
-                             }
-                             .frame(minWidth: 800, minHeight: 600) // Ensure reasonable size
-                         }
-                } else {
-                    // Fallback if video not found
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.black.opacity(0.5))
-                            .aspectRatio(16/9, contentMode: .fit)
-                        
-                        VStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.largeTitle)
-                                .foregroundStyle(.yellow)
-                            Text("Video not found")
-                                .font(.caption)
-                                .foregroundStyle(.white)
-                        }
-                    }
-                }
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-            )
-            
-            Text("Learn how to get the most out of SpeakType with our quick video guide.")
-                .font(.body)
+            Text("Learn how to get the most out of SpeakType with our quick video tutorial.")
+                .font(Typography.bodyMedium)
                 .foregroundStyle(Color.textSecondary)
+                .lineSpacing(4)
+            
+            // Video
+            if let videoURL = Bundle.main.url(forResource: "tutorial", withExtension: "mp4") {
+                VideoPlayer(player: AVPlayer(url: videoURL))
+                    .aspectRatio(16/9, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.border, lineWidth: 1)
+                    )
+                    .overlay(alignment: .topTrailing) {
+                        Button(action: { isMaximized = true }) {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.textPrimary)
+                                .padding(8)
+                                .background(Color.bgCard)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(8)
+                    }
+                    .sheet(isPresented: $isMaximized) {
+                        ZStack {
+                            Color.ink.ignoresSafeArea()
+                            VideoPlayer(player: AVPlayer(url: videoURL))
+                                .aspectRatio(16/9, contentMode: .fit)
+                                
+                            VStack {
+                                HStack {
+                                    Spacer()
+                                    Button(action: { isMaximized = false }) {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundStyle(.white)
+                                            .padding(12)
+                                            .background(Color.white.opacity(0.1))
+                                            .clipShape(Circle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .keyboardShortcut(.escape, modifiers: [])
+                                }
+                                .padding()
+                                Spacer()
+                            }
+                        }
+                        .frame(minWidth: 800, minHeight: 600)
+                    }
+            } else {
+                // Placeholder with mic icon like Flow
+                VStack(spacing: 12) {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(Color.textMuted)
+                    
+                    Text("Take a quick note with your voice")
+                        .font(Typography.bodyMedium)
+                        .foregroundStyle(Color.textMuted)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+                .background(Color.bgHover)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
         }
         .padding(24)
-        .frame(maxWidth: .infinity) // Allow full width in column
-        // Updated Background to match ProductivityCard
-        .background(
-            ZStack {
-                Color.bgCard
-                // subtle yellow glow for "Tips"
-                // subtle yellow glow for "Tips" - conditional for dark mode only
-                if colorScheme == .dark {
-                    RadialGradient(
-                        colors: [Color.yellow.opacity(0.15), Color.clear],
-                        center: .topLeading,
-                        startRadius: 0,
-                        endRadius: 300
-                    )
-                }
-            }
-        )
-        // .background(.ultraThinMaterial)
-        .cornerRadius(24) // Match ProductivityCard
+        .frame(maxWidth: .infinity)
+        .background(Color.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(
-                    LinearGradient(
-                        colors: [.white.opacity(0.2), .white.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.border, lineWidth: 1)
         )
+        .cardShadow()
     }
 }
 

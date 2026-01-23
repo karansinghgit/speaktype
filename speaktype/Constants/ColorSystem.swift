@@ -1,121 +1,196 @@
 import SwiftUI
 
-// MARK: - SpeakType Color System
+// MARK: - SpeakType Design System
+// Inspired by Wispr Flow - warm, seamless, typographically rich
 
 extension Color {
-    // MARK: - Core Background Layers
+    
+    // MARK: - Core Palette
+    
+    /// Warm cream background (like Flow)
+    static let cream = Color(hex: "FAF9F7")
+    static let creamWarm = Color(hex: "F8F6F3")
+    
+    /// Dark theme
+    static let ink = Color(hex: "1A1A1A")
+    static let inkLight = Color(hex: "252525")
+    static let inkSurface = Color(hex: "2F2F2F")
+    
+    /// Accent - lavender tint for selected states (like Flow)
+    static let lavender = Color(hex: "F0EBFF")
+    static let lavenderDark = Color(hex: "3D3560")
+    
+    // MARK: - Semantic Colors
+    
     static let bgApp = Color(nsColor: NSColor(name: "bgApp", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: "0E0F12") : NSColor(hex: "F2F4F8")
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "1A1A1A")
+            : NSColor(hex: "FAF9F7")
     }))
     
     static let bgSidebar = Color(nsColor: NSColor(name: "bgSidebar", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: "121318") : NSColor(hex: "FFFFFF")
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "1A1A1A")
+            : NSColor(hex: "FAF9F7")  // Same as bgApp - seamless
     }))
     
     static let bgSurface = Color(nsColor: NSColor(name: "bgSurface", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: "16171C") : NSColor(hex: "FFFFFF")
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "252525")
+            : NSColor(hex: "FFFFFF")
     }))
     
     static let bgCard = Color(nsColor: NSColor(name: "bgCard", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: "1C1E24") : NSColor(hex: "FFFFFF")
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "252525")
+            : NSColor(hex: "FFFFFF")
     }))
     
     static let bgHover = Color(nsColor: NSColor(name: "bgHover", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: "242632") : NSColor(hex: "E8EAF0")
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "2F2F2F")
+            : NSColor(hex: "F5F4F2")
     }))
     
-    // MARK: - Borders & Dividers
+    static let bgSelected = Color(nsColor: NSColor(name: "bgSelected", dynamicProvider: { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "3D3560")  // Dark lavender
+            : NSColor(hex: "F0EBFF")  // Light lavender
+    }))
+    
+    // MARK: - Borders
+    
+    static let border = Color(nsColor: NSColor(name: "border", dynamicProvider: { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "3A3A3A")
+            : NSColor(hex: "E8E6E3")
+    }))
+    
     static let borderSubtle = Color(nsColor: NSColor(name: "borderSubtle", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: "2A2D36") : NSColor(hex: "E0E0E0")
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "2F2F2F")
+            : NSColor(hex: "EFEDEA")
     }))
     
     static let borderCard = Color(nsColor: NSColor(name: "borderCard", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor.white.withAlphaComponent(0.04) : NSColor.black.withAlphaComponent(0.05)
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "3A3A3A")
+            : NSColor(hex: "E8E6E3")
     }))
     
-    static let borderActive = Color(hex: "4DA3FF").opacity(0.35)
+    static let borderActive = Color(hex: "2C2C54")
     
-    // MARK: - Accent Colors
-    static let accentRed = Color(hex: "FF4D4D")
-    static let accentRedSoft = Color(hex: "FF4D4D").opacity(0.15)
-    static let accentBlue = Color(hex: "4DA3FF")
-    static let accentBlueSoft = Color(hex: "4DA3FF").opacity(0.15)
+    // MARK: - Text
     
-    // MARK: - Text Colors
     static let textPrimary = Color(nsColor: NSColor(name: "textPrimary", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor.white : NSColor(hex: "1A1C20")
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "FFFFFF")
+            : NSColor(hex: "1A1A1A")
     }))
     
     static let textSecondary = Color(nsColor: NSColor(name: "textSecondary", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: "B6BAC7") : NSColor(hex: "6B7280")
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "A0A0A0")
+            : NSColor(hex: "6B6B6B")
     }))
     
     static let textMuted = Color(nsColor: NSColor(name: "textMuted", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: "8A8F9C") : NSColor(hex: "9CA3AF")
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "707070")
+            : NSColor(hex: "9A9A9A")
     }))
     
     static let textDisabled = Color(nsColor: NSColor(name: "textDisabled", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: "5E636E") : NSColor(hex: "D1D5DB")
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "505050")
+            : NSColor(hex: "C0C0C0")
     }))
     
-    // MARK: - Sidebar Colors
+    // MARK: - Sidebar
+    
     static let sidebarItem = Color(nsColor: NSColor(name: "sidebarItem", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: "C8CCD8") : NSColor(hex: "4B5563")
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "A0A0A0")
+            : NSColor(hex: "6B6B6B")
     }))
     
     static let sidebarItemHoverBg = Color(nsColor: NSColor(name: "sidebarItemHoverBg", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: "1E2028") : NSColor(hex: "F3F4F6")
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "2F2F2F")
+            : NSColor(hex: "F0EFED")
     }))
     
-    // MARK: - Button Colors
+    // MARK: - Accents
+    
+    static let accentPrimary = Color(hex: "1A1A1A")  // Dark for buttons like Flow
+    static let accentSuccess = Color(hex: "22C55E")
+    static let accentWarning = Color(hex: "F59E0B")
+    static let accentError = Color(hex: "EF4444")
+    static let accentBlue = Color(hex: "3B82F6")
+    
+    // Legacy
+    static let navyInk = Color(hex: "2C2C54")
+    static let navyLight = Color(hex: "3D3D6B")
+    static let navyMuted = Color(hex: "6B6B6B")
+    static let charcoal = Color(hex: "1A1A1A")
+    static let charcoalLight = Color(hex: "252525")
+    static let charcoalSurface = Color(hex: "2F2F2F")
+    static let accentWarm = Color(hex: "F59E0B")
+    static let accentCool = Color(hex: "3B82F6")
+    static let accentRed = Color(hex: "EF4444")
+    static let accentRedSoft = Color(hex: "EF4444").opacity(0.1)
+    static let accentBlueSoft = Color(hex: "3B82F6").opacity(0.1)
+    
+    // MARK: - Buttons
+    
+    static let btnPrimaryBg = Color(hex: "1A1A1A")
+    static let btnPrimaryFg = Color(hex: "FFFFFF")
+    
     static let btnSecondaryBg = Color(nsColor: NSColor(name: "btnSecondaryBg", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: "2A2D36") : NSColor(hex: "E5E7EB")
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "2F2F2F")
+            : NSColor(hex: "F0EFED")
     }))
     
     static let btnSecondaryHover = Color(nsColor: NSColor(name: "btnSecondaryHover", dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: "323644") : NSColor(hex: "D1D5DB")
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua 
+            ? NSColor(hex: "3A3A3A")
+            : NSColor(hex: "E5E3E0")
     }))
     
-    // MARK: - Badge Colors
-    static let badgeVoiceBg = Color(hex: "FF4D4D").opacity(0.15)
-    static let badgeVoiceText = Color(hex: "FF4D4D")
-    static let badgeMusicBg = Color(hex: "4DA3FF").opacity(0.15)
-    static let badgeMusicText = Color(hex: "4DA3FF")
-    static let badgeMutedBg = Color(hex: "8A8F9C").opacity(0.15)
-    static let badgeMutedText = Color(hex: "8A8F9C")
+    // MARK: - Badges
     
-    // MARK: - Gradients
-    static let gradientPrimary = LinearGradient(
-        colors: [Color(hex: "FF4D4D"), Color(hex: "FF6A6A"), Color(hex: "4DA3FF")],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    static let badgeVoiceBg = Color(hex: "22C55E").opacity(0.12)
+    static let badgeVoiceText = Color(hex: "22C55E")
+    static let badgeMusicBg = Color(hex: "3B82F6").opacity(0.12)
+    static let badgeMusicText = Color(hex: "3B82F6")
+    static let badgeMutedBg = Color(hex: "9A9A9A").opacity(0.12)
+    static let badgeMutedText = Color(hex: "9A9A9A")
     
-    static let gradientButton = LinearGradient(
-        colors: [Color(hex: "FF4D4D"), Color(hex: "4DA3FF")],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-    
-    static let gradientSidebarActive = LinearGradient(
-        colors: [
-            Color(hex: "FF4D4D").opacity(0.25),
-            Color(hex: "4DA3FF").opacity(0.25)
-        ],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
+    // No gradients
+    static let gradientPrimary = LinearGradient(colors: [Color(hex: "1A1A1A")], startPoint: .leading, endPoint: .trailing)
+    static let gradientButton = LinearGradient(colors: [Color(hex: "1A1A1A")], startPoint: .leading, endPoint: .trailing)
+    static let gradientSidebarActive = LinearGradient(colors: [Color(hex: "F0EBFF")], startPoint: .leading, endPoint: .trailing)
+    static let gradientWarm = LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
 }
 
 
-// MARK: - Shadow Modifiers
+// MARK: - Shadow Modifiers (Soft, like Flow)
 
 extension View {
     func cardShadow() -> some View {
-        self.shadow(color: .black.opacity(0.45), radius: 16, x: 0, y: 12)
+        self
+            .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+            .shadow(color: .black.opacity(0.02), radius: 1, x: 0, y: 1)
     }
     
     func softShadow() -> some View {
-        self.shadow(color: .black.opacity(0.35), radius: 12, x: 0, y: 8)
+        self.shadow(color: .black.opacity(0.03), radius: 4, x: 0, y: 1)
+    }
+    
+    func elevatedShadow() -> some View {
+        self
+            .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 4)
+            .shadow(color: .black.opacity(0.02), radius: 2, x: 0, y: 1)
     }
 }

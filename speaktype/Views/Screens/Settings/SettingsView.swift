@@ -388,13 +388,14 @@ struct SettingsSection<Content: View>: View {
         VStack(alignment: .leading, spacing: 16) {
             content
         }
-        .padding()
+        .padding(20)
         .background(Color.bgCard)
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.borderCard, lineWidth: 1)
+                .stroke(Color.border, lineWidth: 1)
         )
+        .cardShadow()
     }
 }
 
@@ -441,9 +442,20 @@ struct RadioButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(isSelected ? Color.appRed : .gray)
+                ZStack {
+                    Circle()
+                        .strokeBorder(isSelected ? Color.navyInk : Color.textMuted, lineWidth: 1.5)
+                        .frame(width: 18, height: 18)
+                    
+                    if isSelected {
+                        Circle()
+                            .fill(Color.navyInk)
+                            .frame(width: 10, height: 10)
+                    }
+                }
+                
                 Text(title)
+                    .font(Typography.bodyMedium)
                     .foregroundStyle(Color.textPrimary)
             }
         }

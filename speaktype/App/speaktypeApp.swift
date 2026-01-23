@@ -35,17 +35,19 @@ struct speaktypeApp: App {
     var body: some Scene {
         // Main Dashboard Window (Hidden by default, opened via Menu Bar or Dock)
         WindowGroup(id: "main-dashboard") {
-            Group {
-                if hasCompletedOnboarding {
-                    MainView()
-                } else {
-                    OnboardingView()
+            ThemeProvider {
+                Group {
+                    if hasCompletedOnboarding {
+                        MainView()
+                    } else {
+                        OnboardingView()
+                    }
                 }
             }
             .environmentObject(licenseManager)
             .environmentObject(trialManager)
             .preferredColorScheme(appTheme.colorScheme)
-            .tint(.appRed)
+            .tint(Color.navyInk)
         }
         .defaultSize(width: 1200, height: 800)
         .windowStyle(.hiddenTitleBar)
@@ -62,9 +64,12 @@ struct speaktypeApp: App {
         
         // License Window
         Window("License", id: "license-window") {
-            LicenseView()
-                .environmentObject(licenseManager)
-                .frame(width: 480, height: 520)
+            ThemeProvider {
+                LicenseView()
+            }
+            .environmentObject(licenseManager)
+            .preferredColorScheme(appTheme.colorScheme)
+            .frame(width: 480, height: 520)
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)

@@ -67,7 +67,23 @@ SpeakType is a **privacy-first, offline voice dictation tool** for macOS that le
 | **Storage** | 2GB free (for AI models) |
 | **Permissions** | Microphone & Accessibility |
 
-### Quick Start
+### Option 1: Download Pre-built App (Recommended)
+
+**📥 [Download Latest Release](https://github.com/yourusername/speaktype/releases/latest)**
+
+1. Download `SpeakType.dmg` from the latest release
+2. Open the DMG file
+3. Drag **SpeakType** to your **Applications** folder
+4. **First time only:** Right-click the app → Select **"Open"** → Click **"Open"** again
+   
+   > ⚠️ **Why right-click?** This app is not yet notarized by Apple (requires paid developer account). Right-clicking bypasses Gatekeeper. This is safe - you can review the source code yourself!
+
+5. Grant permissions when prompted (Microphone + Accessibility)
+6. Download an AI model from Settings → AI Models
+
+**That's it!** 🎉 Press `⌥ Space` (Option + Space) to start dictating.
+
+### Option 2: Build from Source
 
 ```bash
 # 1. Clone the repository
@@ -207,6 +223,11 @@ make build          # Build debug
 make run            # Run app
 make clean          # Clean build artifacts
 
+# Distribution
+make package        # Create ZIP for distribution
+make dmg            # Create DMG installer
+make release        # Create both ZIP and DMG
+
 # Testing
 make test           # Run all tests
 make test-unit      # Unit tests only
@@ -220,6 +241,34 @@ make logs-export    # Export to Desktop
 # Code quality
 make lint           # Run SwiftLint
 make format         # Auto-fix issues
+```
+
+### Creating a Release
+
+Want to publish a new version? It's automated!
+
+```bash
+# 1. Update version in Xcode project
+# 2. Commit your changes
+git add .
+git commit -m "Release v1.0.0"
+
+# 3. Create and push a tag
+git tag v1.0.0
+git push origin main
+git push origin v1.0.0
+
+# 4. GitHub Actions will automatically:
+#    - Build the app
+#    - Create DMG and ZIP files
+#    - Create a GitHub release
+#    - Upload the files
+```
+
+**Or build locally:**
+```bash
+make release
+# Files will be in dist/ folder
 ```
 
 ### Logging & Debugging

@@ -5,19 +5,36 @@
 # Default target
 help:
 	@echo "SpeakType - Available commands:"
+	@echo ""
+	@echo "Development:"
 	@echo "  make setup         - Initial project setup"
-	@echo "  make build         - Build the project"
+	@echo "  make build         - Build the project (Debug)"
 	@echo "  make run           - Run the application"
+	@echo "  make clean         - Clean build artifacts"
+	@echo "  make xcode         - Open in Xcode"
+	@echo ""
+	@echo "Testing:"
 	@echo "  make test          - Run all tests"
+	@echo "  make test-unit     - Run unit tests only"
+	@echo "  make test-ui       - Run UI tests only"
+	@echo ""
+	@echo "Distribution:"
+	@echo "  make release       - 🚀 Build ZIP + DMG for distribution"
+	@echo "  make package       - Create ZIP package"
+	@echo "  make dmg           - Create DMG installer"
+	@echo "  ./scripts/create-release.sh - Interactive release creator"
+	@echo ""
+	@echo "Code Quality:"
 	@echo "  make lint          - Run SwiftLint"
 	@echo "  make format        - Format code with SwiftLint"
-	@echo "  make clean         - Clean build artifacts"
 	@echo ""
 	@echo "Logging:"
 	@echo "  make logs          - View live logs"
 	@echo "  make logs-live     - Stream live logs (alias)"
 	@echo "  make logs-errors   - View recent errors"
 	@echo "  make logs-export   - Export last 24h logs to Desktop"
+	@echo ""
+	@echo "📚 For detailed release instructions, see: RELEASING.md"
 
 # Project setup
 setup:
@@ -77,6 +94,54 @@ clean:
 archive:
 	@echo "Archiving SpeakType..."
 	xcodebuild archive -scheme speaktype -archivePath build/speaktype.xcarchive
+
+# Package for distribution (ZIP)
+package:
+	@echo "📦 Packaging SpeakType for distribution..."
+	@make build-release
+	@mkdir -p dist
+	@cd build/Release && zip -r ../../dist/SpeakType.zip speaktype.app
+	@echo "✅ Created dist/SpeakType.zip"
+	@ls -lh dist/SpeakType.zip
+
+# Create DMG (requires create-dmg: brew install create-dmg)
+dmg:
+	@echo "💿 Creating DMG installer..."
+	@make build-release
+	@mkdir -p dist
+	@if command -v create-dmg > /dev/null; then \
+		create-dmg \
+			--volname "SpeakType" \
+			--volicon "speaktype/Assets.xcassets/AppIcon.appiconset/icon_512x512.png" \
+			--window-pos 200 120 \
+			--window-size 800 400 \
+			--icon-size 100 \
+			--hide-extension "speaktype.app" \
+			--app-drop-link 600 185 \
+			"dist/SpeakType.dmg" \
+			"build/Release/speaktype.app"; \
+	else \
+		hdiutil create -volname "SpeakType" -srcfolder build/Release/speaktype.app -ov -format UDZO dist/SpeakType.dmg; \
+	fi
+	@echo "✅ Created dist/SpeakType.dmg"
+	@ls -lh dist/SpeakType.dmg
+
+# Prepare release (both ZIP and DMG)
+release:
+	@echo "🚀 Preparing release..."
+	@make clean
+	@make package
+	@make dmg
+	@echo ""
+	@echo "✅ Release artifacts ready in dist/"
+	@echo "   - SpeakType.zip (for GitHub Releases)"
+	@echo "   - SpeakType.dmg (for direct download)"
+	@echo ""
+	@echo "Next steps:"
+	@echo "  1. Create a git tag: git tag v1.0.0"
+	@echo "  2. Push tag: git push origin v1.0.0"
+	@echo "  3. GitHub Actions will create the release automatically"
+	@echo "  OR manually: gh release create v1.0.0 dist/SpeakType.dmg --title 'SpeakType v1.0.0'"
 
 # Generate documentation
 docs:

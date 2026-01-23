@@ -8,53 +8,75 @@ struct HistoryView: View {
     @State private var showCopyToast = false
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("History")
-                    .font(Typography.displayLarge)
-                    .foregroundStyle(Color.textPrimary)
-                
-                Spacer()
-                
-                if !historyService.items.isEmpty {
-                    Button(role: .destructive) {
-                        showDeleteAlert = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "trash")
-                            Text("Clear")
+        ScrollView {
+            VStack(spacing: 24) {
+                // Header
+                HStack(alignment: .center) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("History")
+                            .font(Typography.displayLarge)
+                            .foregroundStyle(Color.textPrimary)
+                        
+                        if !historyService.items.isEmpty {
+                            Text("\(historyService.items.count) transcriptions")
+                                .font(Typography.bodySmall)
+                                .foregroundStyle(Color.textSecondary)
                         }
-                        .font(Typography.bodySmall)
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.red.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
-                    .buttonStyle(.plain)
+                    
+                    Spacer()
+                    
+                    if !historyService.items.isEmpty {
+                        Button(role: .destructive) {
+                            showDeleteAlert = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 12))
+                                Text("Clear All")
+                            }
+                            .font(Typography.labelSmall)
+                            .foregroundStyle(Color.textMuted)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(Color.bgHover)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 20)
-            .padding(.bottom, 16)
+                .padding(.horizontal, 24)
+                .padding(.top, 20)
             
-            if historyService.items.isEmpty {
-                Spacer()
-                ContentUnavailableView(
-                    "No History Yet",
-                    systemImage: "clock",
-                    description: Text("Your transcriptions will appear here.")
-                )
-                Spacer()
-            } else {
-                ScrollView {
-                    VStack(spacing: 12) {
+                
+                if historyService.items.isEmpty {
+                    // Empty state
+                    VStack(spacing: 20) {
+                        Image(systemName: "clock.badge.questionmark")
+                            .font(.system(size: 56))
+                            .foregroundStyle(Color.textMuted.opacity(0.4))
+                        
+                        VStack(spacing: 8) {
+                            Text("No transcriptions yet")
+                                .font(Typography.displaySmall)
+                                .foregroundStyle(Color.textPrimary)
+                            
+                            Text("Press ⌘+Shift+Space to start recording")
+                                .font(Typography.bodyMedium)
+                                .foregroundStyle(Color.textSecondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.top, 100)
+                } else {
+                    // History items as individual cards
+                    VStack(spacing: 16) {
                         ForEach(historyService.items) { item in
-                            VStack(alignment: .leading, spacing: 0) {
-                                // Clickable Header
-                                Button(action: {
-                                    withAnimation(.easeInOut(duration: 0.2)) {
+                            HistoryCard(
+                                item: item,
+                                isExpanded: expandedItemId == item.id,
+                                onToggle: {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                         if expandedItemId == item.id {
                                             expandedItemId = nil
                                             audioPlayer.stop()
@@ -65,286 +87,24 @@ struct HistoryView: View {
                                             }
                                         }
                                     }
-                                }) {
-                                    HStack(spacing: 14) {
-                                        // Checkbox instead of arrow
-                                        Image(systemName: expandedItemId == item.id ? "checkmark.square.fill" : "square")
-                                            .font(.title3)
-                                            .foregroundStyle(expandedItemId == item.id ? Color.accentBlue : Color.textMuted)
-                                        
-                                        // Mic icon
-                                        Image(systemName: "mic.fill")
-                                            .font(.title3)
-                                            .foregroundStyle(Color.accentRed)
-                                            .frame(width: 28)
-                                        
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            Text(item.transcript.prefix(80) + (item.transcript.count > 80 ? "..." : ""))
-                                                .font(.body)
-                                                .foregroundStyle(Color.textPrimary)
-                                                .lineLimit(1)
-                                            Text(item.date.formatted(date: .numeric, time: .shortened))
-                                                .font(.subheadline)
-                                                .foregroundStyle(Color.textMuted)
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        // VOICE badge
-                                        Text("VOICE")
-                                            .font(.system(size: 11, weight: .semibold))
-                                            .foregroundStyle(Color.badgeVoiceText)
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 5)
-                                            .background(Color.badgeVoiceBg)
-                                            .cornerRadius(5)
-                                        
-                                        // Duration
-                                        Text(formatDurationShort(item.duration))
-                                            .font(.subheadline)
-                                            .foregroundStyle(Color.textMuted)
-                                            .monospacedDigit()
-                                            .frame(minWidth: 40)
-                                    }
-                                    .padding(18)
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                
-                                // Expanded Content
-                                if expandedItemId == item.id {
-                                    VStack(alignment: .leading, spacing: 20) {
-                                        Divider()
-                                            .padding(.horizontal, 18)
-                                        
-                                        VStack(alignment: .leading, spacing: 20) {
-                                            // Header with badges
-                                            HStack(alignment: .top) {
-                                                Text(item.date.formatted(date: .abbreviated, time: .shortened))
-                                                    .font(.subheadline)
-                                                    .foregroundStyle(Color.textMuted)
-                                                
-                                                Spacer()
-                                                
-                                                Text(formatDuration(item.duration))
-                                                    .font(.subheadline)
-                                                    .foregroundStyle(Color.accentBlue)
-                                                    .fontWeight(.medium)
-                                            }
-                                            
-                                            // Badges row
-                                            HStack {
-                                                Text("Original")
-                                                    .font(.subheadline)
-                                                    .fontWeight(.semibold)
-                                                    .padding(.horizontal, 14)
-                                                    .padding(.vertical, 7)
-                                                    .background(Color.accentBlue)
-                                                    .foregroundStyle(.white)
-                                                    .cornerRadius(6)
-                                                
-                                                Spacer()
-                                                
-                                                Button(action: {
-                                                    copyToClipboard(text: item.transcript)
-                                                }) {
-                                                    HStack(spacing: 6) {
-                                                        Image(systemName: "doc.on.doc")
-                                                            .font(.system(size: 13))
-                                                        Text("Copy")
-                                                            .font(.subheadline)
-                                                            .fontWeight(.semibold)
-                                                    }
-                                                    .padding(.horizontal, 14)
-                                                    .padding(.vertical, 7)
-                                                    .background(Color.accentBlue)
-                                                    .foregroundStyle(.white)
-                                                    .cornerRadius(6)
-                                                }
-                                                .buttonStyle(.plain)
-                                            }
-                                            
-                                            // Transcript - BIGGER TEXT
-                                            Text(item.transcript)
-                                                .font(.title3)
-                                                .foregroundStyle(Color.textPrimary)
-                                                .textSelection(.enabled)
-                                                .fixedSize(horizontal: false, vertical: true)
-                                                .lineSpacing(4)
-                                                .padding(.vertical, 10)
-                                            
-                                            // Audio Playback Section - ALWAYS SHOW
-                                            VStack(spacing: 14) {
-                                                Divider()
-                                                
-                                                if let audioURL = item.audioFileURL {
-                                                    // Recording label with time
-                                                    HStack {
-                                                        HStack(spacing: 8) {
-                                                            Image(systemName: "waveform")
-                                                                .font(.subheadline)
-                                                                .foregroundStyle(Color.textMuted)
-                                                            Text("Recording")
-                                                                .font(.subheadline)
-                                                                .foregroundStyle(Color.textMuted)
-                                                        }
-                                                        
-                                                        Spacer()
-                                                        
-                                                        Text(formatTime(audioPlayer.currentTime))
-                                                            .font(.subheadline)
-                                                            .foregroundStyle(Color.textMuted)
-                                                            .monospacedDigit()
-                                                    }
-                                                    
-                                                    // Waveform
-                                                    WaveformView(
-                                                        audioURL: audioURL,
-                                                        currentTime: $audioPlayer.currentTime,
-                                                        duration: $audioPlayer.duration
-                                                    )
-                                                    .frame(height: 70)
-                                                    
-                                                    // Playback Controls
-                                                    HStack(spacing: 24) {
-                                                        Button(action: {
-                                                            NSWorkspace.shared.activateFileViewerSelecting([audioURL])
-                                                        }) {
-                                                            Image(systemName: "folder")
-                                                                .font(.title2)
-                                                                .foregroundStyle(Color.accentBlue) // Theme Blue (File/System)
-                                                        }
-                                                        .buttonStyle(.plain)
-                                                        .help("Show in Finder")
-                                                        
-                                                        Spacer()
-                                                        
-                                                        Button(action: {
-                                                            if audioPlayer.isPlaying {
-                                                                audioPlayer.pause()
-                                                            } else {
-                                                                audioPlayer.play()
-                                                            }
-                                                        }) {
-                                                            Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                                                                .font(.largeTitle)
-                                                                .foregroundStyle(Color.accentRed) // Theme Red (Playback/Action)
-                                                        }
-                                                        .buttonStyle(.plain)
-                                                        
-                                                        Spacer()
-                                                        
-                                                        Button(action: {
-                                                            audioPlayer.seek(to: 0)
-                                                        }) {
-                                                            Image(systemName: "arrow.clockwise")
-                                                                .font(.title2)
-                                                                .foregroundStyle(Color.accentBlue) // Theme Blue (Navigation)
-                                                        }
-                                                        .buttonStyle(.plain)
-                                                        .help("Restart")
-                                                    }
-                                                    .padding(.vertical, 10)
-                                                } else {
-                                                    // No audio file available
-                                                    VStack(spacing: 12) {
-                                                        Image(systemName: "waveform.slash")
-                                                            .font(.largeTitle)
-                                                            .foregroundStyle(Color.textMuted)
-                                                        Text("No audio recording available")
-                                                            .font(.subheadline)
-                                                            .foregroundStyle(Color.textMuted)
-                                                    }
-                                                    .frame(maxWidth: .infinity)
-                                                    .padding(.vertical, 30)
-                                                }
-                                            }
-                                            .padding(18)
-                                            .background(Color.bgHover)
-                                            .cornerRadius(12)
-                                            
-                                            Divider()
-                                            
-                                            // Audio Duration with icon
-                                            HStack(spacing: 10) {
-                                                Image(systemName: "waveform.circle")
-                                                    .font(.body)
-                                                    .foregroundStyle(Color.textMuted)
-                                                Text("Audio Duration")
-                                                    .font(.body)
-                                                    .foregroundStyle(Color.textMuted)
-                                                
-                                                Spacer()
-                                                
-                                                Text(formatDuration(item.duration))
-                                                    .font(.body)
-                                                    .foregroundStyle(Color.textPrimary)
-                                            }
-                                            .padding(.top, 8)
-                                            
-                                            // Additional Metrics
-                                            if item.modelUsed != nil || item.transcriptionTime != nil {
-                                                VStack(alignment: .leading, spacing: 14) {
-                                                    if let model = item.modelUsed {
-                                                        HStack(spacing: 10) {
-                                                            Image(systemName: "cpu")
-                                                                .font(.body)
-                                                                .foregroundStyle(Color.textMuted)
-                                                            Text("Transcription Model")
-                                                                .font(.body)
-                                                                .foregroundStyle(Color.textMuted)
-                                                            Spacer()
-                                                            Text(model)
-                                                                .font(.body)
-                                                                .foregroundStyle(Color.textPrimary)
-                                                                .lineLimit(1)
-                                                        }
-                                                    }
-                                                    
-                                                    if let transcriptionTime = item.transcriptionTime {
-                                                        HStack(spacing: 10) {
-                                                            Image(systemName: "clock")
-                                                                .font(.body)
-                                                                .foregroundStyle(Color.textMuted)
-                                                            Text("Transcription Time")
-                                                                .font(.body)
-                                                                .foregroundStyle(Color.textMuted)
-                                                            Spacer()
-                                                            Text(formatDuration(transcriptionTime))
-                                                                .font(.body)
-                                                                .foregroundStyle(Color.textPrimary)
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        .padding(.horizontal, 18)
-                                        .padding(.bottom, 18)
-                                    }
-                                }
-                            }
-                            .background(Color.bgCard)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.border, lineWidth: 1)
+                                },
+                                onCopy: { copyToClipboard(text: item.transcript) },
+                                audioPlayer: audioPlayer
                             )
-                            .cardShadow()
                         }
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
                 }
-                }
             }
-        .background(Color.clear)
+        }
         .overlay(alignment: .bottom) {
             if showCopyToast {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.accentBlue) // Theme Blue (Success)
+                        .foregroundStyle(Color.accentBlue)
                     Text("Text Copied")
-                        .font(.headline)
+                        .font(Typography.labelMedium)
                         .foregroundStyle(.white)
                 }
                 .padding(.horizontal, 16)
@@ -398,5 +158,224 @@ struct HistoryView: View {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+// MARK: - History Card Component
+
+struct HistoryCard: View {
+    let item: HistoryItem
+    let isExpanded: Bool
+    let onToggle: () -> Void
+    let onCopy: () -> Void
+    @ObservedObject var audioPlayer: AudioPlayerService
+    @State private var isHovered = false
+    
+    var wordCount: Int {
+        item.transcript.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Main row
+            Button(action: onToggle) {
+                HStack(spacing: 16) {
+                    // Date badge
+                    VStack(alignment: .center, spacing: 2) {
+                        Text(item.date.formatted(.dateTime.day()))
+                            .font(.system(size: 18, weight: .semibold, design: .serif))
+                            .foregroundStyle(Color.textPrimary)
+                        Text(item.date.formatted(.dateTime.month(.abbreviated)))
+                            .font(Typography.captionSmall)
+                            .foregroundStyle(Color.textMuted)
+                            .textCase(.uppercase)
+                    }
+                    .frame(width: 48)
+                    
+                    // Content
+                    VStack(alignment: .leading, spacing: 8) {
+                        // Transcript preview
+                        Text(item.transcript)
+                            .font(Typography.bodyMedium)
+                            .foregroundStyle(Color.textPrimary)
+                            .lineLimit(2)
+                            .lineSpacing(4)
+                        
+                        // Metadata
+                        HStack(spacing: 12) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock")
+                                    .font(.system(size: 10))
+                                Text(item.date.formatted(date: .omitted, time: .shortened))
+                            }
+                            .font(Typography.captionSmall)
+                            .foregroundStyle(Color.textMuted)
+                            
+                            Text("•")
+                                .font(Typography.captionSmall)
+                                .foregroundStyle(Color.textMuted.opacity(0.5))
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: "text.word.spacing")
+                                    .font(.system(size: 10))
+                                Text("\(wordCount) words")
+                            }
+                            .font(Typography.captionSmall)
+                            .foregroundStyle(Color.textMuted)
+                            
+                            Text("•")
+                                .font(Typography.captionSmall)
+                                .foregroundStyle(Color.textMuted.opacity(0.5))
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: "waveform")
+                                    .font(.system(size: 10))
+                                Text(formatDurationShort(item.duration))
+                            }
+                            .font(Typography.captionSmall)
+                            .foregroundStyle(Color.textMuted)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // Expand indicator
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.textMuted)
+                }
+                .padding(20)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            
+            // Expanded content
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 20) {
+                    Divider()
+                        .padding(.horizontal, 20)
+                    
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Full transcript
+                        Text(item.transcript)
+                            .font(Typography.bodyLarge)
+                            .foregroundStyle(Color.textPrimary)
+                            .textSelection(.enabled)
+                            .lineSpacing(6)
+                        
+                        // Actions row
+                        HStack(spacing: 12) {
+                            Button(action: onCopy) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "doc.on.doc")
+                                        .font(.system(size: 12))
+                                    Text("Copy")
+                                        .font(Typography.labelMedium)
+                                }
+                                .foregroundStyle(Color.textSecondary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Color.bgHover)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                            
+                            if let audioURL = item.audioFileURL {
+                                Button(action: {
+                                    if audioPlayer.isPlaying {
+                                        audioPlayer.pause()
+                                    } else {
+                                        audioPlayer.play()
+                                    }
+                                }) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
+                                            .font(.system(size: 12))
+                                        Text(audioPlayer.isPlaying ? "Pause" : "Play Audio")
+                                            .font(Typography.labelMedium)
+                                    }
+                                    .foregroundStyle(Color.textSecondary)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(Color.bgHover)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
+                                
+                                Button(action: {
+                                    NSWorkspace.shared.activateFileViewerSelecting([audioURL])
+                                }) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "folder")
+                                            .font(.system(size: 12))
+                                        Text("Show in Finder")
+                                            .font(Typography.labelMedium)
+                                    }
+                                    .foregroundStyle(Color.textSecondary)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(Color.bgHover)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        
+                        // Audio waveform (if available)
+                        if let audioURL = item.audioFileURL {
+                            VStack(spacing: 12) {
+                                Divider()
+                                
+                                WaveformView(
+                                    audioURL: audioURL,
+                                    currentTime: $audioPlayer.currentTime,
+                                    duration: $audioPlayer.duration
+                                )
+                                .frame(height: 60)
+                            }
+                        }
+                        
+                        // Metadata
+                        if item.modelUsed != nil {
+                            Divider()
+                            
+                            HStack(spacing: 12) {
+                                if let model = item.modelUsed {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "cpu")
+                                            .font(.system(size: 11))
+                                        Text(model)
+                                    }
+                                    .font(Typography.captionSmall)
+                                    .foregroundStyle(Color.textMuted)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
+                }
+            }
+        }
+        .background(Color.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isHovered || isExpanded ? Color.border : Color.border.opacity(0.5), lineWidth: 1)
+        )
+        .cardShadow()
+        .onHover { hovering in
+            isHovered = hovering
+        }
+    }
+    
+    private func formatDurationShort(_ duration: TimeInterval) -> String {
+        let seconds = Int(duration)
+        if seconds < 60 {
+            return "\(seconds)s"
+        } else {
+            let mins = seconds / 60
+            return "\(mins)m"
+        }
     }
 }

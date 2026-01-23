@@ -74,11 +74,11 @@ enum Typography {
     
     // MARK: - Sidebar (Source Sans)
     
-    static let sidebarLogo = Font.custom(FontName.sourceSans, size: 16).weight(.bold)
-    static let sidebarItem = Font.custom(FontName.sourceSans, size: 14).weight(.regular)
-    static let sidebarItemActive = Font.custom(FontName.sourceSans, size: 14).weight(.semibold)
+    static let sidebarLogo = Font.custom(FontName.sourceSans, size: 22).weight(.bold)
+    static let sidebarItem = Font.custom(FontName.sourceSans, size: 15).weight(.regular)
+    static let sidebarItemActive = Font.custom(FontName.sourceSans, size: 15).weight(.semibold)
     static let sidebarBadge = Font.custom(FontName.sourceSans, size: 10).weight(.medium)
-    static let sidebarPromoTitle = Font.custom(FontName.sourceSans, size: 13).weight(.semibold)
-    static let sidebarPromoSubtitle = Font.custom(FontName.sourceSans, size: 12).weight(.regular)
-    static let sidebarPromoButton = Font.custom(FontName.sourceSans, size: 12).weight(.medium)
+    static let sidebarPromoTitle = Font.custom(FontName.sourceSans, size: 14).weight(.semibold)
+    static let sidebarPromoSubtitle = Font.custom(FontName.sourceSans, size: 13).weight(.regular)
+    static let sidebarPromoButton = Font.custom(FontName.sourceSans, size: 13).weight(.medium)
 }

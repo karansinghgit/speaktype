@@ -2,6 +2,7 @@ import SwiftUI
 import AVKit
 import CoreMedia
 import UniformTypeIdentifiers
+import AppKit
 
 struct DashboardView: View {
     @Binding var selection: SidebarItem?
@@ -55,14 +56,14 @@ struct DashboardView: View {
     var weeklyData: [(day: String, count: Int)] {
         let calendar = Calendar.current
         let today = Date()
-        // Last 5 days including today
-        return (0..<5).reversed().map { i in
+        // Last 7 days including today
+        return (0..<7).reversed().map { i in
             let date = calendar.date(byAdding: .day, value: -i, to: today) ?? today
             let count = historyService.items.filter { calendar.isDate($0.date, inSameDayAs: date) }.count
             let formatter = DateFormatter()
-            formatter.dateFormat = "E" // Mon, Tue
-            let dayStr = formatter.string(from: date).prefix(1).uppercased() // M, T
-            return (String(dayStr), count)
+            formatter.dateFormat = "EEE" // Mon, Tue, Wed
+            let dayStr = String(formatter.string(from: date).prefix(3))
+            return (dayStr, count)
         }
     }
 
@@ -74,75 +75,87 @@ struct DashboardView: View {
                     TrialBanner(status: trialManager.trialStatus)
                 }
                 
-                // Header - Serif headline like Flow
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(timeBasedGreeting)
-                        .font(Typography.displaySmall)  // Serif
-                        .foregroundStyle(Color.textPrimary)
-                    Text("Here's your productivity overview.")
-                        .font(Typography.bodyMedium)
-                        .foregroundStyle(Color.textSecondary)
+                // Two horizontal boxes: Stats + Activity Chart
+                HStack(alignment: .top, spacing: 20) {
+                    // Left: Stats Card
+                    StatsCard(
+                        greeting: timeBasedGreeting,
+                        wordCount: totalWordsTranscribed,
+                        timeSaved: timeSavedMinutes,
+                        todayCount: transcriptionCountToday,
+                        allTimeCount: historyService.items.count
+                    )
+                    
+                    // Right: Activity Chart Card
+                    ActivityChartCard(weeklyData: weeklyData)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
                 
-                // Main Content Layout
-                ViewThatFits(in: .horizontal) {
-                    // Wide Layout
-                    HStack(alignment: .top, spacing: 24) {
-                        VStack(spacing: 24) {
-                            ProductivityCard(
-                                transcriptionCount: transcriptionCountToday,
-                                wordsTranscribed: totalWordsTranscribed,
-                                timeSaved: timeSavedMinutes,
-                                weeklyData: weeklyData
-                            )
+                // Recent Transcriptions - Enhanced
+                VStack(alignment: .leading, spacing: 16) {
+                    // Header with actions
+                    HStack(alignment: .center) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Recent transcriptions")
+                                .font(Typography.displaySmall)
+                                .foregroundStyle(Color.textPrimary)
+                            
+                            if !historyService.items.isEmpty {
+                                Text("\(historyService.items.count) total transcriptions")
+                                    .font(Typography.caption)
+                                    .foregroundStyle(Color.textMuted)
+                            }
                         }
                         
-                        TipsCard()
-                            .frame(width: 300)
-                    }
-                    
-                    // Narrow Layout
-                    VStack(spacing: 24) {
-                        ProductivityCard(
-                            transcriptionCount: transcriptionCountToday,
-                            wordsTranscribed: totalWordsTranscribed,
-                            timeSaved: timeSavedMinutes,
-                            weeklyData: weeklyData
-                        )
+                        Spacer()
                         
-                        TipsCard()
-                            .frame(maxWidth: .infinity)
+                        if !historyService.items.isEmpty {
+                            Button(action: { selection = .history }) {
+                                HStack(spacing: 6) {
+                                    Text("View all")
+                                        .font(Typography.labelSmall)
+                                    Image(systemName: "arrow.right")
+                                        .font(.system(size: 11))
+                                }
+                                .foregroundStyle(Color.textSecondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                }
-                
-                // Recent Transcriptions - Flow style
-                VStack(alignment: .leading, spacing: 16) {
-                    // Header with serif
-                    Text("Recent transcriptions")
-                        .font(Typography.displaySmall)
-                        .foregroundStyle(Color.textPrimary)
                     
                     if historyService.items.isEmpty {
-                        Text("No transcriptions yet. Start speaking to create your first one.")
-                            .font(Typography.bodyMedium)
-                            .foregroundStyle(Color.textSecondary)
-                            .padding(.vertical, 20)
+                        // Empty state
+                        VStack(spacing: 16) {
+                            Image(systemName: "waveform.badge.mic")
+                                .font(.system(size: 40))
+                                .foregroundStyle(Color.textMuted.opacity(0.5))
+                            
+                            VStack(spacing: 6) {
+                                Text("No transcriptions yet")
+                                    .font(Typography.bodyMedium)
+                                    .foregroundStyle(Color.textPrimary)
+                                
+                                Text("Press ⌘+Shift+Space to start recording")
+                                    .font(Typography.bodySmall)
+                                    .foregroundStyle(Color.textSecondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
                     } else {
-                        VStack(spacing: 8) {
+                        VStack(spacing: 12) {
                             ForEach(historyService.items.prefix(5)) { item in
                                 RecentTranscriptionRow(item: item)
                             }
                         }
-                        
-                        Button(action: { selection = .history }) {
-                            Text("View all transcriptions")
-                        }
-                        .buttonStyle(.stPrimary)
-                        .padding(.top, 8)
                     }
                 }
-                .themedCard()
+                .padding(24)
+                .background(Color.bgCard)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.border, lineWidth: 1)
+                )
             }
             .padding(20)
         }
@@ -266,179 +279,315 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Productivity Card (Flow-style)
+// MARK: - Stats Card
 
-struct ProductivityCard: View {
-    let transcriptionCount: Int
-    let wordsTranscribed: Int
+struct StatsCard: View {
+    let greeting: String
+    let wordCount: Int
     let timeSaved: Int
-    let weeklyData: [(day: String, count: Int)]
+    let todayCount: Int
+    let allTimeCount: Int
+    
+    var avgWordsPerTranscription: Int {
+        allTimeCount > 0 ? wordCount / allTimeCount : 0
+    }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            // Header with serif
-            Text("Your productivity today")
-                .font(Typography.displaySmall)
-                .foregroundStyle(Color.textPrimary)
-            
-            // Description
-            Text("You've transcribed \(wordsTranscribed) words, saving approximately \(timeSaved) minutes of typing.")
-                .font(Typography.bodyMedium)
-                .foregroundStyle(Color.textSecondary)
-                .lineSpacing(4)
-            
-            // Stats row - like Flow's snippet examples
-            HStack(spacing: 12) {
-                StatPill(label: "Transcriptions", value: "\(transcriptionCount)")
-                StatPill(label: "Words", value: "\(wordsTranscribed)")
-                StatPill(label: "Time saved", value: "\(timeSaved)m")
-            }
-            
-            // Mini chart
-            HStack(alignment: .bottom, spacing: 6) {
-                let maxCount = max(weeklyData.map { $0.count }.max() ?? 1, 1)
+        VStack(alignment: .leading, spacing: 24) {
+            // Greeting + Hero stat
+            VStack(alignment: .leading, spacing: 12) {
+                Text(greeting)
+                    .font(Typography.displayMedium)
+                    .foregroundStyle(Color.textPrimary)
                 
-                ForEach(weeklyData, id: \.day) { data in
-                    VStack(spacing: 4) {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.accentPrimary.opacity(data.count > 0 ? 1 : 0.2))
-                            .frame(width: 24, height: max(CGFloat(data.count) / CGFloat(maxCount) * 50, 6))
-                        
-                        Text(data.day)
-                            .font(Typography.captionSmall)
-                            .foregroundStyle(Color.textMuted)
-                    }
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text("\(wordCount)")
+                        .font(.system(size: 64, weight: .light, design: .serif))
+                        .foregroundStyle(Color.textPrimary)
+                    
+                    Text("words transcribed")
+                        .font(Typography.bodyLarge)
+                        .foregroundStyle(Color.textSecondary)
+                        .padding(.bottom, 10)
                 }
                 
-                Spacer()
+                // Insight text
+                if timeSaved > 0 {
+                    Text("Saving you \(timeSaved) minutes of typing time")
+                        .font(Typography.bodySmall)
+                        .foregroundStyle(Color.textMuted)
+                }
             }
-            .padding(.top, 4)
+            
+            Divider()
+            
+            // Stats grid - 2x2
+            VStack(spacing: 20) {
+                HStack(spacing: 24) {
+                    StatBlock(value: "\(todayCount)", label: "Transcriptions today", icon: "mic.fill")
+                    Spacer()
+                    StatBlock(value: "\(allTimeCount)", label: "Total transcriptions", icon: "tray.full.fill")
+                }
+                
+                HStack(spacing: 24) {
+                    StatBlock(value: "\(timeSaved)m", label: "Time saved typing", icon: "clock.fill")
+                    Spacer()
+                    StatBlock(value: "\(avgWordsPerTranscription)", label: "Avg words per note", icon: "textformat.123")
+                }
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .themedCard()
     }
 }
 
-// MARK: - Stat Pill (Flow-style)
+// MARK: - Activity Chart Card
 
-struct StatPill: View {
-    let label: String
-    let value: String
+struct ActivityChartCard: View {
+    let weeklyData: [(day: String, count: Int)]
+    
+    var totalThisWeek: Int {
+        weeklyData.reduce(0) { $0 + $1.count }
+    }
+    
+    var mostActiveDay: String {
+        guard let maxDay = weeklyData.max(by: { $0.count < $1.count }) else {
+            return "None"
+        }
+        return maxDay.count > 0 ? maxDay.day : "None"
+    }
     
     var body: some View {
-        HStack(spacing: 8) {
-            Text(label)
-                .font(Typography.bodySmall)
-                .foregroundStyle(Color.textMuted)
+        VStack(alignment: .leading, spacing: 20) {
+            // Header
+            VStack(alignment: .leading, spacing: 4) {
+                Text("This week")
+                    .font(Typography.displaySmall)
+                    .foregroundStyle(Color.textPrimary)
+                
+                HStack(spacing: 6) {
+                    Text("\(totalThisWeek)")
+                        .font(Typography.bodyMedium)
+                        .foregroundStyle(Color.textPrimary)
+                    Text("transcriptions")
+                        .font(Typography.bodySmall)
+                        .foregroundStyle(Color.textSecondary)
+                    
+                    if totalThisWeek > 0 {
+                        Text("•")
+                            .font(Typography.bodySmall)
+                            .foregroundStyle(Color.textMuted.opacity(0.5))
+                        
+                        Text("Most active: \(mostActiveDay)")
+                            .font(Typography.bodySmall)
+                            .foregroundStyle(Color.textMuted)
+                    }
+                }
+            }
             
-            Text("→")
-                .font(Typography.caption)
-                .foregroundStyle(Color.textMuted)
+            Spacer()
             
-            Text(value)
-                .font(Typography.labelMedium)
-                .foregroundStyle(Color.textPrimary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color.bgHover)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+            // Chart
+            HStack(alignment: .bottom, spacing: 14) {
+                let maxCount = max(weeklyData.map { $0.count }.max() ?? 1, 1)
+                
+                ForEach(Array(weeklyData.enumerated()), id: \.offset) { index, data in
+                    VStack(spacing: 8) {
+                        // Count label on top (only if > 0)
+                        Text(data.count > 0 ? "\(data.count)" : "")
+                            .font(Typography.captionSmall)
+                            .foregroundStyle(Color.textMuted)
+                            .frame(height: 14)
+                        
+                        // Bar
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(data.count > 0 ? Color.textPrimary : Color.border.opacity(0.3))
+                            .frame(height: max(CGFloat(data.count) / CGFloat(maxCount) * 120, 8))
+                        
+                        // Day label
+                        Text(data.day)
+                            .font(Typography.captionSmall)
+                            .foregroundStyle(data.count > 0 ? Color.textPrimary : Color.textMuted)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
         }
+        .frame(width: 420)
+        .themedCard()
     }
 }
 
-// MARK: - Stat Item
+// MARK: - Stat Block
 
-struct StatItem: View {
+struct StatBlock: View {
     let value: String
     let label: String
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(Typography.titleLarge)
-                .foregroundStyle(Color.textPrimary)
-            Text(label)
-                .font(Typography.captionSmall)
-                .foregroundStyle(Color.textMuted)
-        }
-    }
-}
-
-// MARK: - Metric Card (Clean)
-
-struct MetricCard: View {
-    let title: String
-    let value: String
     let icon: String
-    let iconColor: Color
     
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(iconColor)
+                .font(.system(size: 18))
+                .foregroundStyle(Color.textMuted)
                 .frame(width: 24)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(value)
+                    .font(.system(size: 24, weight: .medium, design: .serif))
+                    .foregroundStyle(Color.textPrimary)
+                
+                Text(label)
                     .font(Typography.captionSmall)
                     .foregroundStyle(Color.textMuted)
-                
-                Text(value)
-                    .font(Typography.headlineMedium)
-                    .foregroundStyle(Color.textPrimary)
             }
             
             Spacer()
         }
-        .themedCard(padding: 16)
     }
 }
 
-// MARK: - Recent Transcription Row (Flow-style)
+
+// MARK: - Recent Transcription Row (Multi-line)
 
 struct RecentTranscriptionRow: View {
     let item: HistoryItem
     @State private var isHovered = false
+    @State private var showCopySuccess = false
+    
+    var wordCount: Int {
+        item.transcript.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count
+    }
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Preview text in a pill
-            Text(item.transcript.isEmpty ? "Empty" : String(item.transcript.prefix(30)))
-                .font(Typography.bodySmall)
-                .foregroundStyle(Color.textPrimary)
-                .lineLimit(1)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.bgHover)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+        HStack(alignment: .top, spacing: 16) {
+            // Icon
+            Image(systemName: "waveform.circle.fill")
+                .font(.system(size: 24))
+                .foregroundStyle(Color.accentPrimary)
+                .frame(width: 32, height: 32)
             
-            Text("→")
-                .font(Typography.caption)
-                .foregroundStyle(Color.textMuted)
-            
-            // Full transcript preview
-            Text(item.transcript.isEmpty ? "No content" : item.transcript)
-                .font(Typography.bodySmall)
-                .foregroundStyle(Color.textSecondary)
-                .lineLimit(1)
-            
-            Spacer()
-            
-            // Time ago
-            Text(timeAgo(item.date))
-                .font(Typography.caption)
-                .foregroundStyle(Color.textMuted)
+            // Main content
+            VStack(alignment: .leading, spacing: 8) {
+                // Transcript - multiple lines
+                Text(item.transcript.isEmpty ? "Empty transcription" : item.transcript)
+                    .font(Typography.bodyMedium)
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(3)
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                
+                // Metadata row
+                HStack(spacing: 12) {
+                    // Time ago
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 11))
+                        Text(timeAgo(item.date))
+                    }
+                    .font(Typography.captionSmall)
+                    .foregroundStyle(Color.textMuted)
+                    
+                    // Word count
+                    HStack(spacing: 4) {
+                        Image(systemName: "text.word.spacing")
+                            .font(.system(size: 11))
+                        Text("\(wordCount) words")
+                    }
+                    .font(Typography.captionSmall)
+                    .foregroundStyle(Color.textMuted)
+                    
+                    // Duration
+                    HStack(spacing: 4) {
+                        Image(systemName: "timer")
+                            .font(.system(size: 11))
+                        Text(formatDuration(item.duration))
+                    }
+                    .font(Typography.captionSmall)
+                    .foregroundStyle(Color.textMuted)
+                    
+                    Spacer()
+                    
+                    // Quick actions
+                    HStack(spacing: 8) {
+                        // Copy button
+                        Button(action: copyToClipboard) {
+                            HStack(spacing: 4) {
+                                Image(systemName: showCopySuccess ? "checkmark" : "doc.on.doc")
+                                    .font(.system(size: 11))
+                                Text(showCopySuccess ? "Copied" : "Copy")
+                                    .font(Typography.captionSmall)
+                            }
+                            .foregroundStyle(showCopySuccess ? Color.accentSuccess : Color.textSecondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.bgHover)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                        .buttonStyle(.plain)
+                        
+                        // Play audio button (if available)
+                        if item.audioFileURL != nil {
+                            Button(action: {}) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "play.fill")
+                                        .font(.system(size: 11))
+                                    Text("Play")
+                                        .font(Typography.captionSmall)
+                                }
+                                .foregroundStyle(Color.textSecondary)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.bgHover)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .opacity(isHovered ? 1 : 0.5)
+                }
+            }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 4)
+        .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isHovered ? Color.bgHover.opacity(0.5) : Color.clear)
+            RoundedRectangle(cornerRadius: 12)
+                .fill(isHovered ? Color.bgHover.opacity(0.7) : Color.bgCard)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.border.opacity(0.5), lineWidth: 1)
         )
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.15)) {
                 isHovered = hovering
             }
+        }
+    }
+    
+    private func copyToClipboard() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(item.transcript, forType: .string)
+        
+        withAnimation {
+            showCopySuccess = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation {
+                showCopySuccess = false
+            }
+        }
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let seconds = Int(duration)
+        if seconds < 60 {
+            return "\(seconds)s"
+        } else {
+            let mins = seconds / 60
+            let secs = seconds % 60
+            return "\(mins)m \(secs)s"
         }
     }
     
@@ -451,44 +600,6 @@ struct RecentTranscriptionRow: View {
     }
 }
 
-// MARK: - Tips Card (Flow-style)
-
-struct TipsCard: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header with serif
-            Text("Quick start guide")
-                .font(Typography.displaySmall)
-                .foregroundStyle(Color.textPrimary)
-            
-            Text("Learn how to get the most out of SpeakType with our quick video tutorial.")
-                .font(Typography.bodyMedium)
-                .foregroundStyle(Color.textSecondary)
-                .lineSpacing(4)
-            
-            // Placeholder with mic icon like Flow
-            VStack(spacing: 12) {
-                Image(systemName: "mic.fill")
-                    .font(.system(size: 28))
-                    .foregroundStyle(Color.textMuted)
-                
-                Text("Take a quick note with your voice")
-                    .font(Typography.bodyMedium)
-                    .foregroundStyle(Color.textMuted)
-                
-                Text("Press ⌘+Shift+Space to start recording")
-                    .font(Typography.caption)
-                    .foregroundStyle(Color.textMuted.opacity(0.7))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 32)
-            .background(Color.bgHover)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-        .frame(maxWidth: .infinity)
-        .themedCard()
-    }
-}
 
 // MARK: - Preference Key
 struct HeightPreferenceKey: PreferenceKey {

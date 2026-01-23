@@ -27,11 +27,10 @@ struct LicenseView: View {
                     .padding(.top, 40)
                 
                 Text("Activate Pro License")
-                    .font(.title)
-                    .fontWeight(.semibold)
+                    .font(Typography.headlineLarge)
                 
                 Text("Enter your license key to unlock all Pro features")
-                    .font(.subheadline)
+                    .font(Typography.bodySmall)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
@@ -41,8 +40,7 @@ struct LicenseView: View {
             // License Key Input
             VStack(alignment: .leading, spacing: 8) {
                 Text("License Key")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(Typography.labelMedium)
                     .foregroundColor(.secondary)
                 
                 HStack {
@@ -87,7 +85,7 @@ struct LicenseView: View {
                         .font(.system(size: 12))
                     
                     Text(errorMessage)
-                        .font(.caption)
+                        .font(Typography.captionSmall)
                         .foregroundColor(.red)
                         .fixedSize(horizontal: false, vertical: true)
                     
@@ -106,7 +104,7 @@ struct LicenseView: View {
                         .font(.system(size: 12))
                     
                     Text("License activated successfully!")
-                        .font(.caption)
+                        .font(Typography.captionSmall)
                         .foregroundColor(.green)
                 }
                 .padding(.horizontal, 40)
@@ -129,7 +127,7 @@ struct LicenseView: View {
                     }
                     
                     Text(licenseManager.isValidating ? "Verifying..." : "Activate License")
-                        .fontWeight(.medium)
+                        .font(Typography.labelMedium)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 36)
@@ -148,14 +146,14 @@ struct LicenseView: View {
                 
                 VStack(spacing: 8) {
                     Text("Don't have a license key?")
-                        .font(.caption)
+                        .font(Typography.captionSmall)
                         .foregroundColor(.secondary)
                     
                     Button("Purchase a License") {
                         openPurchaseURL()
                     }
                     .buttonStyle(.link)
-                    .font(.caption)
+                    .font(Typography.captionSmall)
                 }
                 .padding(.vertical, 16)
                 
@@ -165,7 +163,7 @@ struct LicenseView: View {
                         dismiss()
                     }
                     .buttonStyle(.plain)
-                    .font(.caption)
+                    .font(Typography.captionSmall)
                     .foregroundColor(.secondary)
                     .padding(.bottom, 16)
                 }

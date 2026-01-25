@@ -37,7 +37,7 @@ SpeakType is a **privacy-first, offline voice dictation tool** for macOS that le
 
 ### Core Features
 - **🎤 System-Wide Dictation** - Works in Notes, Slack, Chrome, Terminal—anywhere
-- **⌨️ Global Hotkey** - Press, speak, release = instant text (default: `⌥ Space`)
+- **⌨️ Global Hotkey** - Press, speak, release = instant text (default: `fn` Function Key)
 - **🔒 100% Offline** - All processing happens locally with WhisperKit
 - **📋 Smart Paste** - Auto-copies to clipboard or pastes directly
 - **🎨 Native macOS UI** - Beautiful SwiftUI interface with dark mode
@@ -69,7 +69,7 @@ SpeakType is a **privacy-first, offline voice dictation tool** for macOS that le
 
 ### Option 1: Download Pre-built App (Recommended)
 
-**📥 [Download Latest Release](https://github.com/yourusername/speaktype/releases/latest)**
+**📥 [Download Latest Release](https://github.com/karansinghgit/speaktype/releases/latest)**
 
 1. Download `SpeakType.dmg` from the latest release
 2. Open the DMG file
@@ -81,13 +81,13 @@ SpeakType is a **privacy-first, offline voice dictation tool** for macOS that le
 5. Grant permissions when prompted (Microphone + Accessibility)
 6. Download an AI model from Settings → AI Models
 
-**That's it!** 🎉 Press `⌥ Space` (Option + Space) to start dictating.
+**That's it!** 🎉 Press `fn` (Function Key) to start dictating.
 
 ### Option 2: Build from Source
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/yourusername/speaktype.git
+git clone https://github.com/karansinghgit/speaktype.git
 cd speaktype
 
 # 2. Build & run
@@ -111,7 +111,7 @@ open speaktype.xcodeproj
 
 3. **Configure Hotkey** (optional):
    - Go to Settings
-   - Default is `⌥ Space` (Option + Space)
+   - Default is `fn` (Function Key)
    - Customize to your preference
 
 4. **Start Using**:
@@ -126,7 +126,7 @@ open speaktype.xcodeproj
 ### Basic Usage
 
 ```
-1. Press hotkey (⌥ Space)
+1. Press hotkey (`fn`)
 2. Speak your text
 3. Release hotkey
 4. ✨ Text appears!
@@ -306,7 +306,7 @@ We welcome contributions! Here's how to get started:
 
 1. **Fork & clone**
    ```bash
-   git clone https://github.com/yourusername/speaktype.git
+   git clone https://github.com/karansinghgit/speaktype.git
    cd speaktype
    ```
 
@@ -397,8 +397,8 @@ SpeakType is built with amazing open-source projects:
 
 ## 📞 Support & Community
 
-- **🐛 Bug Reports**: [GitHub Issues](https://github.com/yourusername/speaktype/issues)
-- **💬 Discussions**: [GitHub Discussions](https://github.com/yourusername/speaktype/discussions)
+- **🐛 Bug Reports**: [GitHub Issues](https://github.com/karansinghgit/speaktype/issues)
+- **💬 Discussions**: [GitHub Discussions](https://github.com/karansinghgit/speaktype/discussions)
 - **📧 Email**: [your.email@example.com](mailto:your.email@example.com)
 
 ---

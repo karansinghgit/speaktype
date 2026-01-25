@@ -36,8 +36,7 @@ jobs:
             -derivedDataPath build \
             SYMROOT=build/Release \
             CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            | xcpretty || true
+            CODE_SIGNING_REQUIRED=NO
       
       - name: Verify Build
         run: |
@@ -128,7 +127,7 @@ jobs:
           cat release_notes.md
       
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: SpeakType ${{ steps.get_version.outputs.version }}
           body_path: release_notes.md
@@ -137,6 +136,7 @@ jobs:
             dist/SpeakType.zip
           draft: false
           prerelease: false
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       

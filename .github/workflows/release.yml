@@ -1,62 +1,54 @@
-name: Release Build
+name: Build and Release Mac App
 
 on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version (e.g., v1.0.0)'
-        required: true
-        type: string
 
 jobs:
   build-and-release:
+    runs-on: macos-14
     permissions:
       contents: write
-    runs-on: macos-14
-    
+
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
-      
+
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '15.2'
-      
+
       - name: Install create-dmg
         run: brew install create-dmg
-      
-      - name: Build Release
+
+      - name: Build App (Unsigned)
         run: |
-          xcodebuild -scheme speaktype \
+          echo "🏗️ Building SpeakType..."
+          xcodebuild -scheme "speaktype" \
             -configuration Release \
             -derivedDataPath build \
             SYMROOT=build/Release \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO
-      
+
       - name: Verify Build
         run: |
           if [ ! -d "build/Release/speaktype.app" ]; then
-            echo "❌ Build failed - app not found"
+            echo "❌ Build failed - app not found at build/Release/speaktype.app"
             exit 1
           fi
           echo "✅ Build successful"
-          ls -la build/Release/
-      
-      - name: Create ZIP Package
-        run: |
-          mkdir -p dist
-          cd build/Release
-          zip -r ../../dist/SpeakType.zip speaktype.app
-          cd ../..
-          ls -lh dist/SpeakType.zip
-      
+
       - name: Create DMG
         run: |
+          echo "💿 Creating DMG..."
+          mkdir -p dist
+          
+          # Clean up any previous attempts
+          rm -f dist/SpeakType.dmg
+          
           create-dmg \
             --volname "SpeakType" \
             --window-pos 200 120 \
@@ -66,94 +58,11 @@ jobs:
             --app-drop-link 600 185 \
             --no-internet-enable \
             "dist/SpeakType.dmg" \
-            "build/Release/speaktype.app" || \
-          hdiutil create \
-            -volname "SpeakType" \
-            -srcfolder build/Release/speaktype.app \
-            -ov -format UDZO \
-            dist/SpeakType.dmg
-          ls -lh dist/SpeakType.dmg
-      
-      - name: Get version from tag
-        id: get_version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION=${GITHUB_REF#refs/tags/}
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION"
-      
-      - name: Generate Release Notes
-        id: release_notes
-        run: |
-          cat > release_notes.md << 'EOF'
-          ## 🎉 SpeakType ${{ steps.get_version.outputs.version }}
-          
-          ### 📥 Installation
-          
-          **For macOS Users:**
-          1. Download `SpeakType.dmg` below
-          2. Open the DMG file
-          3. Drag SpeakType to your Applications folder
-          4. **Important:** Right-click the app and select "Open" (first time only)
-          
-          **Why right-click?** This app is not yet notarized with Apple. This is a one-time step.
-          
-          ### ✨ What's New
-          - Initial release
-          - Offline voice-to-text transcription
-          - Multiple Whisper AI models support
-          - Global hotkey support
-          - Native macOS UI with dark mode
-          
-          ### 📋 Requirements
-          - macOS 13.0+ (Ventura or newer)
-          - Apple Silicon (M1+) recommended
-          - 2GB free space (for AI models)
-          
-          ### 🐛 Known Issues
-          - Gatekeeper warning on first launch (see installation steps above)
-          - WhisperKit dependency warnings in build (harmless)
-          
-          ### 📚 Documentation
-          See the [README](https://github.com/${{ github.repository }}) for full documentation.
-          
-          ---
-          
-          **Built with ❤️ | Privacy-First | 100% Offline | Open Source**
-          EOF
-          cat release_notes.md
-      
-      - name: Create GitHub Release
+            "build/Release/speaktype.app"
+
+      - name: Create Release & Upload Assets
         uses: softprops/action-gh-release@v2
         with:
-          name: SpeakType ${{ steps.get_version.outputs.version }}
-          body_path: release_notes.md
-          files: |
-            dist/SpeakType.dmg
-            dist/SpeakType.zip
-          draft: false
-          prerelease: false
+          files: dist/SpeakType.dmg
+          generate_release_notes: true
           fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: SpeakType-${{ steps.get_version.outputs.version }}
-          path: |
-            dist/SpeakType.dmg
-            dist/SpeakType.zip
-          retention-days: 90
-      
-      - name: Release Summary
-        run: |
-          echo "✅ Release ${{ steps.get_version.outputs.version }} created successfully!"
-          echo ""
-          echo "📦 Artifacts:"
-          ls -lh dist/
-          echo ""
-          echo "🔗 View release: https://github.com/${{ github.repository }}/releases/tag/${{ steps.get_version.outputs.version }}"

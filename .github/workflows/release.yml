@@ -30,8 +30,8 @@ jobs:
             -configuration Release \
             -derivedDataPath build \
             SYMROOT=build/Release \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=YES
 
       - name: Verify Build
         run: |

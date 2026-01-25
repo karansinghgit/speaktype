@@ -13,6 +13,8 @@ on:
 
 jobs:
   build-and-release:
+    permissions:
+      contents: write
     runs-on: macos-14
     
     steps:

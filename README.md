@@ -33,7 +33,7 @@ SpeakType is a **privacy-first, offline voice dictation tool** for macOS that le
 
 ---
 
-##✨ Features
+###✨ Features
 
 ### Core Features
 - **🎤 System-Wide Dictation** - Works in Notes, Slack, Chrome, Terminal—anywhere

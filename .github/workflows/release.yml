@@ -23,32 +23,34 @@ jobs:
       - name: Install create-dmg
         run: brew install create-dmg
 
-      - name: Build App (Unsigned)
+      - name: Build App (Ad-Hoc Signed)
         run: |
           echo "🏗️ Building SpeakType..."
+          # We remove SYMROOT to let Xcode build naturally, then we find it.
           xcodebuild -scheme "speaktype" \
             -configuration Release \
             -derivedDataPath build \
-            SYMROOT=build/Release \
             CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=YES
+            CODE_SIGNING_REQUIRED=YES \
+            clean build
 
-      - name: Verify Build
+      - name: Locate App & Create DMG
         run: |
-          if [ ! -d "build/Release/speaktype.app" ]; then
-            echo "❌ Build failed - app not found at build/Release/speaktype.app"
+          # 1. Dynamically find the .app file (Fixes the "Path Mismatch" error)
+          APP_PATH=$(find build -name "speaktype.app" | head -n 1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "❌ Error: Could not find speaktype.app anywhere in build folder!"
             exit 1
           fi
-          echo "✅ Build successful"
+          
+          echo "✅ Found App at: $APP_PATH"
 
-      - name: Create DMG
-        run: |
-          echo "💿 Creating DMG..."
+          # 2. Prepare Output Directory
           mkdir -p dist
-          
-          # Clean up any previous attempts
           rm -f dist/SpeakType.dmg
-          
+
+          # 3. Create DMG using the found path
           create-dmg \
             --volname "SpeakType" \
             --window-pos 200 120 \
@@ -58,7 +60,7 @@ jobs:
             --app-drop-link 600 185 \
             --no-internet-enable \
             "dist/SpeakType.dmg" \
-            "build/Release/speaktype.app"
+            "$APP_PATH"
 
       - name: Create Release & Upload Assets
         uses: softprops/action-gh-release@v2

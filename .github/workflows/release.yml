@@ -23,11 +23,16 @@ jobs:
       - name: Install create-dmg
         run: brew install create-dmg
 
-      - name: Build App (Ad-Hoc Signed)
+      - name: List Files (Debug Info)
+        run: ls -R
+
+      - name: Build App (Target Method)
         run: |
-          echo "🏗️ Building SpeakType..."
-          # We remove SYMROOT to let Xcode build naturally, then we find it.
-          xcodebuild -scheme "speaktype" \
+          echo "🏗️ Building SpeakType using TARGET (Bypassing Scheme)..."
+          
+          # We use -target instead of -scheme to avoid the "Missing Scheme" error
+          xcodebuild -project "speaktype.xcodeproj" \
+            -target "speaktype" \
             -configuration Release \
             -derivedDataPath build \
             CODE_SIGN_IDENTITY="-" \
@@ -36,21 +41,17 @@ jobs:
 
       - name: Locate App & Create DMG
         run: |
-          # 1. Dynamically find the .app file (Fixes the "Path Mismatch" error)
+          # Find the app anywhere in the build folder
           APP_PATH=$(find build -name "speaktype.app" | head -n 1)
 
           if [ -z "$APP_PATH" ]; then
-            echo "❌ Error: Could not find speaktype.app anywhere in build folder!"
+            echo "❌ Error: Could not find speaktype.app!"
             exit 1
           fi
           
           echo "✅ Found App at: $APP_PATH"
 
-          # 2. Prepare Output Directory
-          mkdir -p dist
-          rm -f dist/SpeakType.dmg
-
-          # 3. Create DMG using the found path
+          # Create DMG
           create-dmg \
             --volname "SpeakType" \
             --window-pos 200 120 \
@@ -59,12 +60,11 @@ jobs:
             --hide-extension "speaktype.app" \
             --app-drop-link 600 185 \
             --no-internet-enable \
-            "dist/SpeakType.dmg" \
+            "SpeakType.dmg" \
             "$APP_PATH"
 
-      - name: Create Release & Upload Assets
+      - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/SpeakType.dmg
+          files: SpeakType.dmg
           generate_release_notes: true
-          fail_on_unmatched_files: true

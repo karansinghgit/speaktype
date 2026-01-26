@@ -26,13 +26,11 @@ jobs:
       - name: List Files (Debug Info)
         run: ls -R
 
-      - name: Build App (Target Method)
+      - name: Build App (Scheme Method)
         run: |
-          echo "🏗️ Building SpeakType using TARGET (Bypassing Scheme)..."
+          echo "🏗️ Building SpeakType using SCHEME..."
           
-          # We use -target instead of -scheme to avoid the "Missing Scheme" error
-          xcodebuild -project "speaktype.xcodeproj" \
-            -target "speaktype" \
+          xcodebuild -scheme "speaktype" \
             -configuration Release \
             -derivedDataPath build \
             CODE_SIGN_IDENTITY="-" \

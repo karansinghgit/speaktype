@@ -55,6 +55,32 @@ struct AIModel: Identifiable, Equatable {
             size: "39 MB",
             speed: 9.8,
             accuracy: 7.2
+        ),
+        
+        // MARK: - Parakeet Models (NVIDIA NeMo)
+        // Note: Parakeet models require NeMo toolkit support, not WhisperKit
+        // These models will appear in the UI but need separate implementation
+        AIModel(
+            name: "Parakeet TDT 0.6B V3",
+            variant: "nvidia/parakeet-tdt-0.6b-v3",
+            details: "Multilingual • 25 European Languages • Enhanced Performance",
+            rating: "Excellent",
+            size: "~600 MB",
+            speed: 8.0,
+            accuracy: 9.5
+        ),
+        AIModel(
+            name: "Parakeet TDT 0.6B V2",
+            variant: "nvidia/parakeet-tdt-0.6b-v2",
+            details: "English • High Accuracy • Timestamps • Punctuation",
+            rating: "Excellent",
+            size: "~600 MB",
+            speed: 7.5,
+            accuracy: 9.4
         )
     ]
+    
+    var isParakeet: Bool {
+        return variant.lowercased().contains("parakeet") || variant.lowercased().contains("nemo")
+    }
 }

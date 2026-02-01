@@ -4,10 +4,17 @@ import WhisperKit
 @Observable
 class WhisperService {
     var pipe: WhisperKit?
+    private let nemoService = NeMoService()
+    
     var isInitialized = false
     var isTranscribing = false
     
     var currentModelVariant: String = "openai_whisper-base.en" // Default
+    
+    /// Check if a variant is a Whisper model (not Parakeet)
+    static func isWhisperModel(_ variant: String) -> Bool {
+        return !NeMoService.isParakeetModel(variant)
+    }
     
     enum TranscriptionError: Error {
         case notInitialized
@@ -23,31 +30,45 @@ class WhisperService {
     
     // Dynamic model loading
     func loadModel(variant: String) async throws {
-        if isInitialized && variant == currentModelVariant && pipe != nil {
-             return // Already loaded
+        if isInitialized && variant == currentModelVariant {
+             if NeMoService.isParakeetModel(variant) {
+                 // NeMo check
+                 return 
+             } else if pipe != nil {
+                 return // Whisper already loaded
+             }
         }
         
-        print("Initializing WhisperKit with model: \(variant)...")
+        print("Initializing with model: \(variant)...")
         isInitialized = false
         
-        do {
-            // WhisperKit.download(variant:) logic handles checking if consistent
-            // But here we want the PIPE, so we init WhisperKit(model: variant)
-            // Note: If model isn't downloaded, this might fail or trigger download depending on library version.
-            // Ideally, we ensure it's downloaded first via ModelDownloadService, but WhisperKit init often handles it.
-            
-            pipe = try await WhisperKit(model: variant)
-            currentModelVariant = variant
-            isInitialized = true
-            print("WhisperKit initialized successfully with \(variant)")
-        } catch {
-            print("Failed to initialize WhisperKit with \(variant): \(error.localizedDescription)")
-            throw error
+        if NeMoService.isParakeetModel(variant) {
+            // Route to NeMo
+            do {
+                try await nemoService.loadModel(variant: variant)
+                currentModelVariant = variant
+                isInitialized = true
+                print("NeMoService initialized successfully with \(variant)")
+            } catch {
+                print("Failed to initialize NeMoService with \(variant): \(error.localizedDescription)")
+                throw error
+            }
+        } else {
+            // Standard WhisperKit flow
+            do {
+                pipe = try await WhisperKit(model: variant)
+                currentModelVariant = variant
+                isInitialized = true
+                print("WhisperKit initialized successfully with \(variant)")
+            } catch {
+                print("Failed to initialize WhisperKit with \(variant): \(error.localizedDescription)")
+                throw error
+            }
         }
     }
     
     func transcribe(audioFile: URL) async throws -> String {
-        guard let pipe = pipe, isInitialized else {
+        guard isInitialized else {
             throw TranscriptionError.notInitialized
         }
         
@@ -61,15 +82,21 @@ class WhisperService {
         print("Starting transcription for: \(audioFile.lastPathComponent)")
         
         do {
-            // Transcribe the audio file
-            // Note: WhisperKit 0.9.x API might vary, assuming standard transcribe flow
-            let results = try await pipe.transcribe(audioPath: audioFile.path)
-            
-            // Combine all segments into a single string
-            let text = results.map { $0.text }.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            print("Transcription complete: \(text.prefix(50))...")
-            return text
+            if NeMoService.isParakeetModel(currentModelVariant) {
+                // Route to NeMo
+                return try await nemoService.transcribe(audioFile: audioFile)
+            } else {
+                guard let pipe = pipe else { throw TranscriptionError.notInitialized }
+                
+                // Transcribe the audio file with WhisperKit
+                let results = try await pipe.transcribe(audioPath: audioFile.path)
+                
+                // Combine all segments into a single string
+                let text = results.map { $0.text }.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                print("Transcription complete: \(text.prefix(50))...")
+                return text
+            }
         } catch {
             print("Transcription failed: \(error.localizedDescription)")
             throw error

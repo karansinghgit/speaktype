@@ -12,57 +12,69 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: '15.2'
+    - name: Cache Dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/Library/Developer/Xcode/DerivedData
+          ~/.swiftpm
+        key: deps-${{ github.ref }}
+        restore-keys: |
+          deps-
 
-      - name: Install create-dmg
-        run: brew install create-dmg
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '15.2'
 
-      - name: List Files (Debug Info)
-        run: ls -R
+    - name: Install create-dmg
+      run: brew install create-dmg
 
-      - name: Build App (Scheme Method)
-        run: |
-          echo "🏗️ Building SpeakType using SCHEME..."
-          
-          xcodebuild -scheme "speaktype" \
-            -configuration Release \
-            -derivedDataPath build \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=YES \
-            clean build
+    - name: Reset Swift Package Dependencies
+      run: |
+        echo "📦 Resetting Swift Package Dependencies..."
+        xcodebuild -resolvePackageDependencies
 
-      - name: Locate App & Create DMG
-        run: |
-          # Find the app anywhere in the build folder
-          APP_PATH=$(find build -name "speaktype.app" | head -n 1)
+    - name: Build App (Scheme Method)
+      run: |
+        echo "🏗️ Building SpeakType using SCHEME..."
+        xcodebuild -project "speaktype.xcodeproj" \
+          -scheme "speaktype" \
+          -configuration Release \
+          -derivedDataPath build \
+          CODE_SIGN_IDENTITY="-" \
+          CODE_SIGNING_REQUIRED=YES \
+          clean build
 
-          if [ -z "$APP_PATH" ]; then
-            echo "❌ Error: Could not find speaktype.app!"
-            exit 1
-          fi
-          
-          echo "✅ Found App at: $APP_PATH"
+    - name: Locate App & Create DMG
+      run: |
+        # Find the app in the build folder
+        APP_PATH=$(find build -name "speaktype.app" | head -n 1)
 
-          # Create DMG
-          create-dmg \
-            --volname "SpeakType" \
-            --window-pos 200 120 \
-            --window-size 800 400 \
-            --icon-size 100 \
-            --hide-extension "speaktype.app" \
-            --app-drop-link 600 185 \
-            --no-internet-enable \
-            "SpeakType.dmg" \
-            "$APP_PATH"
+        if [ -z "$APP_PATH" ]; then
+          echo "❌ Error: Could not find speaktype.app!"
+          exit 1
+        fi
+        
+        echo "✅ Found App at: $APP_PATH"
 
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v2
-        with:
-          files: SpeakType.dmg
-          generate_release_notes: true
+        # Create DMG
+        create-dmg \
+          --volname "SpeakType" \
+          --window-pos 200 120 \
+          --window-size 800 400 \
+          --icon-size 100 \
+          --hide-extension "speaktype.app" \
+          --app-drop-link 600 185 \
+          --no-internet-enable \
+          "SpeakType.dmg" \
+          "$APP_PATH"
+
+    - name: Upload Release Asset
+      uses: softprops/action-gh-release@v2
+      with:
+        files: SpeakType.dmg
+        generate_release_notes: true

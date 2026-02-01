@@ -10,7 +10,7 @@ import SwiftUI
 // MARK: - Font Names
 
 private enum FontName {
-    static let sourceSans = "SourceSans3-Regular"
+    static let sourceSans = "Source Sans 3"
 }
 
 // MARK: - Typography System
@@ -66,7 +66,7 @@ enum Typography {
     
     static let cardTitle = Font.custom(FontName.sourceSans, size: 17).weight(.semibold)
     static let cardSubtitle = Font.custom(FontName.sourceSans, size: 14).weight(.regular)
-    static let cardMeta = Font.custom(FontName.sourceSans, size: 12).weight(.light)
+    static let cardMeta = Font.custom(FontName.sourceSans, size: 12).weight(.regular)
     static let cardMetaBold = Font.custom(FontName.sourceSans, size: 12).weight(.medium)
     static let cardDescription = Font.custom(FontName.sourceSans, size: 13).weight(.regular)
     static let buttonLabel = Font.custom(FontName.sourceSans, size: 13).weight(.semibold)

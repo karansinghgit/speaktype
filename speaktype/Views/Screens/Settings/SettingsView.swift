@@ -134,16 +134,18 @@ struct GeneralSettingsTab: View {
                                 HStack(spacing: 6) {
                                     Text(selectedHotkey.displayName)
                                         .font(Typography.bodySmall)
+                                        .foregroundStyle(Color.textPrimary) // Explicitly force text color
                                     Image(systemName: "chevron.up.chevron.down")
                                         .font(.system(size: 9))
+                                        .foregroundStyle(Color.textPrimary)
                                 }
-                                .foregroundStyle(Color.textPrimary)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 7)
                                 .background(Color.bgHover)
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
                             }
                             .menuStyle(.borderlessButton)
+                            .tint(Color.textPrimary) // Override system tint which might be dark
                         }
                         
                         Divider()

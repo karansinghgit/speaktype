@@ -49,7 +49,7 @@ class MiniRecorderWindowController: NSObject {
         // panel?.orderOut(nil)
         
         // 2. Return focus to previous app
-        lastActiveApp?.activate(options: .activateIgnoringOtherApps)
+        _ = lastActiveApp?.activate(options: [])
         
         // 3. Trigger transcription
         NotificationCenter.default.post(name: .recordingStopRequested, object: nil)
@@ -121,7 +121,7 @@ class MiniRecorderWindowController: NSObject {
             // 4. Re-activate the target app
             if let app = self.lastActiveApp {
                 await MainActor.run {
-                    app.activate(options: .activateIgnoringOtherApps)
+                    _ = app.activate(options: [])
                 }
             }
             

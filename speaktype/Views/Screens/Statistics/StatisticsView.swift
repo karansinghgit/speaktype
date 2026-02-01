@@ -35,7 +35,7 @@ struct StatisticsView: View {
         .onDisappear {
             stopTimer()
         }
-        .onChange(of: audioRecorder.isRecording) { isRecording in
+        .onChange(of: audioRecorder.isRecording) { _, isRecording in
             if isRecording {
                 startTimer()
             } else {

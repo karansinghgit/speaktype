@@ -179,8 +179,15 @@ struct PermissionsPage: View {
     }
     
     func checkPermissions() {
-        micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        accessibilityStatus = AXIsProcessTrusted()
+        Task.detached(priority: .userInitiated) {
+            let mic = AVCaptureDevice.authorizationStatus(for: .audio)
+            let access = AXIsProcessTrusted()
+            
+            await MainActor.run {
+                self.micStatus = mic
+                self.accessibilityStatus = access
+            }
+        }
     }
     
     func requestMicPermission() {

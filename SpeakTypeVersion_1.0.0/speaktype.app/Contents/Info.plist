@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ATSApplicationFontsPath</key>
+	<string>Fonts</string>
+	<key>BuildMachineOSBuild</key>
+	<string>25C56</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>SpeakType</string>
+	<key>CFBundleExecutable</key>
+	<string>speaktype</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.2048labs.speaktype</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>speaktype</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>MacOSX</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.karansinghgit.speaktype</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>speaktype</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>DTCompiler</key>
+	<string>com.apple.compilers.llvm.clang.1_0</string>
+	<key>DTPlatformBuild</key>
+	<string>25B74</string>
+	<key>DTPlatformName</key>
+	<string>macosx</string>
+	<key>DTPlatformVersion</key>
+	<string>26.1</string>
+	<key>DTSDKBuild</key>
+	<string>25B74</string>
+	<key>DTSDKName</key>
+	<string>macosx26.1</string>
+	<key>DTXcode</key>
+	<string>2611</string>
+	<key>DTXcodeBuild</key>
+	<string>17B100</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>26.1</string>
+	<key>LSUIElement</key>
+	<false/>
+	<key>NSAccentColorName</key>
+	<string>AccentColor</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>SpeakType needs permission to send keystrokes to paste transcribed text into the active application.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SpeakType needs access to your microphone to record your voice for transcription. All processing is done locally on your device.</string>
+	<key>NSSupportsAutomaticTermination</key>
+	<true/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
+</dict>
+</plist>

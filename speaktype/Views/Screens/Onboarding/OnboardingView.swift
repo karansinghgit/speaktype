@@ -215,9 +215,6 @@ struct PermissionsPage: View {
         }
     }
     
-    // ... Copy-paste existing helpers (checkPermissions, request, polling) ...
-    // Note: Re-implementing them inline for the tool call
-    
     func startPolling() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
@@ -229,15 +226,20 @@ struct PermissionsPage: View {
     }
     
     func checkPermissions() {
-        micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        let newAccessStatus = AXIsProcessTrusted()
-        if newAccessStatus != accessibilityStatus {
-            print("🔐 Accessibility status changed: \(accessibilityStatus) → \(newAccessStatus)")
+        Task.detached(priority: .userInitiated) {
+            let mic = AVCaptureDevice.authorizationStatus(for: .audio)
+            let access = AXIsProcessTrusted()
+            
+            await MainActor.run {
+                self.micStatus = mic
+                let newAccessStatus = access
+                if newAccessStatus != self.accessibilityStatus {
+                    print("🔐 Accessibility status changed: \(self.accessibilityStatus) → \(newAccessStatus)")
+                }
+                self.accessibilityStatus = newAccessStatus
+                self.checkDocumentsAccess()
+            }
         }
-        accessibilityStatus = newAccessStatus
-        
-        // Check documents access by verifying the huggingface folder exists or can be created
-        checkDocumentsAccess()
     }
     
     func checkDocumentsAccess() {

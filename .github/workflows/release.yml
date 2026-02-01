@@ -12,73 +12,87 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: '15.2'
+    - name: Cache Dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/Library/Developer/Xcode/DerivedData
+          ~/.swiftpm
+        key: deps-${{ github.ref }}
+        restore-keys: |
+          deps-
 
-      - name: Install create-dmg
-        run: brew install create-dmg
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '15.2'
 
-      - name: List Files (Debug Info)
-        run: ls -R
+    - name: Install create-dmg
+      run: brew install create-dmg
 
-      - name: Build App (Scheme Method)
-        run: |
-          echo "🏗️ Building SpeakType using SCHEME..."
-          
-          xcodebuild -scheme "speaktype" \
-            -configuration Release \
-            -derivedDataPath build \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=YES \
-            clean build
+    - name: Reset Swift Package Dependencies
+      run: |
+        echo "📦 Resetting Swift Package Dependencies..."
+        xcodebuild -resolvePackageDependencies
 
-      - name: Create DMG Background
-        run: |
+    - name: Build App (Scheme Method)
+      run: |
+        echo "🏗️ Building SpeakType using SCHEME..."
+        xcodebuild -project "speaktype.xcodeproj" \
+          -scheme "speaktype" \
+          -configuration Release \
+          -derivedDataPath build \
+          CODE_SIGN_IDENTITY="-" \
+          CODE_SIGNING_REQUIRED=YES \
+          clean build
+
+    - name: Create DMG Background
+      run: |
+        cd dmg-assets
+        chmod +x create-dmg-background.sh
+        ./create-dmg-background.sh || echo "Using existing background"
+
+    - name: Locate App & Create DMG
+      run: |
+        # Find the app in the build folder
+        APP_PATH=$(find build -name "speaktype.app" | head -n 1)
+
+        if [ -z "$APP_PATH" ]; then
+          echo "❌ Error: Could not find speaktype.app!"
+          exit 1
+        fi
+        
+        echo "✅ Found App at: $APP_PATH"
+
+        # Create DMG with custom background
+        # Create background if needed
+        if [ ! -f "dmg-assets/dmg-background.png" ]; then
           cd dmg-assets
-          chmod +x create-dmg-background.sh
-          ./create-dmg-background.sh || echo "Using existing background"
+          python3 create-background.py 2>/dev/null || ./create-background.sh 2>/dev/null || echo "Using default"
+          cd ..
+        fi
+        
+        # Create DMG with arrow background
+        # Note: If background image is missing, create-dmg typically warns but proceeds with default
+        create-dmg \
+          --volname "SpeakType" \
+          --volicon "speaktype/Assets.xcassets/AppIcon.appiconset/icon_512x512.png" \
+          --background "dmg-assets/dmg-background.png" \
+          --window-pos 200 120 \
+          --window-size 660 400 \
+          --icon-size 160 \
+          --icon "speaktype.app" 180 170 \
+          --hide-extension "speaktype.app" \
+          --app-drop-link 480 170 \
+          --no-internet-enable \
+          "SpeakType.dmg" \
+          "$APP_PATH"
 
-      - name: Locate App & Create DMG
-        run: |
-          # Find the app anywhere in the build folder
-          APP_PATH=$(find build -name "speaktype.app" | head -n 1)
-
-          if [ -z "$APP_PATH" ]; then
-            echo "❌ Error: Could not find speaktype.app!"
-            exit 1
-          fi
-          
-          echo "✅ Found App at: $APP_PATH"
-
-          # Create DMG with custom background
-          # Create background if needed
-          if [ ! -f "dmg-assets/dmg-background.png" ]; then
-            cd dmg-assets
-            python3 create-background.py 2>/dev/null || ./create-background.sh 2>/dev/null || echo "Using default"
-            cd ..
-          fi
-          
-          # Create DMG with arrow background
-          create-dmg \
-            --volname "SpeakType" \
-            --volicon "speaktype/Assets.xcassets/AppIcon.appiconset/icon_512x512.png" \
-            --background "dmg-assets/dmg-background.png" \
-            --window-pos 200 120 \
-            --window-size 660 400 \
-            --icon-size 160 \
-            --icon "speaktype.app" 180 170 \
-            --hide-extension "speaktype.app" \
-            --app-drop-link 480 170 \
-            "SpeakType.dmg" \
-            "$APP_PATH"
-
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v2
-        with:
-          files: SpeakType.dmg
-          generate_release_notes: true
+    - name: Upload Release Asset
+      uses: softprops/action-gh-release@v2
+      with:
+        files: SpeakType.dmg
+        generate_release_notes: true

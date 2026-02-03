@@ -164,6 +164,29 @@ Press hotkey → "Remember to buy milk and eggs"
 
 ## 🛠️ Development
 
+### Quick Start for Development
+
+```bash
+# First time setup
+make setup
+
+# Clean development (removes all app data, permissions, caches)
+make clean-dev
+
+# Build and run
+make build
+open ~/Library/Developer/Xcode/DerivedData/speaktype-*/Build/Products/Debug/speaktype.app
+
+# Or use the combined command
+make run
+```
+
+**🧹 Fresh Start:** Use `make clean-dev` before each build to:
+- Remove all app data and preferences
+- Reset accessibility permissions
+- Clear cached UI state
+- Ensure you're testing the latest code
+
 ### Project Structure
 
 ```
@@ -261,16 +284,23 @@ git push origin v1.0.0
 
 # 4. GitHub Actions will automatically:
 #    - Build the app
-#    - Create DMG and ZIP files
+#    - Create a professional DMG with custom background
+#    - Create ZIP package
 #    - Create a GitHub release
 #    - Upload the files
 ```
 
 **Or build locally:**
 ```bash
+# Install create-dmg first (one-time setup)
+brew install create-dmg
+
+# Build release
 make release
-# Files will be in dist/ folder
+# Files will be in dist/ folder with professional DMG installer
 ```
+
+> 💡 **New!** The DMG installer now includes a custom background with drag-and-drop instructions for a professional installation experience. See [DMG_SETUP.md](DMG_SETUP.md) for details.
 
 ### Logging & Debugging
 

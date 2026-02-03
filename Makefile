@@ -1,6 +1,6 @@
 # Makefile for SpeakType
 
-.PHONY: help build clean test lint format run setup logs logs-live logs-errors logs-export
+.PHONY: help build clean clean-dev test lint format run run-release setup logs logs-live logs-errors logs-export
 
 # Default target
 help:
@@ -11,6 +11,7 @@ help:
 	@echo "  make build         - Build the project (Debug)"
 	@echo "  make run           - Run the application"
 	@echo "  make clean         - Clean build artifacts"
+	@echo "  make clean-dev     - 🧹 Clean ALL app data & permissions (fresh start)"
 	@echo "  make xcode         - Open in Xcode"
 	@echo ""
 	@echo "Testing:"
@@ -20,6 +21,7 @@ help:
 	@echo ""
 	@echo "Distribution:"
 	@echo "  make release       - 🚀 Build ZIP + DMG for distribution"
+	@echo "  make run-release   - Run Release build"
 	@echo "  make package       - Create ZIP package"
 	@echo "  make dmg           - Create DMG installer"
 	@echo "  ./scripts/create-release.sh - Interactive release creator"
@@ -50,13 +52,18 @@ build:
 # Build for release
 build-release:
 	@echo "Building SpeakType (Release)..."
-	xcodebuild -scheme speaktype -configuration Release build
+	@xcodebuild -scheme speaktype -configuration Release build 2>&1 | grep -E "(error:|BUILD)" || true
+
+# Run release build
+run-release:
+	@echo "Running SpeakType (Release)..."
+	@open $$(find ~/Library/Developer/Xcode/DerivedData/speaktype-*/Build/Products/Release -name "speaktype.app" -type d | head -1)
 
 # Run the application
 run:
 	@echo "Running SpeakType..."
-	xcodebuild -scheme speaktype -configuration Debug build
-	open build/Debug/speaktype.app
+	@xcodebuild -scheme speaktype -configuration Debug build 2>&1 | grep -E "(error:|BUILD)" || true
+	@open $$(find ~/Library/Developer/Xcode/DerivedData/speaktype-*/Build/Products/Debug -name "speaktype.app" -type d | head -1)
 
 # Run all tests
 test:
@@ -90,6 +97,11 @@ clean:
 	rm -rf build/
 	rm -rf DerivedData/
 
+# Clean all app data and permissions (for fresh development testing)
+clean-dev:
+	@echo "🧹 Running development cleanup..."
+	@./scripts/clean-dev.sh
+
 # Archive the application
 archive:
 	@echo "Archiving SpeakType..."
@@ -109,20 +121,34 @@ dmg:
 	@echo "💿 Creating DMG installer..."
 	@make build-release
 	@mkdir -p dist
-	@if command -v create-dmg > /dev/null; then \
-		create-dmg \
-			--volname "SpeakType" \
-			--volicon "speaktype/Assets.xcassets/AppIcon.appiconset/icon_512x512.png" \
-			--window-pos 200 120 \
-			--window-size 800 400 \
-			--icon-size 100 \
-			--hide-extension "speaktype.app" \
-			--app-drop-link 600 185 \
-			"dist/SpeakType.dmg" \
-			"build/Release/speaktype.app"; \
-	else \
-		hdiutil create -volname "SpeakType" -srcfolder build/Release/speaktype.app -ov -format UDZO dist/SpeakType.dmg; \
-	fi
+	@rm -f dist/SpeakType.dmg
+	@# Find the app
+	@APP_PATH=$$(find ~/Library/Developer/Xcode/DerivedData/speaktype-*/Build/Products/Release -name "speaktype.app" -type d 2>/dev/null | head -n 1); \
+	if [ -z "$$APP_PATH" ]; then \
+		APP_PATH=$$(find build -name "speaktype.app" -type d 2>/dev/null | head -n 1); \
+	fi; \
+	if [ -z "$$APP_PATH" ]; then \
+		echo "❌ Error: Could not find speaktype.app!"; \
+		exit 1; \
+	fi; \
+	echo "✅ Found App at: $$APP_PATH"; \
+	if [ ! -f "dmg-assets/dmg-background.png" ]; then \
+		echo "Creating background with arrow..."; \
+		cd dmg-assets && python3 create-background.py 2>/dev/null || ./create-background.sh 2>/dev/null || echo "Using default"; \
+		cd ..; \
+	fi; \
+	create-dmg \
+		--volname "SpeakType" \
+		--volicon "speaktype/Assets.xcassets/AppIcon.appiconset/icon_512x512.png" \
+		--background "dmg-assets/dmg-background.png" \
+		--window-pos 200 120 \
+		--window-size 660 400 \
+		--icon-size 160 \
+		--icon "speaktype.app" 180 170 \
+		--hide-extension "speaktype.app" \
+		--app-drop-link 480 170 \
+		"dist/SpeakType.dmg" \
+		"$$APP_PATH"
 	@echo "✅ Created dist/SpeakType.dmg"
 	@ls -lh dist/SpeakType.dmg
 

@@ -37,6 +37,12 @@ jobs:
             CODE_SIGNING_REQUIRED=YES \
             clean build
 
+      - name: Create DMG Background
+        run: |
+          cd dmg-assets
+          chmod +x create-dmg-background.sh
+          ./create-dmg-background.sh || echo "Using existing background"
+
       - name: Locate App & Create DMG
         run: |
           # Find the app anywhere in the build folder
@@ -49,15 +55,25 @@ jobs:
           
           echo "✅ Found App at: $APP_PATH"
 
-          # Create DMG
+          # Create DMG with custom background
+          # Create background if needed
+          if [ ! -f "dmg-assets/dmg-background.png" ]; then
+            cd dmg-assets
+            python3 create-background.py 2>/dev/null || ./create-background.sh 2>/dev/null || echo "Using default"
+            cd ..
+          fi
+          
+          # Create DMG with arrow background
           create-dmg \
             --volname "SpeakType" \
+            --volicon "speaktype/Assets.xcassets/AppIcon.appiconset/icon_512x512.png" \
+            --background "dmg-assets/dmg-background.png" \
             --window-pos 200 120 \
-            --window-size 800 400 \
-            --icon-size 100 \
+            --window-size 660 400 \
+            --icon-size 160 \
+            --icon "speaktype.app" 180 170 \
             --hide-extension "speaktype.app" \
-            --app-drop-link 600 185 \
-            --no-internet-enable \
+            --app-drop-link 480 170 \
             "SpeakType.dmg" \
             "$APP_PATH"
 

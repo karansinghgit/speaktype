@@ -1,0 +1,4 @@
+// Configuration for Production Builds
+
+POLAR_ORGANIZATION_ID = bf5894db-32cc-4117-93ee-d89efd98a03d
+POLAR_PURCHASE_URL = https://buy.polar.sh/polar_cl_5xXVrqmxABEotyU8zHHfkoQg9qqEzWDuca3fd0jaBgB

@@ -74,18 +74,6 @@
             ReferencedContainer = "container:speaktype.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <EnvironmentVariables>
-         <EnvironmentVariable
-            key = "POLAR_ORGANIZATION_ID"
-            value = "bf5894db-32cc-4117-93ee-d89efd98a03d"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-         <EnvironmentVariable
-            key = "POLAR_PURCHASE_URL"
-            value = "https://buy.polar.sh/polar_cl_5xXVrqmxABEotyU8zHHfkoQg9qqEzWDuca3fd0jaBgB"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-      </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"

@@ -179,6 +179,35 @@ xcode:
 	@echo "Opening in Xcode..."
 	open speaktype.xcodeproj
 
+# Full uninstall - removes ALL data, permissions, and reinstalls fresh
+uninstall:
+	@echo "🗑️  Uninstalling SpeakType completely..."
+	@pkill -9 speaktype 2>/dev/null || true
+	@echo "   Killed running app"
+	@tccutil reset Accessibility com.2048labs.speaktype 2>/dev/null || true
+	@tccutil reset Microphone com.2048labs.speaktype 2>/dev/null || true
+	@echo "   Reset accessibility & microphone permissions"
+	@defaults delete com.2048labs.speaktype 2>/dev/null || true
+	@rm -rf ~/Library/Application\ Support/SpeakType 2>/dev/null || true
+	@rm -rf ~/Library/Preferences/com.2048labs.speaktype.plist 2>/dev/null || true
+	@rm -rf ~/Library/Caches/com.2048labs.speaktype 2>/dev/null || true
+	@rm -rf ~/Library/Saved\ Application\ State/com.2048labs.speaktype.savedState 2>/dev/null || true
+	@echo "   Removed app data and preferences"
+	@rm -rf ~/Library/Developer/Xcode/DerivedData/speaktype-* 2>/dev/null || true
+	@echo "   Cleared Xcode build cache"
+	@rm -rf /Applications/speaktype.app /Applications/SpeakType.app 2>/dev/null || true
+	@echo "   Removed installed app"
+	@echo "✅ Uninstall complete!"
+	@echo ""
+	@echo "🔨 Rebuilding and running fresh..."
+	@make run
+
+# Quick rebuild - keeps data, just rebuilds and runs
+rebuild:
+	@echo "🔄 Rebuilding SpeakType (keeping data)..."
+	@pkill -9 speaktype 2>/dev/null || true
+	@make run
+
 # LOGGING COMMANDS
 
 # View live logs

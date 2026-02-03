@@ -5,7 +5,7 @@ import CoreMedia
 
 struct MiniRecorderView: View {
     @ObservedObject private var audioRecorder = AudioRecordingService.shared
-    @State private var whisperService = WhisperService()
+    private var whisperService: WhisperService { WhisperService.shared }
     @State private var isListening = false
 
     @State private var isProcessing = false
@@ -13,7 +13,7 @@ struct MiniRecorderView: View {
     var onCommit: ((String) -> Void)?
     var onCancel: (() -> Void)?
     
-    @AppStorage("selectedModelVariant") private var selectedModel: String = "openai_whisper-base.en"
+    @AppStorage("selectedModelVariant") private var selectedModel: String = ""
     
     // MARK: - State for Animation
     @State private var phase: CGFloat = 0
@@ -80,9 +80,15 @@ struct MiniRecorderView: View {
         }
         .onAppear {
             initializedService()
-            // Animate phase for wave movement
-            withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                phase = .pi * 4
+        }
+        .onChange(of: isListening) { listening in
+            // Only animate when actually recording to save CPU
+            if listening {
+                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                    phase = .pi * 4
+                }
+            } else {
+                phase = 0
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -147,6 +153,14 @@ struct MiniRecorderView: View {
     // MARK: - Logic
     
     private func initializedService() {
+        // Pre-warm the audio capture session for instant first recording
+        audioRecorder.prewarmSession()
+        
+        guard !selectedModel.isEmpty else {
+            debugLog("No model selected - skipping initialization")
+            return
+        }
+        
         Task {
             debugLog("Initializing WhisperService with model: \(selectedModel)")
             do {
@@ -178,6 +192,22 @@ struct MiniRecorderView: View {
     
     private func stopAndTranscribe() {
         debugLog("stopAndTranscribe called")
+        
+        // Check if model is selected
+        guard !selectedModel.isEmpty else {
+            debugLog("No model selected - cannot transcribe")
+            Task { @MainActor in
+                isListening = false
+                isProcessing = false
+                statusMessage = "No AI model selected. Go to Settings → AI Models to download one."
+                
+                // Show error for 3 seconds
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                onCancel?()
+            }
+            return
+        }
+        
         Task {
             let url = await audioRecorder.stopRecording()
             debugLog("stopRecording returned: \(url?.absoluteString ?? "nil")")

@@ -82,6 +82,14 @@ make test           # Run tests
 make dmg            # Create DMG installer
 ```
 
+### Release
+
+```bash
+scripts/release.sh 1.0.6
+git push origin HEAD
+git push origin v1.0.6
+```
+
 ### Project Structure
 
 ```

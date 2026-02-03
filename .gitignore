@@ -30,6 +30,9 @@ dist/
 *.tmp
 *~
 
+# Cursor
+.cursor/
+
 # App-specific
 *.app
 

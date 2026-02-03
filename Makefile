@@ -1,6 +1,6 @@
 # Makefile for SpeakType
 
-.PHONY: help build clean clean-dev test lint format run run-release setup logs logs-live logs-errors logs-export
+.PHONY: help build clean clean-dev test lint format run run-release setup logs logs-live logs-errors logs-export install uninstall reinstall
 
 # Default target
 help:
@@ -13,6 +13,9 @@ help:
 	@echo "  make clean         - Clean build artifacts"
 	@echo "  make clean-dev     - 🧹 Clean ALL app data & permissions (fresh start)"
 	@echo "  make xcode         - Open in Xcode"
+	@echo "  make install       - Install SpeakType to /Applications"
+	@echo "  make uninstall     - Fully uninstall (no rebuild)"
+	@echo "  make reinstall     - Uninstall then install again"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test          - Run all tests"
@@ -179,7 +182,24 @@ xcode:
 	@echo "Opening in Xcode..."
 	open speaktype.xcodeproj
 
-# Full uninstall - removes ALL data, permissions, and reinstalls fresh
+# Install to /Applications
+install:
+	@echo "📦 Installing SpeakType to /Applications..."
+	@make build-release
+	@APP_PATH=$$(find ~/Library/Developer/Xcode/DerivedData/speaktype-*/Build/Products/Release -name "speaktype.app" -type d 2>/dev/null | head -n 1); \
+	if [ -z "$$APP_PATH" ]; then \
+		APP_PATH=$$(find build -name "speaktype.app" -type d 2>/dev/null | head -n 1); \
+	fi; \
+	if [ -z "$$APP_PATH" ]; then \
+		echo "❌ Error: Could not find speaktype.app!"; \
+		exit 1; \
+	fi; \
+	echo "✅ Found App at: $$APP_PATH"; \
+	rm -rf /Applications/SpeakType.app 2>/dev/null || true; \
+	cp -R "$$APP_PATH" /Applications/SpeakType.app; \
+	echo "✅ Installed to /Applications/SpeakType.app"
+
+# Full uninstall - removes ALL data and permissions
 uninstall:
 	@echo "🗑️  Uninstalling SpeakType completely..."
 	@pkill -9 speaktype 2>/dev/null || true
@@ -198,9 +218,12 @@ uninstall:
 	@rm -rf /Applications/speaktype.app /Applications/SpeakType.app 2>/dev/null || true
 	@echo "   Removed installed app"
 	@echo "✅ Uninstall complete!"
-	@echo ""
-	@echo "🔨 Rebuilding and running fresh..."
-	@make run
+
+# Reinstall - uninstall then install
+reinstall:
+	@echo "🔁 Reinstalling SpeakType..."
+	@make uninstall
+	@make install
 
 # Quick rebuild - keeps data, just rebuilds and runs
 rebuild:
@@ -244,4 +267,3 @@ logs-export:
 logs-console:
 	@echo "Opening Console.app..."
 	@open -a Console
-

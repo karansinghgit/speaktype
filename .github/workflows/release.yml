@@ -55,6 +55,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           DMG_NAME="SpeakType-${VERSION}.dmg"
+          echo "DMG_NAME=$DMG_NAME" >> "$GITHUB_ENV"
           # Find the app anywhere in the build folder
           APP_PATH=$(find build -name "speaktype.app" | head -n 1)
 
@@ -90,5 +91,5 @@ jobs:
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: SpeakType-${{ github.ref_name#v }}.dmg
+          files: ${{ env.DMG_NAME }}
           generate_release_notes: true

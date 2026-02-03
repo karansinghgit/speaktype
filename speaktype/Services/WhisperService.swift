@@ -3,16 +3,24 @@ import WhisperKit
 
 @Observable
 class WhisperService {
+    // Shared singleton instance - use this everywhere
+    static let shared = WhisperService()
+    
     var pipe: WhisperKit?
     var isInitialized = false
     var isTranscribing = false
+    var isLoading = false
     
-    var currentModelVariant: String = "openai_whisper-base.en" // Default
+    var currentModelVariant: String = "" // No default - must be explicitly set
     
     enum TranscriptionError: Error {
         case notInitialized
         case fileNotFound
+        case alreadyLoading
     }
+    
+    // Init is internal to allow testing, but prefer using .shared in production
+    init() {}
     
     // Default initialization (loads default or saved model)
     func initialize() async throws {
@@ -23,25 +31,37 @@ class WhisperService {
     
     // Dynamic model loading
     func loadModel(variant: String) async throws {
+        // Already loaded this exact model
         if isInitialized && variant == currentModelVariant && pipe != nil {
-             return // Already loaded
+            print("✅ Model \(variant) already loaded, skipping")
+            return
         }
         
-        print("Initializing WhisperKit with model: \(variant)...")
+        // Prevent concurrent loading
+        guard !isLoading else {
+            print("⚠️ Model loading already in progress, skipping")
+            throw TranscriptionError.alreadyLoading
+        }
+        
+        print("🔄 Initializing WhisperKit with model: \(variant)...")
+        isLoading = true
         isInitialized = false
         
+        // Release existing model to free memory
+        if pipe != nil {
+            print("🗑️ Releasing previous model from memory...")
+            pipe = nil
+        }
+        
         do {
-            // WhisperKit.download(variant:) logic handles checking if consistent
-            // But here we want the PIPE, so we init WhisperKit(model: variant)
-            // Note: If model isn't downloaded, this might fail or trigger download depending on library version.
-            // Ideally, we ensure it's downloaded first via ModelDownloadService, but WhisperKit init often handles it.
-            
             pipe = try await WhisperKit(model: variant)
             currentModelVariant = variant
             isInitialized = true
-            print("WhisperKit initialized successfully with \(variant)")
+            isLoading = false
+            print("✅ WhisperKit initialized successfully with \(variant)")
         } catch {
-            print("Failed to initialize WhisperKit with \(variant): \(error.localizedDescription)")
+            isLoading = false
+            print("❌ Failed to initialize WhisperKit with \(variant): \(error.localizedDescription)")
             throw error
         }
     }

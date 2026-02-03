@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 struct TranscribeAudioView: View {
     @StateObject private var audioRecorder = AudioRecordingService()
-    @State private var whisperService = WhisperService()
+    private var whisperService: WhisperService { WhisperService.shared }
     @State private var transcribedText: String = ""
     @State private var isTranscribing = false
     @State private var showFileImporter = false

@@ -6,6 +6,13 @@ struct ModelRow: View {
     @Binding var selectedModel: String
     @ObservedObject var downloadService = ModelDownloadService.shared
     
+    // Use the shared WhisperService for loading state
+    private var whisperService: WhisperService { WhisperService.shared }
+    
+    // State for model loading
+    @State private var isLoadingModel = false
+    @State private var loadError: String?
+    
     // MARK: - Computed Properties
     
     var progress: Double {
@@ -140,28 +147,65 @@ struct ModelRow: View {
     private var downloadedActions: some View {
         HStack(spacing: 10) {
             if isActive {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 12))
-                    Text("Selected")
-                        .font(Typography.buttonLabelSmall)
+                // Show warning if selected model isn't actually downloaded
+                if !isDownloaded {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12))
+                        Text("Missing")
+                            .font(Typography.buttonLabelSmall)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.orange.opacity(0.2))
+                    .foregroundStyle(Color.orange)
+                    .clipShape(Capsule())
+                    .help("This model is selected but not downloaded. Download it or select another model.")
+                } else {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 12))
+                        Text("Selected")
+                            .font(Typography.buttonLabelSmall)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.bgHover)
+                    .foregroundStyle(Color.textPrimary)
+                    .clipShape(Capsule())
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(Color.bgHover)
-                .foregroundStyle(Color.textPrimary)
-                .clipShape(Capsule())
             } else {
-                Button("Use") {
-                    selectedModel = model.variant
+                if isLoadingModel {
+                    // Show loading state while model is being loaded
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .frame(width: 12, height: 12)
+                        Text("Loading...")
+                            .font(Typography.buttonLabelSmall)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.bgHover)
+                    .foregroundStyle(Color.textSecondary)
+                    .clipShape(Capsule())
+                } else {
+                    Button("Use") {
+                        // Only allow selecting downloaded models
+                        if isDownloaded {
+                            loadAndSelectModel()
+                        }
+                    }
+                    .font(Typography.buttonLabelSmall)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(isDownloaded ? Color.bgHover : Color.bgHover.opacity(0.3))
+                    .foregroundStyle(isDownloaded ? Color.textPrimary : Color.textMuted)
+                    .clipShape(Capsule())
+                    .buttonStyle(.plain)
+                    .disabled(!isDownloaded)
+                    .help(isDownloaded ? "Set as default model" : "Download this model first")
                 }
-                .font(Typography.buttonLabelSmall)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(Color.bgHover)
-                .foregroundStyle(Color.textPrimary)
-                .clipShape(Capsule())
-                .buttonStyle(.plain)
             }
             
             Button(action: {
@@ -215,6 +259,37 @@ struct ModelRow: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+    
+    // MARK: - Model Loading
+    
+    /// Load the model into memory before selecting it
+    private func loadAndSelectModel() {
+        isLoadingModel = true
+        loadError = nil
+        
+        Task {
+            do {
+                print("🔄 Loading model into shared service: \(model.variant)")
+                
+                // Load into the SHARED WhisperService so MiniRecorderView can use it
+                try await whisperService.loadModel(variant: model.variant)
+                
+                print("✅ Model loaded successfully: \(model.variant)")
+                
+                await MainActor.run {
+                    isLoadingModel = false
+                    selectedModel = model.variant
+                }
+            } catch {
+                print("❌ Failed to load model \(model.variant): \(error.localizedDescription)")
+                
+                await MainActor.run {
+                    isLoadingModel = false
+                    loadError = error.localizedDescription
+                }
+            }
+        }
     }
 }
 

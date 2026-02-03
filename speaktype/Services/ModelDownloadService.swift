@@ -14,21 +14,114 @@ class ModelDownloadService: ObservableObject {
     private init() {
         // Force a custom cache directory to avoid "Multiple models found" conflicts
         setupCustomCache()
+        
+        // Check for already-downloaded models on launch
+        Task { @MainActor in
+            await refreshDownloadedModels()
+            
+            // Auto-select first downloaded model if none is selected
+            let selectedModel = UserDefaults.standard.string(forKey: "selectedModelVariant") ?? ""
+            if selectedModel.isEmpty {
+                if let firstModel = self.downloadProgress.first(where: { $0.value >= 1.0 })?.key {
+                    UserDefaults.standard.set(firstModel, forKey: "selectedModelVariant")
+                    print("🎯 Auto-selected first available model: \(firstModel)")
+                }
+            }
+        }
     }
     
     private func setupCustomCache() {
-        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+        // Use the standard Documents/huggingface location that WhisperKit expects
+        guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
         
-        // ~/Library/Application Support/SpeakType/huggingface
-        let customCache = appSupport.appendingPathComponent("SpeakType/huggingface")
+        let huggingfaceCache = documentsDir.appendingPathComponent("huggingface")
         
         do {
-            try FileManager.default.createDirectory(at: customCache, withIntermediateDirectories: true)
-            // Set HF_HUB_CACHE to this clean directory
-            setenv("HF_HUB_CACHE", customCache.path, 1)
-            print("Redirected HF Cache to: \(customCache.path)")
+            try FileManager.default.createDirectory(at: huggingfaceCache, withIntermediateDirectories: true)
+            print("✅ Using standard HuggingFace cache at: \(huggingfaceCache.path)")
         } catch {
-            print("Failed to setup custom cache: \(error)")
+            print("⚠️ Failed to create huggingface directory: \(error)")
+        }
+        
+        // Don't override HF_HUB_CACHE - let WhisperKit use its default behavior
+        // This ensures compatibility with the standard HuggingFace cache structure
+    }
+    
+    // Check which models are already downloaded and update progress dictionary
+    func refreshDownloadedModels() async {
+        print("🔍 Checking for already-downloaded models...")
+        
+        var foundModels = Set<String>()
+        
+        // NOTE: WhisperKit.fetchAvailableModels() returns ALL remote models, not local ones
+        // We ONLY rely on disk-based verification to check what's actually downloaded
+        
+        // Verify models actually exist on disk with proper size validation
+        let fileManager = FileManager.default
+        if let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let whisperKitPath = documentsDir.appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml")
+            
+            if fileManager.fileExists(atPath: whisperKitPath.path) {
+                if let contents = try? fileManager.contentsOfDirectory(at: whisperKitPath, includingPropertiesForKeys: [.isDirectoryKey]) {
+                    print("📁 Found \(contents.count) items in WhisperKit cache at \(whisperKitPath.path)")
+                    
+                    for item in contents {
+                        let modelName = item.lastPathComponent
+                        
+                        // Skip non-model directories
+                        if modelName == "config.json" || modelName == ".DS_Store" {
+                            continue
+                        }
+                        
+                        // Verify this directory has actual model files (not just empty directory)
+                        if let subContents = try? fileManager.contentsOfDirectory(at: item, includingPropertiesForKeys: [.fileSizeKey]),
+                           !subContents.isEmpty {
+                            
+                            // Check if it has the essential files for a model (must have config.json)
+                            let hasConfigJson = subContents.contains(where: { $0.lastPathComponent == "config.json" })
+                            let hasModelFiles = subContents.contains(where: { $0.lastPathComponent.hasSuffix(".mlmodelc") })
+                            
+                            if hasConfigJson && hasModelFiles {
+                                // Calculate total directory size
+                                let directorySize = Self.calculateDirectorySize(at: item)
+                                let expectedSize = AIModel.expectedSize(for: modelName)
+                                
+                                // Model is complete if it's at least 80% of expected size
+                                let minAcceptableSize = Int64(Double(expectedSize) * 0.8)
+                                
+                                if directorySize >= minAcceptableSize {
+                                    print("✅ Model \(modelName) verified: \(Self.formatBytes(directorySize)) (expected ~\(Self.formatBytes(expectedSize)))")
+                                    foundModels.insert(modelName)
+                                } else {
+                                    print("⚠️ Model \(modelName) is INCOMPLETE: \(Self.formatBytes(directorySize)) < \(Self.formatBytes(minAcceptableSize)) minimum")
+                                }
+                            } else {
+                                print("⚠️ Model \(modelName) is incomplete (missing config.json or .mlmodelc files)")
+                            }
+                        }
+                    }
+                }
+            } else {
+                print("ℹ️ WhisperKit cache directory doesn't exist yet: \(whisperKitPath.path)")
+                print("   Models will be downloaded on first use.")
+            }
+        }
+        
+        await MainActor.run {
+            // Clear all previous progress
+            self.downloadProgress.removeAll()
+            
+            // Only mark models that actually exist
+            for variant in foundModels {
+                self.downloadProgress[variant] = 1.0
+                print("✅ Marked as downloaded: \(variant)")
+            }
+            
+            if foundModels.isEmpty {
+                print("❌ No models found - all will show as 'Download' buttons")
+            } else {
+                print("✅ Found \(foundModels.count) usable model(s)")
+            }
         }
     }
     
@@ -176,10 +269,7 @@ class ModelDownloadService: ObservableObject {
             checkedPaths.append(hfHubDir.path)
             deletedCount += cleanupDirectory(hfHubDir, matchAny: [String(modelName), underscoreVariant])
             
-            // Check SpeakType-specific directory
-            let speaktypeDir = baseDir.appendingPathComponent("SpeakType/huggingface")
-            checkedPaths.append(speaktypeDir.path)
-            deletedCount += cleanupDirectory(speaktypeDir, matchAny: [String(modelName), underscoreVariant])
+            // Skip the old SpeakType-specific directory (no longer used)
             
             // Check root directory (sometimes models are here)
             deletedCount += cleanupDirectory(baseDir, matchAny: [String(modelName), underscoreVariant])
@@ -202,14 +292,11 @@ class ModelDownloadService: ObservableObject {
         deletedCount += cleanupDirectory(tempHf, matchAny: [String(modelName), underscoreVariant])
         deletedCount += cleanupDirectory(tempDir, matchAny: [String(modelName), underscoreVariant])
         
-        // 4. Check for models--* pattern in Application Support (WhisperKit style)
-        if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let modelsPattern = "models--" + variant.replacingOccurrences(of: "/", with: "--")
-            deletedCount += cleanupDirectory(appSupport, matchAny: [modelsPattern])
-            
-            // Also check nested huggingface/hub for models-- pattern
-            let hfHub = appSupport.appendingPathComponent("huggingface/hub")
-            deletedCount += cleanupDirectory(hfHub, matchAny: [modelsPattern])
+        // 4. Check Documents/huggingface/models/argmaxinc/whisperkit-coreml (standard location)
+        if let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let whisperKitModels = documentsDir.appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml")
+            checkedPaths.append(whisperKitModels.path)
+            deletedCount += cleanupDirectory(whisperKitModels, matchAny: [String(modelName), underscoreVariant])
         }
         
         print("🗑️ Cleanup complete. Deleted \(deletedCount) items from \(checkedPaths.count) locations")
@@ -263,5 +350,44 @@ class ModelDownloadService: ObservableObject {
         isDownloading[variant] = false
         downloadProgress[variant] = 0.0
         downloadError[variant] = nil
+        
+        // Delete any partial download
+        Task {
+            let result = await deleteModel(variant: variant)
+            print("🗑️ Cleaned up partial download: \(result)")
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    /// Calculate total size of a directory recursively
+    static func calculateDirectorySize(at url: URL) -> Int64 {
+        let fileManager = FileManager.default
+        var totalSize: Int64 = 0
+        
+        guard let enumerator = fileManager.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey], options: [.skipsHiddenFiles]) else {
+            return 0
+        }
+        
+        for case let fileURL as URL in enumerator {
+            do {
+                let resourceValues = try fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+                if resourceValues.isRegularFile == true {
+                    totalSize += Int64(resourceValues.fileSize ?? 0)
+                }
+            } catch {
+                continue
+            }
+        }
+        
+        return totalSize
+    }
+    
+    /// Format bytes into human-readable string
+    static func formatBytes(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
     }
 }

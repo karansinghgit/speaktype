@@ -41,3 +41,4 @@ dist/
 !dmg-assets/*.svg
 speaktype.xcodeproj/project.xcworkspace/xcuserdata/
 Config.xcconfig
+env.example

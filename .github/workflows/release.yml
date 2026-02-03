@@ -103,5 +103,5 @@ jobs:
     - name: Upload Release Asset
       uses: softprops/action-gh-release@v2
       with:
-        files: SpeakType-${{ github.ref_name }}.dmg
+        files: SpeakType-*.dmg
         generate_release_notes: true

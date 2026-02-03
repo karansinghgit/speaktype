@@ -28,10 +28,10 @@ struct SidebarView: View {
             
             Spacer()
             
-            // Upgrade Card
-            SidebarPromoCard()
-                .padding(.horizontal, SidebarConstants.itemHorizontalPadding)
-                .padding(.bottom, SidebarConstants.bottomPadding)
+            // Upgrade Card - Hidden (logic kept for future use)
+            // SidebarPromoCard()
+            //     .padding(.horizontal, SidebarConstants.itemHorizontalPadding)
+            //     .padding(.bottom, SidebarConstants.bottomPadding)
         }
         .frame(width: SidebarConstants.width)
     }

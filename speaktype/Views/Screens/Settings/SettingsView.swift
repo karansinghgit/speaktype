@@ -210,30 +210,30 @@ struct GeneralSettingsTab: View {
                     }
                 }
                 
-                // License
-                SettingsSection {
-                    SettingsSectionHeader(
-                        icon: "key",
-                        title: "License",
-                        subtitle: licenseManager.isPro ? "Pro Active" : "Free Plan"
-                    )
-                    
-                    if licenseManager.isPro {
-                        Button(action: { showDeactivateAlert = true }) {
-                            Text("Deactivate License")
-                                .font(Typography.labelMedium)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.stSecondary)
-                    } else {
-                        Button(action: { showLicenseSheet = true }) {
-                            Text("Activate License")
-                                .font(Typography.labelMedium)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.stPrimary)
-                    }
-                }
+                // License - Hidden (logic kept for future use)
+                // SettingsSection {
+                //     SettingsSectionHeader(
+                //         icon: "key",
+                //         title: "License",
+                //         subtitle: licenseManager.isPro ? "Pro Active" : "Free Plan"
+                //     )
+                //     
+                //     if licenseManager.isPro {
+                //         Button(action: { showDeactivateAlert = true }) {
+                //             Text("Deactivate License")
+                //                 .font(Typography.labelMedium)
+                //                 .frame(maxWidth: .infinity)
+                //         }
+                //         .buttonStyle(.stSecondary)
+                //     } else {
+                //         Button(action: { showLicenseSheet = true }) {
+                //             Text("Activate License")
+                //                 .font(Typography.labelMedium)
+                //                 .frame(maxWidth: .infinity)
+                //         }
+                //         .buttonStyle(.stPrimary)
+                //     }
+                // }
             }
             .padding(24)
         }

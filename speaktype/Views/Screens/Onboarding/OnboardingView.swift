@@ -51,47 +51,84 @@ struct WelcomePage: View {
             Image("AppLogo")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 96, height: 96)
-                .shadow(color: Color.black.opacity(0.06), radius: 16, x: 0, y: 4)
+                .frame(width: 88, height: 88)
+                .shadow(color: Color.black.opacity(0.08), radius: 20, x: 0, y: 8)
             
-            VStack(spacing: 16) {
-                Text("Welcome to SpeakType")
-                    .font(.system(size: 40, weight: .semibold, design: .default))
+            VStack(spacing: 14) {
+                Text("Welcome to")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.textMuted)
+                    .textCase(.uppercase)
+                    .tracking(2.5)
+                
+                Text("SpeakType")
+                    .font(.system(size: 48, weight: .regular, design: .serif))
                     .foregroundStyle(Color.textPrimary)
                     .tracking(-0.5)
                 
-                Text("Experience the power of local AI transcription.\nSecure, fast, and completely offline.")
-                    .font(.system(size: 15, weight: .regular))
-                    .multilineTextAlignment(.center)
+                Text("Voice to text, powered by AI.")
+                    .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(Color.textSecondary)
-                    .lineSpacing(4)
-                    .frame(maxWidth: 480)
+                +
+                Text(" Private. Fast. Offline.")
+                    .font(.system(size: 16, weight: .regular, design: .serif))
+                    .italic()
+                    .foregroundStyle(Color.textMuted)
             }
+            .multilineTextAlignment(.center)
             .padding(.top, 32)
             
             HStack(spacing: 20) {
-                FeatureCard(icon: "lock.shield.fill", title: "Private by Design", description: "Your audio never leaves your device")
-                FeatureCard(icon: "bolt.fill", title: "Lightning Fast", description: "Optimized for Apple Silicon")
-                FeatureCard(icon: "keyboard.fill", title: "Works Everywhere", description: "Type with your voice in any app")
+                FeatureCard(icon: "lock.shield.fill", title: "Private", description: "Your audio never leaves your device")
+                FeatureCard(icon: "bolt.fill", title: "Fast", description: "Optimized for Apple Silicon")
+                FeatureCard(icon: "keyboard.fill", title: "Universal", description: "Works in any app")
             }
             .padding(.top, 48)
             
             Spacer()
             
-            Button(action: action) {
-                Text("Get Started")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white)
-                    .frame(width: 200, height: 44)
-                    .background(Color.accentPrimary)
-                    .cornerRadius(8)
-                    .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
-            }
-            .buttonStyle(.plain)
-            .padding(.bottom, 48)
+            GetStartedButton(action: action)
+                .padding(.bottom, 48)
         }
         .padding(.horizontal, 60)
         .padding(.vertical, 40)
+    }
+}
+
+struct GetStartedButton: View {
+    let action: () -> Void
+    @State private var isHovered = false
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Text("Get Started")
+                    .font(.system(size: 15, weight: .medium))
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .offset(x: isHovered ? 3 : 0)
+            }
+            .foregroundStyle(.white)
+            .frame(width: 160, height: 44)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.textPrimary)
+            )
+            .shadow(color: Color.black.opacity(isHovered ? 0.2 : 0.1), radius: isHovered ? 12 : 6, x: 0, y: isHovered ? 6 : 3)
+            .scaleEffect(isPressed ? 0.97 : 1.0)
+        }
+        .buttonStyle(.plain)
+        .animation(.easeOut(duration: 0.15), value: isHovered)
+        .animation(.easeOut(duration: 0.1), value: isPressed)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
     }
 }
 
@@ -99,6 +136,7 @@ struct PermissionsPage: View {
     var finishAction: () -> Void
     @State private var micStatus: AVAuthorizationStatus = .notDetermined
     @State private var accessibilityStatus: Bool = false
+    @State private var documentsAccessGranted: Bool = false
     @State private var timer: Timer?
     
     var body: some View {
@@ -106,62 +144,60 @@ struct PermissionsPage: View {
             Spacer()
             
             VStack(spacing: 16) {
-                Text("Permissions Setup")
-                    .font(.system(size: 40, weight: .semibold))
-                    .foregroundStyle(Color.textPrimary)
-                    .tracking(-0.5)
+                Text("QUICK SETUP")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.textMuted)
+                    .textCase(.uppercase)
+                    .tracking(2)
                 
-                Text("SpeakType needs access to your microphone and accessibility features to function.")
+                Text("Permissions")
+                    .font(.system(size: 40, weight: .regular, design: .serif))
+                    .foregroundStyle(Color.textPrimary)
+                
+                Text("Grant these permissions to unlock the full experience.")
                     .font(.system(size: 15, weight: .regular))
                     .foregroundStyle(Color.textSecondary)
                     .multilineTextAlignment(.center)
-                    .lineSpacing(4)
-                    .frame(maxWidth: 480)
+                    .frame(maxWidth: 380)
             }
             
             VStack(spacing: 12) {
                 // Microphone
                 OnboardingPermissionRow(
                     icon: "mic.fill",
-                    title: "Microphone Access",
-                    description: "Record your voice for transcription",
+                    title: "Microphone",
+                    description: "To hear and transcribe your voice",
                     isGranted: micStatus == .authorized,
                     action: requestMicPermission
+                )
+                
+                // Documents Folder
+                OnboardingPermissionRow(
+                    icon: "folder.fill",
+                    title: "Documents Folder",
+                    description: "To store AI models locally on your Mac",
+                    isGranted: documentsAccessGranted,
+                    action: requestDocumentsAccess
                 )
                 
                 // Accessibility
                 OnboardingPermissionRow(
                     icon: "hand.raised.fill",
-                    title: "Accessibility Access",
-                    description: "Type text into other apps",
+                    title: "Accessibility",
+                    description: "To type transcribed text into any app",
                     isGranted: accessibilityStatus,
                     action: requestAccessibilityPermission
                 )
             }
-            .frame(maxWidth: 560)
-            .padding(.top, 40)
+            .frame(maxWidth: 520)
+            .padding(.top, 48)
             
             Spacer()
             
-            Button(action: finishAction) {
-                HStack(spacing: 8) {
-                    Text("Start Using SpeakType")
-                        .font(.system(size: 15, weight: .medium))
-                    if micStatus == .authorized && accessibilityStatus {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 13, weight: .semibold))
-                    }
-                }
-                .foregroundColor(.white)
-                .frame(width: 240, height: 44)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill((micStatus == .authorized && accessibilityStatus) ? Color.accentPrimary : Color.textMuted.opacity(0.3))
-                )
-                .shadow(color: (micStatus == .authorized && accessibilityStatus) ? Color.black.opacity(0.08) : Color.clear, radius: 8, x: 0, y: 2)
-            }
-            .buttonStyle(.plain)
-            .disabled(micStatus != .authorized || !accessibilityStatus)
+            ContinueButton(
+                isEnabled: micStatus == .authorized && accessibilityStatus && documentsAccessGranted,
+                action: finishAction
+            )
             .padding(.bottom, 48)
         }
         .padding(.horizontal, 60)
@@ -183,14 +219,56 @@ struct PermissionsPage: View {
     // Note: Re-implementing them inline for the tool call
     
     func startPolling() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            checkPermissions()
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            DispatchQueue.main.async {
+                self.checkPermissions()
+            }
         }
+        RunLoop.current.add(timer!, forMode: .common)
     }
     
     func checkPermissions() {
         micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        accessibilityStatus = AXIsProcessTrusted()
+        let newAccessStatus = AXIsProcessTrusted()
+        if newAccessStatus != accessibilityStatus {
+            print("🔐 Accessibility status changed: \(accessibilityStatus) → \(newAccessStatus)")
+        }
+        accessibilityStatus = newAccessStatus
+        
+        // Check documents access by verifying the huggingface folder exists or can be created
+        checkDocumentsAccess()
+    }
+    
+    func checkDocumentsAccess() {
+        guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            documentsAccessGranted = false
+            return
+        }
+        
+        let huggingfacePath = documentsDir.appendingPathComponent("huggingface")
+        // If the folder exists or we can access it, permission was granted
+        documentsAccessGranted = FileManager.default.fileExists(atPath: huggingfacePath.path) ||
+                                 FileManager.default.isReadableFile(atPath: documentsDir.path)
+    }
+    
+    func requestDocumentsAccess() {
+        guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return
+        }
+        
+        let huggingfacePath = documentsDir.appendingPathComponent("huggingface")
+        
+        // Creating a directory in Documents triggers the permission prompt
+        do {
+            try FileManager.default.createDirectory(at: huggingfacePath, withIntermediateDirectories: true)
+            print("✅ Documents folder access granted - created huggingface directory")
+            documentsAccessGranted = true
+        } catch {
+            print("⚠️ Documents folder access error: \(error)")
+            // Permission may have been denied, or there was another error
+            documentsAccessGranted = false
+        }
     }
     
     func requestMicPermission() {
@@ -253,44 +331,74 @@ struct FeatureCard: View {
     let icon: String
     let title: String
     let description: String
+    @State private var isHovered = false
     
     var body: some View {
-        VStack(spacing: 16) {
-            // Icon with premium styling
-            Image(systemName: icon)
-                .font(.system(size: 24, weight: .medium))
-                .foregroundStyle(Color.textPrimary)
-                .frame(width: 52, height: 52)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.bgHover)
-                )
+        VStack(spacing: 0) {
+            Spacer()
             
-            VStack(spacing: 8) {
-                Text(title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.textPrimary)
-                    .tracking(-0.2)
+            // Icon with subtle background
+            ZStack {
+                Circle()
+                    .fill(Color.textPrimary.opacity(0.05))
+                    .frame(width: 52, height: 52)
                 
-                Text(description)
-                    .font(.system(size: 14, weight: .regular))
-                    .foregroundStyle(Color.textSecondary)
-                    .lineSpacing(3)
-                    .multilineTextAlignment(.center)
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(Color.textPrimary)
             }
+            
+            Spacer()
+                .frame(height: 20)
+            
+            // Title in serif
+            Text(title)
+                .font(.system(size: 16, weight: .medium, design: .serif))
+                .foregroundStyle(Color.textPrimary)
+            
+            Spacer()
+                .frame(height: 6)
+            
+            // Description
+            Text(description)
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.textMuted)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            
+            Spacer()
         }
-        .frame(width: 180, height: 180)
-        .padding(20)
+        .frame(width: 160, height: 165)
+        .padding(.horizontal, 16)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.bgCard)
+            ZStack {
+                // Base fill
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.white)
+                
+                // Subtle inner border for depth
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.8),
+                                Color.black.opacity(0.03)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+            }
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(Color.border.opacity(0.6), lineWidth: 0.5)
-        )
-        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 2)
-        .shadow(color: Color.black.opacity(0.02), radius: 1, x: 0, y: 1)
+        .shadow(color: Color.black.opacity(0.03), radius: 1, x: 0, y: 1)
+        .shadow(color: Color.black.opacity(isHovered ? 0.08 : 0.05), radius: isHovered ? 20 : 12, x: 0, y: isHovered ? 10 : 6)
+        .scaleEffect(isHovered ? 1.03 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }
 
@@ -300,70 +408,98 @@ struct OnboardingPermissionRow: View {
     let description: String
     let isGranted: Bool
     let action: () -> Void
+    @State private var isHovered = false
     
     var body: some View {
-        HStack(spacing: 18) {
-            // Icon with refined styling
-            Image(systemName: icon)
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(Color.textPrimary)
-                .frame(width: 52, height: 52)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.bgHover)
-                )
+        HStack(spacing: 16) {
+            // Clean icon
+            Image(systemName: isGranted ? "checkmark.circle.fill" : icon)
+                .font(.system(size: 24, weight: .regular))
+                .foregroundStyle(isGranted ? Color.accentSuccess : Color.textPrimary.opacity(0.7))
+                .frame(width: 40)
             
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Color.textPrimary)
-                    .tracking(-0.2)
                 
                 Text(description)
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(Color.textSecondary)
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Color.textMuted)
             }
             
             Spacer()
             
             if isGranted {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("Granted")
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .foregroundStyle(Color.accentSuccess)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.accentSuccess.opacity(0.08))
-                )
+                Image(systemName: "checkmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.accentSuccess)
             } else {
                 Button(action: action) {
-                    Text("Allow Access")
+                    Text("Allow")
                         .font(.system(size: 13, weight: .medium))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 7)
-                        .background(Color.accentPrimary)
                         .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color.textPrimary)
+                        )
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(20)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.bgCard)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(isHovered ? 0.06 : 0.03), radius: isHovered ? 8 : 4, x: 0, y: 2)
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(isGranted ? Color.accentSuccess.opacity(0.15) : Color.border.opacity(0.6), lineWidth: 0.5)
+        .scaleEffect(isHovered ? 1.01 : 1.0)
+        .animation(.easeOut(duration: 0.15), value: isHovered)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+    }
+}
+
+struct ContinueButton: View {
+    let isEnabled: Bool
+    let action: () -> Void
+    @State private var isHovered = false
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Text("Continue")
+                    .font(.system(size: 15, weight: .medium))
+                Image(systemName: isEnabled ? "arrow.right" : "lock.fill")
+                    .font(.system(size: isEnabled ? 12 : 10, weight: .medium))
+                    .offset(x: (isHovered && isEnabled) ? 3 : 0)
+            }
+            .foregroundStyle(.white)
+            .frame(width: 160, height: 44)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isEnabled ? Color.textPrimary : Color.textMuted.opacity(0.3))
+            )
+            .shadow(color: isEnabled ? Color.black.opacity(isHovered ? 0.2 : 0.1) : Color.clear, radius: isHovered ? 12 : 6, x: 0, y: isHovered ? 6 : 3)
+            .scaleEffect(isPressed ? 0.97 : 1.0)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .animation(.easeOut(duration: 0.15), value: isHovered)
+        .animation(.easeOut(duration: 0.1), value: isPressed)
+        .onHover { hovering in
+            if isEnabled { isHovered = hovering }
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in if isEnabled { isPressed = true } }
+                .onEnded { _ in isPressed = false }
         )
-        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 2)
-        .shadow(color: Color.black.opacity(0.02), radius: 1, x: 0, y: 1)
     }
 }
 

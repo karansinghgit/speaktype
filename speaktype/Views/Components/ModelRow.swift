@@ -159,7 +159,7 @@ struct ModelRow: View {
                     .padding(.vertical, 8)
                     .background(Color.orange.opacity(0.2))
                     .foregroundStyle(Color.orange)
-                    .clipShape(Capsule())
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .help("This model is selected but not downloaded. Download it or select another model.")
                 } else {
                     HStack(spacing: 6) {
@@ -170,9 +170,9 @@ struct ModelRow: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .background(Color.bgHover)
-                    .foregroundStyle(Color.textPrimary)
-                    .clipShape(Capsule())
+                    .background(Color.textPrimary)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
             } else {
                 if isLoadingModel {
@@ -181,30 +181,30 @@ struct ModelRow: View {
                         ProgressView()
                             .scaleEffect(0.7)
                             .frame(width: 12, height: 12)
-                        Text("Loading...")
+                        Text("Loading model...")
                             .font(Typography.buttonLabelSmall)
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(Color.bgHover)
                     .foregroundStyle(Color.textSecondary)
-                    .clipShape(Capsule())
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .help("First load may take 10-30 seconds")
                 } else {
-                    Button("Use") {
-                        // Only allow selecting downloaded models
-                        if isDownloaded {
-                            loadAndSelectModel()
-                        }
+                    // Downloaded but not selected - show "Use" button
+                    Button {
+                        loadAndSelectModel()
+                    } label: {
+                        Text("Use")
+                            .font(Typography.buttonLabelSmall)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.bgHover)
+                            .foregroundStyle(Color.textPrimary)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
-                    .font(Typography.buttonLabelSmall)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(isDownloaded ? Color.bgHover : Color.bgHover.opacity(0.3))
-                    .foregroundStyle(isDownloaded ? Color.textPrimary : Color.textMuted)
-                    .clipShape(Capsule())
                     .buttonStyle(.plain)
-                    .disabled(!isDownloaded)
-                    .help(isDownloaded ? "Set as default model" : "Download this model first")
+                    .help("Set as default model")
                 }
             }
             
@@ -237,7 +237,7 @@ struct ModelRow: View {
             .padding(.vertical, 8)
             .background(Color.textMuted.opacity(0.2))
             .foregroundStyle(Color.textPrimary)
-            .clipShape(Capsule())
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -254,9 +254,9 @@ struct ModelRow: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 9)
-            .background(Color.accentPrimary)
+            .background(Color.textPrimary)
             .foregroundStyle(.white)
-            .clipShape(Capsule())
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
     }

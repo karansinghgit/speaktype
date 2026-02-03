@@ -14,12 +14,22 @@ struct AIModelsView: View {
         models.first(where: { $0.variant == selectedModel })?.name ?? "No model downloaded yet"
     }
     
+    private var hasAnyModelDownloaded: Bool {
+        downloadService.downloadProgress.values.contains { $0 >= 1.0 }
+    }
+    
     // MARK: - Body
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 headerSection
+                
+                // Show setup banner if no model downloaded
+                if !hasAnyModelDownloaded {
+                    setupBanner
+                }
+                
                 currentModelCard
                 modelsListSection
             }
@@ -60,9 +70,17 @@ struct AIModelsView: View {
                 .font(Typography.displayLarge)
                 .foregroundStyle(Color.textPrimary)
             
-            Text("Manage your local transcription models powered by WhisperKit.")
-                .font(Typography.bodySmall)
-                .foregroundStyle(Color.textSecondary)
+            HStack(spacing: 6) {
+                Text("Manage your local transcription models powered by WhisperKit.")
+                    .font(Typography.bodySmall)
+                    .foregroundStyle(Color.textSecondary)
+                
+                // Info icon with tooltip on hover
+                Image(systemName: "info.circle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.textMuted)
+                    .help("First transcription after selecting a model may take 10-30 seconds while the AI loads.")
+            }
         }
     }
     
@@ -101,6 +119,35 @@ struct AIModelsView: View {
                 }
             }
         }
+    }
+    
+    private var setupBanner: some View {
+        HStack(spacing: 16) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 32))
+                .foregroundStyle(Color.textPrimary)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Download a Model to Get Started")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.textPrimary)
+                
+                Text("Choose a model below to enable voice transcription. We recommend Whisper Base for most users.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.textSecondary)
+            }
+            
+            Spacer()
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.textPrimary.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.textPrimary.opacity(0.1), lineWidth: 1)
+        )
     }
 }
 

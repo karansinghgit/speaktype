@@ -18,15 +18,7 @@ class ModelDownloadService: ObservableObject {
         // Check for already-downloaded models on launch
         Task { @MainActor in
             await refreshDownloadedModels()
-            
-            // Auto-select first downloaded model if none is selected
-            let selectedModel = UserDefaults.standard.string(forKey: "selectedModelVariant") ?? ""
-            if selectedModel.isEmpty {
-                if let firstModel = self.downloadProgress.first(where: { $0.value >= 1.0 })?.key {
-                    UserDefaults.standard.set(firstModel, forKey: "selectedModelVariant")
-                    print("🎯 Auto-selected first available model: \(firstModel)")
-                }
-            }
+            // Don't auto-select - let user explicitly pick a model which will load it
         }
     }
     

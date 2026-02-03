@@ -23,6 +23,7 @@ class AudioRecordingService: NSObject, ObservableObject {
     private var currentFileURL: URL?
     private var isSessionStarted = false
     private var setupTask: Task<Void, Never>?
+    private var isStopping = false // Flag to prevent appending during stop
     
     private let audioQueue = DispatchQueue(label: "com.speaktype.audioQueue")
     
@@ -115,7 +116,8 @@ class AudioRecordingService: NSObject, ObservableObject {
         guard !isRecording else { return }
         if captureSession == nil { setupSession() }
         
-        // 1. Set Recording State Immediately to prevent "Stop" from being ignored
+        // 1. Reset flags and set Recording State Immediately
+        isStopping = false
         isRecording = true
         
         // 2. Wrap setup in a Task so stopRecording can wait for it
@@ -181,6 +183,8 @@ class AudioRecordingService: NSObject, ObservableObject {
         
         guard isRecording, let url = currentFileURL else { return nil }
         
+        // Set stopping flag BEFORE anything else to prevent race conditions
+        isStopping = true
         isRecording = false // Stop capturing new frames immediately
         DispatchQueue.main.async {
             self.audioLevel = 0.0
@@ -189,11 +193,15 @@ class AudioRecordingService: NSObject, ObservableObject {
         
         return await withCheckedContinuation { continuation in
             audioQueue.async {
-                // Stop the capture session to save CPU when not recording
+                // Stop the capture session first to prevent more audio data
                 self.captureSession?.stopRunning()
+                
+                // Small delay to let any in-flight audio data finish
+                Thread.sleep(forTimeInterval: 0.05)
                 
                 self.assetWriterInput?.markAsFinished()
                 self.assetWriter?.finishWriting {
+                    self.isStopping = false // Reset flag after writing is complete
                     print("Recording finished saving to \(url.path)")
                     continuation.resume(returning: url)
                 }
@@ -239,6 +247,8 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
         
         processAudioLevel(from: sampleBuffer)
         
+        // Don't append if we're stopping - prevents race condition crash
+        guard !isStopping else { return }
         guard let writer = assetWriter, let input = assetWriterInput else { return }
         
         if writer.status == .writing {
@@ -248,6 +258,8 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
             }
             
             if input.isReadyForMoreMediaData {
+                // Double-check we're not stopping before appending
+                guard !isStopping else { return }
                 input.append(sampleBuffer)
             }
         }

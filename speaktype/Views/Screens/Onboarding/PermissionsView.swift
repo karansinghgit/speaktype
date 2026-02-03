@@ -47,10 +47,7 @@ struct PermissionsView: View {
                         isGranted: accessibilityStatus,
                         action: { 
                             ClipboardService.shared.requestAccessibilityPermission()
-                            // Also open settings in case prompt doesn't appear (e.g. already denied)
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                openSettings(for: "Privacy_Accessibility")
-                            }
+                            // System dialog handles opening Settings when user clicks "Open System Settings"
                         }
                     )
                     

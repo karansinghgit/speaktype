@@ -344,9 +344,7 @@ struct PermissionsSettingsTab: View {
                             isGranted: accessibilityStatus,
                             action: {
                                 ClipboardService.shared.requestAccessibilityPermission()
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                    openSettings(for: "Privacy_Accessibility")
-                                }
+                                // System dialog handles opening Settings when user clicks "Open System Settings"
                             }
                         )
                     }

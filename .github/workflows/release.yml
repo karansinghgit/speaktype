@@ -39,9 +39,17 @@ jobs:
 
       - name: Create DMG Background
         run: |
+          if [ -f "dmg-assets/dmg-background.png" ]; then
+            echo "✅ DMG background already present"
+            exit 0
+          fi
           cd dmg-assets
-          chmod +x create-dmg-background.sh
-          ./create-dmg-background.sh || echo "Using existing background"
+          if [ -f "create-dmg-background.sh" ]; then
+            chmod +x create-dmg-background.sh
+            ./create-dmg-background.sh || echo "Using existing background"
+          else
+            echo "⚠️  No background generator script found; continuing"
+          fi
 
       - name: Locate App & Create DMG
         run: |

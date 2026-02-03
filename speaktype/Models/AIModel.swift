@@ -92,7 +92,7 @@ struct AIModel: Identifiable, Equatable {
     ]
     
     /// Returns the expected minimum size for a given model variant
-    static func expectedSize(for variant: String) -> Int64 {
+    nonisolated static func expectedSize(for variant: String) -> Int64 {
         return availableModels.first(where: { $0.variant == variant })?.expectedSizeBytes ?? 50_000_000
     }
     

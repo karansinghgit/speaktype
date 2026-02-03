@@ -41,64 +41,67 @@ class ModelDownloadService: ObservableObject {
     
     // Check which models are already downloaded and update progress dictionary
     func refreshDownloadedModels() async {
-        print("🔍 Checking for already-downloaded models...")
-        
-        var foundModels = Set<String>()
-        
-        // NOTE: WhisperKit.fetchAvailableModels() returns ALL remote models, not local ones
-        // We ONLY rely on disk-based verification to check what's actually downloaded
-        
-        // Verify models actually exist on disk with proper size validation
-        let fileManager = FileManager.default
-        if let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let whisperKitPath = documentsDir.appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml")
+        // PREVENT MAIN THREAD HANG: Run heavy file system operations in a detached background task
+        let foundModels = await Task.detached(priority: .userInitiated) {
+            print("🔍 Checking for already-downloaded models (Background Task)...")
             
-            if fileManager.fileExists(atPath: whisperKitPath.path) {
-                if let contents = try? fileManager.contentsOfDirectory(at: whisperKitPath, includingPropertiesForKeys: [.isDirectoryKey]) {
-                    print("📁 Found \(contents.count) items in WhisperKit cache at \(whisperKitPath.path)")
-                    
-                    for item in contents {
-                        let modelName = item.lastPathComponent
+            var foundModels = Set<String>()
+            let fileManager = FileManager.default
+            
+            // NOTE: WhisperKit.fetchAvailableModels() returns ALL remote models, not local ones
+            // We ONLY rely on disk-based verification to check what's actually downloaded
+            
+            // Verify models actually exist on disk with proper size validation
+            if let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+                let whisperKitPath = documentsDir.appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml")
+                
+                if fileManager.fileExists(atPath: whisperKitPath.path) {
+                    if let contents = try? fileManager.contentsOfDirectory(at: whisperKitPath, includingPropertiesForKeys: [.isDirectoryKey]) {
+                        print("📁 Found \(contents.count) items in WhisperKit cache at \(whisperKitPath.path)")
                         
-                        // Skip non-model directories
-                        if modelName == "config.json" || modelName == ".DS_Store" {
-                            continue
-                        }
-                        
-                        // Verify this directory has actual model files (not just empty directory)
-                        if let subContents = try? fileManager.contentsOfDirectory(at: item, includingPropertiesForKeys: [.fileSizeKey]),
-                           !subContents.isEmpty {
+                        for item in contents {
+                            let modelName = item.lastPathComponent
                             
-                            // Check if it has the essential files for a model (must have config.json)
-                            let hasConfigJson = subContents.contains(where: { $0.lastPathComponent == "config.json" })
-                            let hasModelFiles = subContents.contains(where: { $0.lastPathComponent.hasSuffix(".mlmodelc") })
+                            // Skip non-model directories
+                            if modelName == "config.json" || modelName == ".DS_Store" {
+                                continue
+                            }
                             
-                            if hasConfigJson && hasModelFiles {
-                                // Calculate total directory size
-                                let directorySize = Self.calculateDirectorySize(at: item)
-                                let expectedSize = AIModel.expectedSize(for: modelName)
+                            // Verify this directory has actual model files (not just empty directory)
+                            if let subContents = try? fileManager.contentsOfDirectory(at: item, includingPropertiesForKeys: [.fileSizeKey]),
+                               !subContents.isEmpty {
                                 
-                                // Model is complete if it's at least 80% of expected size
-                                let minAcceptableSize = Int64(Double(expectedSize) * 0.8)
+                                // Check if it has the essential files for a model (must have config.json)
+                                let hasConfigJson = subContents.contains(where: { $0.lastPathComponent == "config.json" })
+                                let hasModelFiles = subContents.contains(where: { $0.lastPathComponent.hasSuffix(".mlmodelc") })
                                 
-                                if directorySize >= minAcceptableSize {
-                                    print("✅ Model \(modelName) verified: \(Self.formatBytes(directorySize)) (expected ~\(Self.formatBytes(expectedSize)))")
-                                    foundModels.insert(modelName)
-                                } else {
-                                    print("⚠️ Model \(modelName) is INCOMPLETE: \(Self.formatBytes(directorySize)) < \(Self.formatBytes(minAcceptableSize)) minimum")
+                                if hasConfigJson && hasModelFiles {
+                                    // Calculate total directory size (Expensive operation!)
+                                    let directorySize = ModelDownloadService.calculateDirectorySize(at: item)
+                                    let expectedSize = AIModel.expectedSize(for: modelName)
+                                    
+                                    // Model is complete if it's at least 80% of expected size
+                                    let minAcceptableSize = Int64(Double(expectedSize) * 0.8)
+                                    
+                                    if directorySize >= minAcceptableSize {
+                                        print("✅ Model \(modelName) verified: \(ModelDownloadService.formatBytes(directorySize))")
+                                        foundModels.insert(modelName)
+                                    } else {
+                                        print("⚠️ Model \(modelName) is INCOMPLETE: \(ModelDownloadService.formatBytes(directorySize)) < \(ModelDownloadService.formatBytes(minAcceptableSize)) minimum")
+                                    }
                                 }
-                            } else {
-                                print("⚠️ Model \(modelName) is incomplete (missing config.json or .mlmodelc files)")
                             }
                         }
                     }
+                } else {
+                    print("ℹ️ WhisperKit cache directory doesn't exist yet: \(whisperKitPath.path)")
                 }
-            } else {
-                print("ℹ️ WhisperKit cache directory doesn't exist yet: \(whisperKitPath.path)")
-                print("   Models will be downloaded on first use.")
             }
-        }
+            
+            return foundModels
+        }.value
         
+        // Update UI on MainActor
         await MainActor.run {
             // Clear all previous progress
             self.downloadProgress.removeAll()
@@ -633,7 +636,7 @@ class ModelDownloadService: ObservableObject {
     // MARK: - Helper Functions
     
     /// Calculate total size of a directory recursively
-    static func calculateDirectorySize(at url: URL) -> Int64 {
+    nonisolated static func calculateDirectorySize(at url: URL) -> Int64 {
         let fileManager = FileManager.default
         var totalSize: Int64 = 0
         
@@ -656,7 +659,7 @@ class ModelDownloadService: ObservableObject {
     }
     
     /// Format bytes into human-readable string
-    static func formatBytes(_ bytes: Int64) -> String {
+    nonisolated static func formatBytes(_ bytes: Int64) -> String {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
         formatter.countStyle = .file

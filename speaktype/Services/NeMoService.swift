@@ -11,9 +11,12 @@ class NeMoService {
     private var asr_model_class: PythonObject?
     
     init() {
-        Task {
+        // Run Python setup in a detached task to avoid blocking the main thread
+        // or inheriting MainActor context, which can cause hangs with PythonKit.
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return }
             do {
-                try await setupPythonEnvironment()
+                try await self.setupPythonEnvironment()
             } catch {
                 print("NeMoService: Failed to setup Python environment: \(error)")
             }

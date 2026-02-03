@@ -51,13 +51,23 @@ jobs:
 
     - name: Create DMG Background
       run: |
+        if [ -f "dmg-assets/dmg-background.png" ]; then
+          echo "✅ DMG background already present"
+          exit 0
+        fi
         cd dmg-assets
-        chmod +x create-dmg-background.sh
-        ./create-dmg-background.sh || echo "Using existing background"
+        if [ -f "create-dmg-background.sh" ]; then
+          chmod +x create-dmg-background.sh
+          ./create-dmg-background.sh || echo "Using existing background"
+        else
+          echo "⚠️  No background generator script found; continuing"
+        fi
 
     - name: Locate App & Create DMG
       run: |
-        # Find the app in the build folder
+        VERSION="${GITHUB_REF_NAME#v}"
+        DMG_NAME="SpeakType-${VERSION}.dmg"
+        # Find the app anywhere in the build folder
         APP_PATH=$(find build -name "speaktype.app" | head -n 1)
 
         if [ -z "$APP_PATH" ]; then
@@ -87,12 +97,11 @@ jobs:
           --icon "speaktype.app" 180 170 \
           --hide-extension "speaktype.app" \
           --app-drop-link 480 170 \
-          --no-internet-enable \
-          "SpeakType.dmg" \
+          "$DMG_NAME" \
           "$APP_PATH"
 
     - name: Upload Release Asset
       uses: softprops/action-gh-release@v2
       with:
-        files: SpeakType.dmg
+        files: SpeakType-${{ github.ref_name }}.dmg
         generate_release_notes: true

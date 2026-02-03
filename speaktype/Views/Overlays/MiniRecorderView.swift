@@ -10,10 +10,15 @@ struct MiniRecorderView: View {
 
     @State private var isProcessing = false
     @State private var statusMessage = "Transcribing..."
+    @State private var showAccessibilityWarning = false
     var onCommit: ((String) -> Void)?
     var onCancel: (() -> Void)?
     
     @AppStorage("selectedModelVariant") private var selectedModel: String = ""
+    
+    private var isAccessibilityEnabled: Bool {
+        AXIsProcessTrusted()
+    }
     
     // MARK: - State for Animation
     @State private var phase: CGFloat = 0
@@ -101,6 +106,16 @@ struct MiniRecorderView: View {
                 }
             })
         )
+        .alert("Accessibility Permission Required", isPresented: $showAccessibilityWarning) {
+            Button("Open Settings") {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            Button("Continue Anyway", role: .cancel) { }
+        } message: {
+            Text("Accessibility is disabled. Transcribed text will be copied to clipboard but won't auto-paste into apps.\n\nEnable it in System Settings → Privacy & Security → Accessibility.")
+        }
     }
     
     // MARK: - Subviews
@@ -185,6 +200,41 @@ struct MiniRecorderView: View {
             debugLog("Already processing, ignoring start request")
             return
         }
+        
+        // Check if accessibility is enabled - warn but don't block
+        if !isAccessibilityEnabled {
+            showAccessibilityWarning = true
+        }
+        
+        // Check if model is selected BEFORE starting recording
+        guard !selectedModel.isEmpty else {
+            debugLog("No model selected - showing error")
+            isProcessing = true
+            statusMessage = "No model selected"
+            
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                isProcessing = false
+                onCancel?()
+            }
+            return
+        }
+        
+        // Check if model is downloaded
+        let progress = ModelDownloadService.shared.downloadProgress[selectedModel] ?? 0
+        guard progress >= 1.0 else {
+            debugLog("Model not downloaded - showing error")
+            isProcessing = true
+            statusMessage = "Model not downloaded"
+            
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                isProcessing = false
+                onCancel?()
+            }
+            return
+        }
+        
         debugLog("Starting recording...")
         audioRecorder.startRecording()
         isListening = true
@@ -253,7 +303,7 @@ struct MiniRecorderView: View {
              // Ensure model is loaded before transcribing
              if !whisperService.isInitialized || whisperService.currentModelVariant != selectedModel {
                  debugLog("Loading model: \(selectedModel)")
-                 await MainActor.run { statusMessage = "Loading Model..." }
+                 await MainActor.run { statusMessage = "Loading AI model (one-time)..." }
                  do {
                      try await whisperService.loadModel(variant: selectedModel)
                      debugLog("Model loaded successfully")

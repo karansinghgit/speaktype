@@ -40,3 +40,4 @@ dist/
 !dmg-assets/*.py
 !dmg-assets/*.svg
 speaktype.xcodeproj/project.xcworkspace/xcuserdata/
+Config.xcconfig

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Update dialog sheet matching the VoiceInk design
+/// Update dialog sheet for prompting users to install new versions
 struct UpdateSheet: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var updateService = UpdateService.shared

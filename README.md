@@ -421,7 +421,6 @@ SpeakType is built with amazing open-source projects:
 - **[OpenAI Whisper](https://github.com/openai/whisper)** - State-of-the-art speech recognition
 
 **Inspiration:**
-- [VoiceInk](https://voices.ink/) - Original inspiration
 - macOS Speech Framework - System dictation
 
 ---

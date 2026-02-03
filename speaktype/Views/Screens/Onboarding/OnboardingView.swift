@@ -8,18 +8,8 @@ struct OnboardingView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Background - Darker Contrast (Matches Main App)
-                ZStack {
-                    Color.bgApp.ignoresSafeArea()
-                    
-                    // Subtle ambient gradient for premium feel
-                    LinearGradient(
-                        colors: [Color.accentRed.opacity(0.15), Color.accentBlue.opacity(0.1), Color.clear],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .ignoresSafeArea()
-                }
+                // Background - Match main app exactly
+                Color.bgContent.ignoresSafeArea()
                 
                 // Content ZStack
                     ZStack {
@@ -54,42 +44,54 @@ struct WelcomePage: View {
     let action: () -> Void
     
     var body: some View {
-        VStack(spacing: 40) {
-            // Icon / Hero
+        VStack(spacing: 0) {
+            Spacer()
+            
+            // Icon / Hero with refined shadow
             Image("AppLogo")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 100, height: 100)
-                .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
+                .frame(width: 96, height: 96)
+                .shadow(color: Color.black.opacity(0.06), radius: 16, x: 0, y: 4)
             
             VStack(spacing: 16) {
                 Text("Welcome to SpeakType")
-                    .font(Typography.displayLarge)
+                    .font(.system(size: 40, weight: .semibold, design: .default))
                     .foregroundStyle(Color.textPrimary)
+                    .tracking(-0.5)
                 
-                Text("Experience the power of local AI transcription. Secure, fast, and completely offline.")
-                    .font(Typography.bodyLarge)
+                Text("Experience the power of local AI transcription.\nSecure, fast, and completely offline.")
+                    .font(.system(size: 15, weight: .regular))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(Color.textSecondary)
-                    .frame(maxWidth: 500)
+                    .lineSpacing(4)
+                    .frame(maxWidth: 480)
             }
+            .padding(.top, 32)
             
-            HStack(spacing: 24) {
-                FeatureCard(icon: "lock.shield.fill", title: "Private by Design", description: "Your audio never leaves your device.")
-                FeatureCard(icon: "bolt.fill", title: "Lightning Fast", description: "Optimized for Apple Silicon.")
-                FeatureCard(icon: "keyboard.fill", title: "Global Injection", description: "Type with your voice anywhere.")
+            HStack(spacing: 20) {
+                FeatureCard(icon: "lock.shield.fill", title: "Private by Design", description: "Your audio never leaves your device")
+                FeatureCard(icon: "bolt.fill", title: "Lightning Fast", description: "Optimized for Apple Silicon")
+                FeatureCard(icon: "keyboard.fill", title: "Works Everywhere", description: "Type with your voice in any app")
             }
+            .padding(.top, 48)
+            
+            Spacer()
             
             Button(action: action) {
                 Text("Get Started")
-                    .font(Typography.labelLarge)
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(.white)
-                    .frame(width: 200, height: 50)
-                    .background(Color.accentRed)
-                    .cornerRadius(25)
+                    .frame(width: 200, height: 44)
+                    .background(Color.accentPrimary)
+                    .cornerRadius(8)
+                    .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
             }
             .buttonStyle(.plain)
+            .padding(.bottom, 48)
         }
+        .padding(.horizontal, 60)
+        .padding(.vertical, 40)
     }
 }
 
@@ -100,24 +102,29 @@ struct PermissionsPage: View {
     @State private var timer: Timer?
     
     var body: some View {
-        VStack(spacing: 40) {
-            VStack(spacing: 10) {
-                Text("Permissions Setup")
-                    .font(Typography.displayMedium)
-                    .foregroundStyle(Color.textPrimary)
-                Text("SpeakType needs access to your microphone and accessibility features to function.")
-                    .font(Typography.bodyMedium)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.top, 20)
+        VStack(spacing: 0) {
+            Spacer()
             
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
+                Text("Permissions Setup")
+                    .font(.system(size: 40, weight: .semibold))
+                    .foregroundStyle(Color.textPrimary)
+                    .tracking(-0.5)
+                
+                Text("SpeakType needs access to your microphone and accessibility features to function.")
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(Color.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+                    .frame(maxWidth: 480)
+            }
+            
+            VStack(spacing: 12) {
                 // Microphone
                 OnboardingPermissionRow(
                     icon: "mic.fill",
                     title: "Microphone Access",
-                    description: "Required to record your voice.",
+                    description: "Record your voice for transcription",
                     isGranted: micStatus == .authorized,
                     action: requestMicPermission
                 )
@@ -125,37 +132,40 @@ struct PermissionsPage: View {
                 // Accessibility
                 OnboardingPermissionRow(
                     icon: "hand.raised.fill",
-                    title: "Accessibility",
-                    description: "Required to type text into other apps.",
+                    title: "Accessibility Access",
+                    description: "Type text into other apps",
                     isGranted: accessibilityStatus,
                     action: requestAccessibilityPermission
                 )
             }
-            .frame(maxWidth: 600) // Readability constraint
+            .frame(maxWidth: 560)
+            .padding(.top, 40)
             
             Spacer()
             
             Button(action: finishAction) {
-                HStack {
+                HStack(spacing: 8) {
                     Text("Start Using SpeakType")
-                        .font(Typography.labelLarge)
+                        .font(.system(size: 15, weight: .medium))
                     if micStatus == .authorized && accessibilityStatus {
                         Image(systemName: "checkmark")
+                            .font(.system(size: 13, weight: .semibold))
                     }
                 }
                 .foregroundColor(.white)
-                .frame(width: 300, height: 60)
+                .frame(width: 240, height: 44)
                 .background(
-                    RoundedRectangle(cornerRadius: 30)
-                        .fill((micStatus == .authorized && accessibilityStatus) ? Color.accentRed : Color.gray.opacity(0.3))
-                        .shadow(color: (micStatus == .authorized && accessibilityStatus) ? Color.accentRed.opacity(0.4) : Color.clear, radius: 10, x: 0, y: 5)
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill((micStatus == .authorized && accessibilityStatus) ? Color.accentPrimary : Color.textMuted.opacity(0.3))
                 )
-                .animation(.easeInOut, value: micStatus == .authorized && accessibilityStatus)
+                .shadow(color: (micStatus == .authorized && accessibilityStatus) ? Color.black.opacity(0.08) : Color.clear, radius: 8, x: 0, y: 2)
             }
             .buttonStyle(.plain)
             .disabled(micStatus != .authorized || !accessibilityStatus)
-            .padding(.bottom, 40)
+            .padding(.bottom, 48)
         }
+        .padding(.horizontal, 60)
+        .padding(.vertical, 40)
         .onAppear {
             checkPermissions()
             startPolling()
@@ -184,25 +194,52 @@ struct PermissionsPage: View {
     }
     
     func requestMicPermission() {
-        AVCaptureDevice.requestAccess(for: .audio) { _ in
-            DispatchQueue.main.async { checkPermissions() }
-        }
-        // Also open settings if denied?
-         if micStatus == .denied {
+        // Check current status
+        let currentStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        
+        switch currentStatus {
+        case .authorized:
+            // Already granted
+            micStatus = .authorized
+            return
+            
+        case .notDetermined:
+            // Show native permission prompt
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                DispatchQueue.main.async {
+                    self.checkPermissions()
+                }
+            }
+            
+        case .denied, .restricted:
+            // User previously denied - open System Settings
             openSettings(for: "Privacy_Microphone")
-         }
+            
+        @unknown default:
+            break
+        }
     }
     
     func requestAccessibilityPermission() {
         print("DEBUG: Requesting Accessibility Permission")
+        
+        // First check current status
+        let currentStatus = AXIsProcessTrusted()
+        
+        if currentStatus {
+            // Already granted
+            accessibilityStatus = true
+            return
+        }
+        
+        // Show the native macOS prompt (will appear automatically)
         let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String : true]
         let accessEnabled = AXIsProcessTrustedWithOptions(options)
         accessibilityStatus = accessEnabled
         
-        if !accessEnabled {
-             print("DEBUG: Access not enabled, opening settings")
-             openSettings(for: "Privacy_Accessibility")
-        }
+        // Note: We don't manually open System Settings here because
+        // the native prompt will show. Only open manually if user
+        // needs to re-enable after denying (handled by polling)
     }
     
     func openSettings(for pane: String) {
@@ -218,34 +255,42 @@ struct FeatureCard: View {
     let description: String
     
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 16) {
+            // Icon with premium styling
             Image(systemName: icon)
-                .font(.title)
-                .foregroundStyle(Color.accentRed)
-                .frame(width: 50, height: 50)
-                .background(Color.accentRed.opacity(0.1))
-                .clipShape(Circle())
-            
-            Text(title)
-                .font(Typography.labelMedium)
+                .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(Color.textPrimary)
+                .frame(width: 52, height: 52)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.bgHover)
+                )
             
-            Text(description)
-                .font(Typography.captionSmall)
-                .foregroundStyle(Color.textSecondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: 8) {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.textPrimary)
+                    .tracking(-0.2)
+                
+                Text(description)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(Color.textSecondary)
+                    .lineSpacing(3)
+                    .multilineTextAlignment(.center)
+            }
         }
-        .frame(width: 140, height: 160)
-        .padding()
-        .padding()
-        .background(Color.bgCard)
-        .cornerRadius(20)
-        .cornerRadius(20)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.borderCard, lineWidth: 1)
+        .frame(width: 180, height: 180)
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.bgCard)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.border.opacity(0.6), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 2)
+        .shadow(color: Color.black.opacity(0.02), radius: 1, x: 0, y: 1)
     }
 }
 
@@ -257,58 +302,68 @@ struct OnboardingPermissionRow: View {
     let action: () -> Void
     
     var body: some View {
-        HStack {
+        HStack(spacing: 18) {
+            // Icon with refined styling
             Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(Color.accentRed)
-                .frame(width: 50, height: 50)
-                .background(Color.accentRed.opacity(0.1))
-                .clipShape(Circle())
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(Color.textPrimary)
+                .frame(width: 52, height: 52)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.bgHover)
+                )
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(Typography.labelMedium)
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Color.textPrimary)
+                    .tracking(-0.2)
+                
                 Text(description)
-                    .font(Typography.bodySmall)
+                    .font(.system(size: 13, weight: .regular))
                     .foregroundStyle(Color.textSecondary)
             }
             
             Spacer()
             
             if isGranted {
-                HStack {
-                    Text("Granted")
-                        .font(Typography.labelMedium)
+                HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Granted")
+                        .font(.system(size: 13, weight: .medium))
                 }
-                .foregroundStyle(.green)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.green.opacity(0.1))
-                .clipShape(Capsule())
+                .foregroundStyle(Color.accentSuccess)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.accentSuccess.opacity(0.08))
+                )
             } else {
                 Button(action: action) {
                     Text("Allow Access")
-                        .font(Typography.labelMedium)
+                        .font(.system(size: 13, weight: .medium))
                         .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.accentRed)
+                        .padding(.vertical, 7)
+                        .background(Color.accentPrimary)
                         .foregroundStyle(.white)
-                        .clipShape(Capsule())
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(20)
-        .padding(20)
-        .background(Color.bgCard)
-        .cornerRadius(16)
-        .cornerRadius(16)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(isGranted ? Color.green.opacity(0.3) : Color.borderCard, lineWidth: 1)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.bgCard)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(isGranted ? Color.accentSuccess.opacity(0.15) : Color.border.opacity(0.6), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 2)
+        .shadow(color: Color.black.opacity(0.02), radius: 1, x: 0, y: 1)
     }
 }
 

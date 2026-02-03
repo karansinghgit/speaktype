@@ -29,10 +29,10 @@ class ClipboardService {
     
     // Wrap text with promotional message for free users
     private func wrapTextIfNeeded(_ text: String) -> String {
-        // Skip if user has Pro license
-        if licenseManager.isPro {
+        // License check disabled - always allow unwrapped text
+        // if licenseManager.isPro {
             return text
-        }
+        // }
         
         // Add promotional text above and below
         let promotionalText = "Upgrade to a lifetime subscription at speaktype.io"

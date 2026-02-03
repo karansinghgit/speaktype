@@ -8,7 +8,7 @@ struct DashboardView: View {
     @Binding var selection: SidebarItem?
     @StateObject private var historyService = HistoryService.shared
     @StateObject private var audioRecorder = AudioRecordingService()
-    @State private var whisperService = WhisperService()
+    private var whisperService: WhisperService { WhisperService.shared }
     @State private var leftColumnHeight: CGFloat = 0
 
     
@@ -70,10 +70,10 @@ struct DashboardView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // Trial Banner
-                if !licenseManager.isPro {
-                    TrialBanner(status: trialManager.trialStatus)
-                }
+                // Trial Banner - Hidden (logic kept for future use)
+                // if !licenseManager.isPro {
+                //     TrialBanner(status: trialManager.trialStatus)
+                // }
                 
                 // Two horizontal boxes: Stats + Activity Chart
                 HStack(alignment: .top, spacing: 20) {

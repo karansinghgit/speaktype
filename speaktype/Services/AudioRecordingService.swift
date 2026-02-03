@@ -91,9 +91,21 @@ class AudioRecordingService: NSObject, ObservableObject {
             audioOutput?.setSampleBufferDelegate(self, queue: audioQueue)
         }
         
-        // Start running immediately to keep warm
+        // Don't start session here - only start when recording begins
+        // This prevents continuous CPU usage when idle
+    }
+    
+    /// Pre-warm the capture session so first recording starts instantly
+    func prewarmSession() {
+        if captureSession == nil { setupSession() }
+        
         audioQueue.async {
-            self.captureSession?.startRunning()
+            guard let session = self.captureSession, !session.isRunning else { return }
+            print("🎤 Pre-warming audio capture session...")
+            session.startRunning()
+            // Give it a moment to fully initialize
+            Thread.sleep(forTimeInterval: 0.3)
+            print("🎤 Audio capture session ready")
         }
     }
     
@@ -108,15 +120,30 @@ class AudioRecordingService: NSObject, ObservableObject {
         
         // 2. Wrap setup in a Task so stopRecording can wait for it
         setupTask = Task { @MainActor in
+            // Ensure capture session is running before setting up the writer
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                audioQueue.async {
+                    if self.captureSession?.isRunning != true {
+                        print("🎤 Starting capture session...")
+                        self.captureSession?.startRunning()
+                        // Wait for session to be ready
+                        Thread.sleep(forTimeInterval: 0.3)
+                        print("🎤 Capture session started")
+                    }
+                    continuation.resume()
+                }
+            }
+            
             let url = getRecordingsDirectory().appendingPathComponent("recording-\(Date().timeIntervalSince1970).wav")
             currentFileURL = url
             
             do {
                 assetWriter = try AVAssetWriter(outputURL: url, fileType: .wav)
                 
+                // Use standard WAV format compatible with WhisperKit
                 let settings: [String: Any] = [
                     AVFormatIDKey: kAudioFormatLinearPCM,
-                    AVSampleRateKey: 16000,
+                    AVSampleRateKey: 16000.0,
                     AVNumberOfChannelsKey: 1,
                     AVLinearPCMBitDepthKey: 16,
                     AVLinearPCMIsFloatKey: false,
@@ -133,8 +160,6 @@ class AudioRecordingService: NSObject, ObservableObject {
                 
                 assetWriter?.startWriting()
                 isSessionStarted = false
-                
-                // captureSession is already running (warm start)
                 
                 DispatchQueue.main.async {
                     self.audioLevel = 0.0
@@ -164,7 +189,9 @@ class AudioRecordingService: NSObject, ObservableObject {
         
         return await withCheckedContinuation { continuation in
             audioQueue.async {
-                // Do NOT stop captureSession, keep it warm
+                // Stop the capture session to save CPU when not recording
+                self.captureSession?.stopRunning()
+                
                 self.assetWriterInput?.markAsFinished()
                 self.assetWriter?.finishWriting {
                     print("Recording finished saving to \(url.path)")
@@ -207,10 +234,12 @@ class AudioRecordingService: NSObject, ObservableObject {
 
 extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        // Always process audio level for visualization, regardless of recording status
+        // Only process audio when actually recording (saves CPU)
+        guard isRecording else { return }
+        
         processAudioLevel(from: sampleBuffer)
         
-        guard isRecording, let writer = assetWriter, let input = assetWriterInput else { return }
+        guard let writer = assetWriter, let input = assetWriterInput else { return }
         
         if writer.status == .writing {
             if !isSessionStarted {

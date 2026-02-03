@@ -38,7 +38,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func setupHotkeyMonitoring() {
         // Get selected hotkey from UserDefaults (default to Fn)
-        let selectedHotkey = getSelectedHotkey()
+        _ = getSelectedHotkey()
         
         // Add global monitor for hotkey events
         NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in

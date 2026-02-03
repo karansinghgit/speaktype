@@ -64,11 +64,39 @@ struct AIModel: Identifiable, Equatable {
             speed: 9.5,  // Fastest
             accuracy: 6.0, // ~12% WER
             expectedSizeBytes: 30_000_000
+        ),
+        
+        // MARK: - Parakeet Models (NVIDIA NeMo)
+        // Note: Parakeet models require NeMo toolkit support, not WhisperKit
+        // These models will appear in the UI but need separate implementation
+        AIModel(
+            name: "Parakeet TDT 0.6B V3",
+            variant: "nvidia/parakeet-tdt-0.6b-v3",
+            details: "Multilingual • 25 European Languages • Enhanced Performance",
+            rating: "Excellent",
+            size: "~600 MB",
+            speed: 8.0,
+            accuracy: 9.5,
+            expectedSizeBytes: 600_000_000
+        ),
+        AIModel(
+            name: "Parakeet TDT 0.6B V2",
+            variant: "nvidia/parakeet-tdt-0.6b-v2",
+            details: "English • High Accuracy • Timestamps • Punctuation",
+            rating: "Excellent",
+            size: "~600 MB",
+            speed: 7.5,
+            accuracy: 9.4,
+            expectedSizeBytes: 600_000_000
         )
     ]
     
     /// Returns the expected minimum size for a given model variant
-    static func expectedSize(for variant: String) -> Int64 {
+    nonisolated static func expectedSize(for variant: String) -> Int64 {
         return availableModels.first(where: { $0.variant == variant })?.expectedSizeBytes ?? 50_000_000
+    }
+    
+    var isParakeet: Bool {
+        return variant.lowercased().contains("parakeet") || variant.lowercased().contains("nemo")
     }
 }

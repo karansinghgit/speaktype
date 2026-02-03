@@ -1,5 +1,5 @@
 {
-  "originHash" : "9a97c8073af9b07b8c46128893fdd0b6f4eb090da4c6175aa09be32df1ea140f",
+  "originHash" : "a214be00c9fe19e9dd85e7e874c044653a0aeca50283ac2890618cc1204028f7",
   "pins" : [
     {
       "identity" : "keyboardshortcuts",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "1aef85578fdd4f9eaeeb8d53b7b4fc31bf08fe27",
         "version" : "2.4.0"
+      }
+    },
+    {
+      "identity" : "pythonkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pvieito/PythonKit.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "d030b5193d1e4e770156deb27865773b64c5695f"
       }
     },
     {

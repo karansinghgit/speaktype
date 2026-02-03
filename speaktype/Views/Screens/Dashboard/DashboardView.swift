@@ -180,7 +180,7 @@ struct DashboardView: View {
                 }
             }
         }
-        .onChange(of: selectedModel) { newValue in
+        .onChange(of: selectedModel) { _, newValue in
             Task {
                 try? await whisperService.loadModel(variant: newValue)
             }

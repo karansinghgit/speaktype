@@ -7,7 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1C1FCB162F2FB92300998529 /* CoreML.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C1FCB152F2FB91900998529 /* CoreML.framework */; };
 		1C547F2B2F0E7DC0008120A6 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1C547F2A2F0E7DC0008120A6 /* WhisperKit */; };
+		1CBAE9C92F2FD38200F58713 /* PythonKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1CBAE9C82F2FD38200F58713 /* PythonKit */; };
 		1CE4CB3F2F0EF6AF00C01C62 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 1CE4CB3E2F0EF6AF00C01C62 /* KeyboardShortcuts */; };
 		1CE4CB412F0EF86B00C01C62 /* whisperkit-cli in Frameworks */ = {isa = PBXBuildFile; productRef = 1CE4CB402F0EF86B00C01C62 /* whisperkit-cli */; };
 /* End PBXBuildFile section */
@@ -29,7 +31,22 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		1C1FCB132F2FB6FF00998529 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		1C1FCB142F2FB91900998529 /* libswiftCoreML.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libswiftCoreML.tbd; path = usr/lib/swift/libswiftCoreML.tbd; sourceTree = SDKROOT; };
+		1C1FCB152F2FB91900998529 /* CoreML.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreML.framework; path = System/Library/Frameworks/CoreML.framework; sourceTree = SDKROOT; };
 		362947222F0DBC4E00BE895D /* speaktype.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = speaktype.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3629472F2F0DBC5100BE895D /* speaktypeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = speaktypeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		362947392F0DBC5100BE895D /* speaktypeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = speaktypeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -73,7 +90,9 @@
 			files = (
 				1C547F2B2F0E7DC0008120A6 /* WhisperKit in Frameworks */,
 				1CE4CB3F2F0EF6AF00C01C62 /* KeyboardShortcuts in Frameworks */,
+				1C1FCB162F2FB92300998529 /* CoreML.framework in Frameworks */,
 				1CE4CB412F0EF86B00C01C62 /* whisperkit-cli in Frameworks */,
+				1CBAE9C92F2FD38200F58713 /* PythonKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -97,6 +116,8 @@
 		1C547F292F0E7DC0008120A6 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				1C1FCB152F2FB91900998529 /* CoreML.framework */,
+				1C1FCB142F2FB91900998529 /* libswiftCoreML.tbd */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -132,6 +153,7 @@
 				3629471E2F0DBC4E00BE895D /* Sources */,
 				3629471F2F0DBC4E00BE895D /* Frameworks */,
 				362947202F0DBC4E00BE895D /* Resources */,
+				1C1FCB132F2FB6FF00998529 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -145,6 +167,7 @@
 				1C547F2A2F0E7DC0008120A6 /* WhisperKit */,
 				1CE4CB3E2F0EF6AF00C01C62 /* KeyboardShortcuts */,
 				1CE4CB402F0EF86B00C01C62 /* whisperkit-cli */,
+				1CBAE9C82F2FD38200F58713 /* PythonKit */,
 			);
 			productName = speaktype;
 			productReference = 362947222F0DBC4E00BE895D /* speaktype.app */;
@@ -231,6 +254,7 @@
 			packageReferences = (
 				1C547F222F0E7D07008120A6 /* XCRemoteSwiftPackageReference "WhisperKit" */,
 				1CE4CB3D2F0EF6AF00C01C62 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
+				1CBAE9C72F2FD38200F58713 /* XCRemoteSwiftPackageReference "PythonKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 362947232F0DBC4E00BE895D /* Products */;
@@ -614,6 +638,14 @@
 				version = 0.9.4;
 			};
 		};
+		1CBAE9C72F2FD38200F58713 /* XCRemoteSwiftPackageReference "PythonKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pvieito/PythonKit.git";
+			requirement = {
+				branch = master;
+				kind = branch;
+			};
+		};
 		1CE4CB3D2F0EF6AF00C01C62 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sindresorhus/KeyboardShortcuts";
@@ -629,6 +661,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1C547F222F0E7D07008120A6 /* XCRemoteSwiftPackageReference "WhisperKit" */;
 			productName = WhisperKit;
+		};
+		1CBAE9C82F2FD38200F58713 /* PythonKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1CBAE9C72F2FD38200F58713 /* XCRemoteSwiftPackageReference "PythonKit" */;
+			productName = PythonKit;
 		};
 		1CE4CB3E2F0EF6AF00C01C62 /* KeyboardShortcuts */ = {
 			isa = XCSwiftPackageProductDependency;

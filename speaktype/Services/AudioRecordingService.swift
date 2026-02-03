@@ -56,17 +56,21 @@ class AudioRecordingService: NSObject, ObservableObject {
     }
     
     func fetchAvailableDevices() {
-        let discoverySession = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.microphone],
-            mediaType: .audio,
-            position: .unspecified
-        )
-        DispatchQueue.main.async {
-            self.availableDevices = discoverySession.devices.filter { device in
+        DispatchQueue.global(qos: .userInitiated).async {
+            let discoverySession = AVCaptureDevice.DiscoverySession(
+                deviceTypes: [.microphone],
+                mediaType: .audio,
+                position: .unspecified
+            )
+            let devices = discoverySession.devices.filter { device in
                 !device.localizedName.localizedCaseInsensitiveContains("Microsoft Teams")
             }
-            if self.selectedDeviceId == nil, let first = self.availableDevices.first {
-                self.selectedDeviceId = first.uniqueID
+            
+            DispatchQueue.main.async {
+                self.availableDevices = devices
+                if self.selectedDeviceId == nil, let first = self.availableDevices.first {
+                    self.selectedDeviceId = first.uniqueID
+                }
             }
         }
     }

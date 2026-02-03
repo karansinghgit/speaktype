@@ -31,7 +31,7 @@ struct WaveformView: View {
         .onAppear {
             generateSamples()
         }
-        .onChange(of: audioURL) { _ in
+        .onChange(of: audioURL) { _, _ in
             generateSamples()
         }
     }

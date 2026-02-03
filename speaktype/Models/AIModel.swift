@@ -9,6 +9,7 @@ struct AIModel: Identifiable, Equatable {
     let size: String
     let speed: Double // Score relative to 10
     let accuracy: Double // Score relative to 10
+    let expectedSizeBytes: Int64 // Minimum expected size in bytes for validation
     
     static let availableModels: [AIModel] = [
         AIModel(
@@ -18,7 +19,8 @@ struct AIModel: Identifiable, Equatable {
             rating: "Excellent",
             size: "1.6 GB",
             speed: 8.5,
-            accuracy: 9.7
+            accuracy: 9.7,
+            expectedSizeBytes: 1_400_000_000 // ~1.4GB minimum
         ),
         AIModel(
             name: "Whisper Medium",
@@ -27,7 +29,8 @@ struct AIModel: Identifiable, Equatable {
             rating: "Great",
             size: "1.5 GB",
             speed: 5.0,
-            accuracy: 9.4
+            accuracy: 9.4,
+            expectedSizeBytes: 1_300_000_000 // ~1.3GB minimum
         ),
         AIModel(
             name: "Whisper Base",
@@ -36,7 +39,8 @@ struct AIModel: Identifiable, Equatable {
             rating: "Standard",
             size: "74 MB",
             speed: 9.0,
-            accuracy: 8.0
+            accuracy: 8.0,
+            expectedSizeBytes: 70_000_000 // ~70MB minimum
         ),
         AIModel(
             name: "Whisper Small",
@@ -45,7 +49,8 @@ struct AIModel: Identifiable, Equatable {
             rating: "Good",
             size: "244 MB",
             speed: 7.5,
-            accuracy: 8.9
+            accuracy: 8.9,
+            expectedSizeBytes: 200_000_000 // ~200MB minimum
         ),
         AIModel(
             name: "Whisper Tiny",
@@ -54,7 +59,13 @@ struct AIModel: Identifiable, Equatable {
             rating: "Basic",
             size: "39 MB",
             speed: 9.8,
-            accuracy: 7.2
+            accuracy: 7.2,
+            expectedSizeBytes: 30_000_000 // ~30MB minimum
         )
     ]
+    
+    /// Returns the expected minimum size for a given model variant
+    static func expectedSize(for variant: String) -> Int64 {
+        return availableModels.first(where: { $0.variant == variant })?.expectedSizeBytes ?? 50_000_000
+    }
 }

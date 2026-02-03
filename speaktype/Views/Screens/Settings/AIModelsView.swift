@@ -5,13 +5,13 @@ struct AIModelsView: View {
     // MARK: - Properties
     
     @StateObject private var downloadService = ModelDownloadService.shared
-    @AppStorage("selectedModelVariant") private var selectedModel: String = "openai_whisper-base"
+    @AppStorage("selectedModelVariant") private var selectedModel: String = ""
     @State private var models = AIModel.availableModels
     
     // MARK: - Computed Properties
     
     var selectedModelName: String {
-        models.first(where: { $0.variant == selectedModel })?.name ?? "Unknown Model"
+        models.first(where: { $0.variant == selectedModel })?.name ?? "No model downloaded yet"
     }
     
     // MARK: - Body
@@ -28,6 +28,28 @@ struct AIModelsView: View {
             .padding(.bottom, 24)
         }
         .background(Color.clear)
+        .onAppear {
+            // Refresh model download status when view appears
+            Task {
+                await downloadService.refreshDownloadedModels()
+                
+                // Auto-fallback: If selected model isn't downloaded, switch to first available
+                if !selectedModel.isEmpty {
+                    let isSelectedModelDownloaded = downloadService.downloadProgress[selectedModel] ?? 0.0 >= 1.0
+                    
+                    if !isSelectedModelDownloaded {
+                        // Find first downloaded model
+                        if let firstDownloaded = downloadService.downloadProgress.first(where: { $0.value >= 1.0 })?.key {
+                            print("⚠️ Selected model '\(selectedModel)' not found. Auto-switching to '\(firstDownloaded)'")
+                            selectedModel = firstDownloaded
+                        } else {
+                            print("⚠️ No models downloaded. Please download a model to use the app.")
+                            selectedModel = "" // Clear invalid selection
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // MARK: - Subviews

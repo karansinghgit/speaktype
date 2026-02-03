@@ -53,6 +53,8 @@ jobs:
 
       - name: Locate App & Create DMG
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          DMG_NAME="SpeakType-${VERSION}.dmg"
           # Find the app anywhere in the build folder
           APP_PATH=$(find build -name "speaktype.app" | head -n 1)
 
@@ -82,11 +84,11 @@ jobs:
             --icon "speaktype.app" 180 170 \
             --hide-extension "speaktype.app" \
             --app-drop-link 480 170 \
-            "SpeakType.dmg" \
+            "$DMG_NAME" \
             "$APP_PATH"
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: SpeakType.dmg
+          files: SpeakType-${{ github.ref_name#v }}.dmg
           generate_release_notes: true

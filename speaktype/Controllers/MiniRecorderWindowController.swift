@@ -108,13 +108,13 @@ class MiniRecorderWindowController: NSObject {
                 self.panel?.orderOut(nil)
             }
             
-            // 3. Check accessibility and show alert if needed
+            // 3. Check accessibility - if not granted, just copy to clipboard silently
             let accessibilityTrusted = ClipboardService.shared.isAccessibilityTrusted
             
             if !accessibilityTrusted {
-                await MainActor.run {
-                    self.showAccessibilityAlert()
-                }
+                // Text is already copied to clipboard, just return
+                // Don't show annoying popup - user can paste manually with Cmd+V
+                print("⚠️ Accessibility not granted - text copied to clipboard, user can paste with Cmd+V")
                 return
             }
             

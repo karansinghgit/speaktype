@@ -144,7 +144,7 @@ struct MiniRecorderView: View {
                 .transition(.opacity)
             }
         }
-        .frame(width: 260, height: 50)
+        .frame(width: 240, height: 50)
         .clipShape(RoundedRectangle(cornerRadius: 25))
         .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 2)
         .contextMenu {

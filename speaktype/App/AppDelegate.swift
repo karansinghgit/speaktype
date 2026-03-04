@@ -8,6 +8,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowWillClose),
+            name: NSWindow.willCloseNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidBecomeKey),
+            name: NSWindow.didBecomeKeyNotification,
+            object: nil
+        )
+
         miniRecorderController = MiniRecorderWindowController()
 
         // Setup dynamic hotkey monitoring based on user selection
@@ -21,6 +35,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.showUpdateWindow()
             }
             .store(in: &cancellables)
+
+        NSApp.activate()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -176,6 +192,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc private func windowDidBecomeKey(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow,
+              window.styleMask.contains(.titled) else { return }
+        NSApp.setActivationPolicy(.regular)
+    }
+
+    @objc private func windowWillClose(_ notification: Notification) {
+        DispatchQueue.main.async {
+            let hasVisibleWindow = NSApp.windows.contains {
+                $0.isVisible && $0.styleMask.contains(.titled)
+            }
+            if !hasVisibleWindow {
+                NSApp.setActivationPolicy(.accessory)
+            }
+        }
+    }
+
     private func showUpdateWindow() {
         guard let update = UpdateService.shared.availableUpdate else { return }
 
@@ -189,6 +222,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
         window.isMovableByWindowBackground = true
         window.makeKeyAndOrderFront(nil)
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate()
     }
 }

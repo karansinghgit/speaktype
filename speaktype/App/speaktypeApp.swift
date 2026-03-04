@@ -81,11 +81,8 @@ struct speaktypeApp: App {
         // Menu Bar Extra (Always running listener)
         MenuBarExtra("SpeakType", systemImage: "mic.fill", isInserted: $showMenuBarIcon) {
             Button("Open Dashboard") {
-                // Ensure we open the main dashboard via consistent ID or URL
-                // Using URL forces the specific window group to handle it
-                if let url = URL(string: "speaktype://open") {
-                    NSWorkspace.shared.open(url)
-                }
+                openWindow(id: "main-dashboard")
+                NSApp.activate()
             }
             Divider()
             Button("Quit") {

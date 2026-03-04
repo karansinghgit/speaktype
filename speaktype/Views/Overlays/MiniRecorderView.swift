@@ -17,6 +17,7 @@ struct MiniRecorderView: View {
 
     @AppStorage("selectedModelVariant") private var selectedModel: String = ""
     @AppStorage("recordingMode") private var recordingMode: Int = 0
+    @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
 
     private var isAccessibilityEnabled: Bool {
         AXIsProcessTrusted()
@@ -432,7 +433,7 @@ struct MiniRecorderView: View {
             if !cancelCommit {
                 await MainActor.run { statusMessage = "Transcribing..." }
             }
-            let text = try await whisperService.transcribe(audioFile: url)
+            let text = try await whisperService.transcribe(audioFile: url, language: transcriptionLanguage)
             debugLog("Transcription result: \(text.prefix(50))...")
 
             guard !text.isEmpty else {

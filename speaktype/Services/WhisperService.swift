@@ -124,7 +124,7 @@ class WhisperService {
         }
     }
 
-    func transcribe(audioFile: URL) async throws -> String {
+    func transcribe(audioFile: URL, language: String = "auto") async throws -> String {
         guard let pipe = pipe, isInitialized else {
             throw TranscriptionError.notInitialized
         }
@@ -139,7 +139,11 @@ class WhisperService {
         print("Starting transcription for: \(audioFile.lastPathComponent)")
 
         do {
-            let results = try await pipe.transcribe(audioPath: audioFile.path)
+            var options = DecodingOptions()
+            options.task = .transcribe
+            options.language = (language == "auto") ? nil : language
+
+            let results = try await pipe.transcribe(audioPath: audioFile.path, decodeOptions: options)
             let text = results.map { $0.text }.joined(separator: " ").trimmingCharacters(
                 in: .whitespacesAndNewlines)
 

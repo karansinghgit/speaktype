@@ -16,6 +16,7 @@ struct DashboardView: View {
     @EnvironmentObject var licenseManager: LicenseManager
 
     @AppStorage("selectedModelVariant") private var selectedModel: String = "openai_whisper-base"
+    @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
     @State private var showFileImporter = false
     @State private var isTranscribing = false
     @State private var transcriptionStatus = ""
@@ -248,7 +249,7 @@ struct DashboardView: View {
             do {
                 if !whisperService.isInitialized { try? await whisperService.initialize() }
 
-                let text = try await whisperService.transcribe(audioFile: url)
+                let text = try await whisperService.transcribe(audioFile: url, language: transcriptionLanguage)
                 let duration = try await getAudioDuration(url: url)
                 let modelName =
                     AIModel.availableModels.first(where: { $0.variant == selectedModel })?.name

@@ -91,6 +91,18 @@ struct GeneralSettingsTab: View {
     @AppStorage("recordingMode") private var recordingMode: Int = 0  // 0: Hold to record, 1: Toggle
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon: Bool = true
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
+    @AppStorage("recentTranscriptionLanguages") private var recentLanguagesString: String = ""
+
+    private var recentLanguageCodes: [String] {
+        recentLanguagesString.split(separator: ",").map(String.init).filter { !$0.isEmpty }
+    }
+
+    private func updateRecentLanguages(code: String) {
+        guard code != "auto" else { return }
+        var recents = recentLanguageCodes.filter { $0 != code }
+        recents.insert(code, at: 0)
+        recentLanguagesString = recents.prefix(5).joined(separator: ",")
+    }
 
     @StateObject private var updateService = UpdateService.shared
     @EnvironmentObject var licenseManager: LicenseManager
@@ -211,9 +223,23 @@ struct GeneralSettingsTab: View {
                         Spacer()
                         Menu {
                             Button("Auto-detect") { transcriptionLanguage = "auto" }
+                            if !recentLanguageCodes.isEmpty {
+                                Divider()
+                                ForEach(recentLanguageCodes, id: \.self) { code in
+                                    if let lang = Self.whisperLanguages.first(where: { $0.code == code }) {
+                                        Button(lang.name) {
+                                            transcriptionLanguage = code
+                                            updateRecentLanguages(code: code)
+                                        }
+                                    }
+                                }
+                            }
                             Divider()
                             ForEach(Self.whisperLanguages, id: \.code) { lang in
-                                Button(lang.name) { transcriptionLanguage = lang.code }
+                                Button(lang.name) {
+                                    transcriptionLanguage = lang.code
+                                    updateRecentLanguages(code: lang.code)
+                                }
                             }
                         } label: {
                             HStack(spacing: 6) {

@@ -18,6 +18,28 @@ struct MiniRecorderView: View {
     @AppStorage("selectedModelVariant") private var selectedModel: String = ""
     @AppStorage("recordingMode") private var recordingMode: Int = 0
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
+    @AppStorage("recentTranscriptionLanguages") private var recentLanguagesString: String = ""
+
+    private var recentLanguageCodes: [String] {
+        recentLanguagesString.split(separator: ",").map(String.init).filter { !$0.isEmpty }
+    }
+
+    private func updateRecentLanguages(code: String) {
+        guard code != "auto" else { return }
+        var recents = recentLanguageCodes.filter { $0 != code }
+        recents.insert(code, at: 0)
+        recentLanguagesString = recents.prefix(5).joined(separator: ",")
+    }
+
+    private func setLanguage(_ code: String) {
+        transcriptionLanguage = code
+        updateRecentLanguages(code: code)
+    }
+
+    private var currentLanguageLabel: String {
+        if transcriptionLanguage == "auto" { return "auto" }
+        return transcriptionLanguage.uppercased()
+    }
 
     private var isAccessibilityEnabled: Bool {
         AXIsProcessTrusted()
@@ -76,7 +98,7 @@ struct MiniRecorderView: View {
 
                     // Waveform - bar visualizer style
                     HStack(spacing: 3) {
-                        ForEach(0..<20) { index in
+                        ForEach(0..<15) { index in
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(Color.white.opacity(0.7))
                                 .frame(width: 3, height: barHeight(for: index))
@@ -85,6 +107,31 @@ struct MiniRecorderView: View {
                         }
                     }
                     .frame(height: 30)
+
+                    // Language quick picker
+                    Menu {
+                        Button("Auto") { setLanguage("auto") }
+                        if !recentLanguageCodes.isEmpty {
+                            Divider()
+                            ForEach(recentLanguageCodes, id: \.self) { code in
+                                if let lang = GeneralSettingsTab.whisperLanguages.first(where: { $0.code == code }) {
+                                    Button(lang.name) { setLanguage(code) }
+                                }
+                            }
+                            Divider()
+                            Button("Clear recents") { recentLanguagesString = "" }
+                        }
+                    } label: {
+                        Text(currentLanguageLabel)
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.75))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 3)
+                            .background(Color.white.opacity(0.15))
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
 
                     // Recording mode indicator
                     Image(systemName: recordingMode == 0 ? "hand.tap.fill" : "repeat.1")
@@ -97,7 +144,7 @@ struct MiniRecorderView: View {
                 .transition(.opacity)
             }
         }
-        .frame(width: 220, height: 50)
+        .frame(width: 260, height: 50)
         .clipShape(RoundedRectangle(cornerRadius: 25))
         .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 2)
         .contextMenu {

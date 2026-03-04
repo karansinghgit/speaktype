@@ -26,7 +26,7 @@ class MiniRecorderWindowController: NSObject {
             // Position above dock with fixed width (panel width should be 220)
             if let screen = NSScreen.main {
                 let visibleFrame = screen.visibleFrame
-                let windowWidth: CGFloat = 220  // Fixed width from setupPanel
+                let windowWidth: CGFloat = 260  // Fixed width from setupPanel
                 let x = visibleFrame.midX - (windowWidth / 2)
                 let y = visibleFrame.minY + 50  // 50px padding above dock
                 panel.setFrameOrigin(NSPoint(x: x, y: y))
@@ -71,7 +71,7 @@ class MiniRecorderWindowController: NSObject {
             rootView: AnyView(recorderView.background(Color.clear)))
 
         let p = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 220, height: 50),
+            contentRect: NSRect(x: 0, y: 0, width: 260, height: 50),
             styleMask: [.nonactivatingPanel, .fullSizeContentView, .borderless],
             backing: .buffered,
             defer: false

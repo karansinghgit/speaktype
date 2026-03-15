@@ -40,6 +40,52 @@ class AudioRecordingService: NSObject, ObservableObject {
 
     private let audioQueue = DispatchQueue(label: "com.speaktype.audioQueue")
 
+    private func validatedAudioFileURL(
+        at url: URL,
+        writer: AVAssetWriter?,
+        label: String
+    ) -> URL? {
+        if let writer {
+            switch writer.status {
+            case .completed:
+                break
+            case .failed:
+                AppLogger.error(
+                    "\(label) writer failed",
+                    error: writer.error,
+                    category: AppLogger.audio
+                )
+                return nil
+            case .cancelled:
+                AppLogger.warning("\(label) writer was cancelled", category: AppLogger.audio)
+                return nil
+            default:
+                AppLogger.warning(
+                    "\(label) writer finished with status \(String(describing: writer.status.rawValue))",
+                    category: AppLogger.audio
+                )
+                return nil
+            }
+        }
+
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            AppLogger.warning("\(label) file missing after finishWriting", category: AppLogger.audio)
+            return nil
+        }
+
+        do {
+            _ = try AVAudioFile(forReading: url)
+            return url
+        } catch {
+            AppLogger.error(
+                "\(label) file is unreadable after finishWriting",
+                error: error,
+                category: AppLogger.audio
+            )
+            return nil
+        }
+    }
+
     private func resetMainWriterState() {
         assetWriter = nil
         assetWriterInput = nil
@@ -245,6 +291,7 @@ class AudioRecordingService: NSObject, ObservableObject {
 
                 // --- Finalize the last in-flight chunk ---
                 let finishGroup = DispatchGroup()
+                var finalizedRecordingURL: URL?
 
                 if let lastChunkInput = self.chunkAssetWriterInput,
                     let lastChunkWriter = self.chunkAssetWriter,
@@ -256,9 +303,19 @@ class AudioRecordingService: NSObject, ObservableObject {
                     finishGroup.enter()
                     lastChunkInput.markAsFinished()
                     lastChunkWriter.finishWriting {
-                        print("🔪 Final chunk saved: \(lastChunkURL.lastPathComponent)")
-                        self.chunkPublisher.send(lastChunkURL)
-                        finishGroup.leave()
+                        self.audioQueue.async {
+                            if let validChunkURL = self.validatedAudioFileURL(
+                                at: lastChunkURL,
+                                writer: lastChunkWriter,
+                                label: "Final chunk"
+                            ) {
+                                print("🔪 Final chunk saved: \(validChunkURL.lastPathComponent)")
+                                self.chunkPublisher.send(validChunkURL)
+                            } else {
+                                try? FileManager.default.removeItem(at: lastChunkURL)
+                            }
+                            finishGroup.leave()
+                        }
                     }
                 }
 
@@ -271,14 +328,25 @@ class AudioRecordingService: NSObject, ObservableObject {
                     finishGroup.enter()
                     writerInput?.markAsFinished()
                     writer.finishWriting {
-                        print("Recording finished saving to \(url.path)")
-                        finishGroup.leave()
+                        self.audioQueue.async {
+                            finalizedRecordingURL = self.validatedAudioFileURL(
+                                at: url,
+                                writer: writer,
+                                label: "Recording"
+                            )
+                            if let finalizedRecordingURL {
+                                print("Recording finished saving to \(finalizedRecordingURL.path)")
+                            } else {
+                                try? FileManager.default.removeItem(at: url)
+                            }
+                            finishGroup.leave()
+                        }
                     }
                 }
 
                 finishGroup.notify(queue: self.audioQueue) {
                     self.isStopping = false
-                    continuation.resume(returning: url)
+                    continuation.resume(returning: finalizedRecordingURL)
                 }
             }
         }

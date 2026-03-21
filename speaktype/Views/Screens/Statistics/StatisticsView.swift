@@ -271,12 +271,9 @@ struct StatisticsView: View {
         let calendar = Calendar.current
         var dailyCounts: [Date: Int] = [:]
 
-        for item in historyService.items {
-            guard item.date >= startDate else { continue }
-            let day = calendar.startOfDay(for: item.date)
-            let wordCount = item.transcript.components(separatedBy: .whitespacesAndNewlines)
-                .filter { !$0.isEmpty }.count
-            dailyCounts[day, default: 0] += wordCount
+        for entry in historyService.statsEntries(since: startDate) {
+            let day = calendar.startOfDay(for: entry.date)
+            dailyCounts[day, default: 0] += entry.wordCount
         }
 
         var result: [DailyWordCount] = []
@@ -296,16 +293,10 @@ struct StatisticsView: View {
         var monthlyCounts: [String: Int] = [:]  // Key: "yyyy-MM"
 
         // Group items by month
-        for item in historyService.items {
-            guard item.date >= startDate else { continue }
-
-            let components = calendar.dateComponents([.year, .month], from: item.date)
+        for entry in historyService.statsEntries(since: startDate) {
+            let components = calendar.dateComponents([.year, .month], from: entry.date)
             let key = "\(components.year!)-\(components.month!)"
-
-            let wordCount = item.transcript.components(separatedBy: .whitespacesAndNewlines)
-                .filter { !$0.isEmpty }.count
-
-            monthlyCounts[key, default: 0] += wordCount
+            monthlyCounts[key, default: 0] += entry.wordCount
         }
 
         // Generate last 12 months buckets
@@ -355,7 +346,7 @@ struct StatisticsView: View {
             startDate = calendar.date(byAdding: .day, value: -364, to: now)!
         }
 
-        return historyService.items.filter { $0.date >= startDate }.count
+        return historyService.transcriptionCount(since: startDate)
     }
 
     private func formattedDuration(for period: StatisticsPeriod) -> String {
@@ -372,9 +363,7 @@ struct StatisticsView: View {
             startDate = calendar.date(byAdding: .day, value: -364, to: now)!
         }
 
-        var totalSeconds = historyService.items
-            .filter { $0.date >= startDate }
-            .reduce(0.0) { $0 + $1.duration }
+        var totalSeconds = historyService.totalDuration(since: startDate)
 
         // Add current recording duration if active
         if audioRecorder.isRecording, let recordingStart = audioRecorder.recordingStartTime {

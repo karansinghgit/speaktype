@@ -23,13 +23,13 @@ struct DashboardView: View {
 
     // Computed Metrics
     var transcriptionCountToday: Int {
-        historyService.items.filter { Calendar.current.isDateInToday($0.date) }.count
+        historyService.transcriptionCount(
+            since: Calendar.current.startOfDay(for: Date())
+        )
     }
 
     var totalWordsTranscribed: Int {
-        historyService.items.reduce(0) { count, item in
-            count + item.transcript.components(separatedBy: .whitespacesAndNewlines).count
-        }
+        historyService.totalWordCount()
     }
 
     var timeSavedMinutes: Int {
@@ -40,7 +40,7 @@ struct DashboardView: View {
     }
 
     var totalDurationSeconds: TimeInterval {
-        historyService.items.reduce(0) { $0 + $1.duration }
+        historyService.totalDuration()
     }
 
     var timeBasedGreeting: String {
@@ -59,7 +59,8 @@ struct DashboardView: View {
         // Last 7 days including today
         return (0..<7).reversed().map { i in
             let date = calendar.date(byAdding: .day, value: -i, to: today) ?? today
-            let count = historyService.items.filter { calendar.isDate($0.date, inSameDayAs: date) }
+            let count = historyService.statsEntries(since: calendar.startOfDay(for: date))
+                .filter { calendar.isDate($0.date, inSameDayAs: date) }
                 .count
             let formatter = DateFormatter()
             formatter.dateFormat = "EEE"  // Mon, Tue, Wed
@@ -84,7 +85,7 @@ struct DashboardView: View {
                         wordCount: totalWordsTranscribed,
                         timeSaved: timeSavedMinutes,
                         todayCount: transcriptionCountToday,
-                        allTimeCount: historyService.items.count
+                        allTimeCount: historyService.transcriptionCount()
                     )
 
                     // Right: Activity Chart Card

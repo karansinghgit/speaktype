@@ -123,7 +123,7 @@ struct HistoryView: View {
                 historyService.clearAll()
             }
         } message: {
-            Text("This action cannot be undone.")
+            Text("This removes your saved transcripts, but keeps your statistics history.")
         }
     }
     

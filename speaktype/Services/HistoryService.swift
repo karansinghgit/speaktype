@@ -2,6 +2,13 @@ import Foundation
 import Combine
 import SwiftUI // For IndexSet operations if needed, though Foundation usually covers it, but error says missing import.
 
+struct HistoryStatsEntry: Identifiable, Codable, Hashable {
+    let id: UUID
+    let date: Date
+    let wordCount: Int
+    let duration: TimeInterval
+}
+
 struct HistoryItem: Identifiable, Codable, Hashable {
     let id: UUID
     let date: Date
@@ -24,10 +31,13 @@ class HistoryService: ObservableObject {
     static let shared = HistoryService()
     
     @Published var items: [HistoryItem] = []
+    @Published private(set) var statsEntries: [HistoryStatsEntry] = []
     
     private let saveKey = "history_items"
+    private let statsSaveKey = "history_stats_entries"
     
     private init() {
+        loadStats()
         loadHistory()
     }
     
@@ -35,17 +45,30 @@ class HistoryService: ObservableObject {
         let normalizedTranscript = WhisperService.normalizedTranscription(from: transcript)
         guard !normalizedTranscript.isEmpty else { return }
 
+        let timestamp = Date()
+        let wordCount = normalizedTranscript.components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .count
+
         let newItem = HistoryItem(
             id: UUID(),
-            date: Date(),
+            date: timestamp,
             transcript: normalizedTranscript,
             duration: duration,
             audioFileURL: audioFileURL,
             modelUsed: modelUsed,
             transcriptionTime: transcriptionTime
         )
+        let statsEntry = HistoryStatsEntry(
+            id: newItem.id,
+            date: timestamp,
+            wordCount: wordCount,
+            duration: duration
+        )
         items.insert(newItem, at: 0) // Newest first
+        statsEntries.insert(statsEntry, at: 0)
         saveHistory()
+        saveStats()
     }
     
     func deleteItem(at offsets: IndexSet) {
@@ -62,10 +85,39 @@ class HistoryService: ObservableObject {
         items.removeAll()
         saveHistory()
     }
+
+    func totalWordCount() -> Int {
+        statsEntries.reduce(0) { $0 + $1.wordCount }
+    }
+    
+    func transcriptionCount(since startDate: Date? = nil) -> Int {
+        filteredStatsEntries(since: startDate).count
+    }
+    
+    func totalDuration(since startDate: Date? = nil) -> TimeInterval {
+        filteredStatsEntries(since: startDate).reduce(0) { $0 + $1.duration }
+    }
+    
+    func wordCount(on day: Date, calendar: Calendar = .current) -> Int {
+        let startOfDay = calendar.startOfDay(for: day)
+        return statsEntries
+            .filter { calendar.isDate($0.date, inSameDayAs: startOfDay) }
+            .reduce(0) { $0 + $1.wordCount }
+    }
+    
+    func statsEntries(since startDate: Date) -> [HistoryStatsEntry] {
+        filteredStatsEntries(since: startDate)
+    }
     
     private func saveHistory() {
         if let encoded = try? JSONEncoder().encode(items) {
             UserDefaults.standard.set(encoded, forKey: saveKey)
+        }
+    }
+
+    private func saveStats() {
+        if let encoded = try? JSONEncoder().encode(statsEntries) {
+            UserDefaults.standard.set(encoded, forKey: statsSaveKey)
         }
     }
     
@@ -97,6 +149,46 @@ class HistoryService: ObservableObject {
             {
                 saveHistory()
             }
+
+            migrateStatsIfNeeded(from: normalizedItems)
         }
     }
+
+    private func loadStats() {
+        if let data = UserDefaults.standard.data(forKey: statsSaveKey),
+           let decoded = try? JSONDecoder().decode([HistoryStatsEntry].self, from: data) {
+            statsEntries = decoded.sorted { $0.date > $1.date }
+        }
+    }
+    
+    private func migrateStatsIfNeeded(from historyItems: [HistoryItem]) {
+        guard statsEntries.isEmpty, !historyItems.isEmpty else { return }
+
+        statsEntries = historyItems.map { item in
+            HistoryStatsEntry(
+                id: item.id,
+                date: item.date,
+                wordCount: item.transcript
+                    .components(separatedBy: .whitespacesAndNewlines)
+                    .filter { !$0.isEmpty }
+                    .count,
+                duration: item.duration
+            )
+        }
+        saveStats()
+    }
+    
+    private func filteredStatsEntries(since startDate: Date?) -> [HistoryStatsEntry] {
+        guard let startDate else { return statsEntries }
+        return statsEntries.filter { $0.date >= startDate }
+    }
+
+#if DEBUG
+    func resetAllDataForTesting() {
+        items = []
+        statsEntries = []
+        UserDefaults.standard.removeObject(forKey: saveKey)
+        UserDefaults.standard.removeObject(forKey: statsSaveKey)
+    }
+#endif
 }

@@ -94,6 +94,8 @@ struct GeneralSettingsTab: View {
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon: Bool = true
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
     @AppStorage("recentTranscriptionLanguages") private var recentLanguagesString: String = ""
+    @AppStorage("enableAutoEdit") private var enableAutoEdit: Bool = false
+    @AppStorage("customReplacementRules") private var customReplacementRules: String = ""
 
     private var recentLanguageCodes: [String] {
         recentLanguagesString.split(separator: ",").map(String.init).filter { !$0.isEmpty }
@@ -228,6 +230,65 @@ struct GeneralSettingsTab: View {
                             .font(Typography.captionSmall)
                             .foregroundStyle(Color.textMuted)
                         }
+                    }
+                }
+
+                // Transcript Cleanup
+                SettingsSection {
+                    SettingsSectionHeader(
+                        icon: "wand.and.stars",
+                        title: "Transcript Cleanup",
+                        subtitle: "Lightweight post-processing for dictation"
+                    )
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            Text("Enable Auto Edit")
+                                .font(Typography.bodyMedium)
+                                .foregroundStyle(Color.textPrimary)
+                            Spacer()
+                            Toggle("", isOn: $enableAutoEdit)
+                                .labelsHidden()
+                        }
+
+                        Text(
+                            "Auto Edit removes common filler words like \"um\" and \"uh\" after transcription. It stays fully offline and does not rewrite the meaning of what you said."
+                        )
+                        .font(Typography.captionSmall)
+                        .foregroundStyle(Color.textMuted)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Custom replacements")
+                                .font(Typography.bodyMedium)
+                                .foregroundStyle(Color.textPrimary)
+
+                            ZStack(alignment: .topLeading) {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.bgHover)
+
+                                if customReplacementRules.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    Text("teh => the\nspeak type => SpeakType\nuh huh =>")
+                                        .font(.system(size: 12, design: .monospaced))
+                                        .foregroundStyle(Color.textMuted)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 10)
+                                        .allowsHitTesting(false)
+                                }
+
+                                TextEditor(text: $customReplacementRules)
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .scrollContentBackground(.hidden)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 6)
+                            }
+                            .frame(minHeight: 110)
+                            .opacity(enableAutoEdit ? 1.0 : 0.65)
+
+                            Text("One rule per line using `from => to`. Leave the right side blank to delete a phrase.")
+                                .font(Typography.captionSmall)
+                                .foregroundStyle(Color.textMuted)
+                        }
+                        .disabled(!enableAutoEdit)
                     }
                 }
 

@@ -5,11 +5,15 @@ import WhisperKit
 class WhisperService {
     // Shared singleton instance - use this everywhere
     static let shared = WhisperService()
+    private static let autoEditEnabledKey = "enableAutoEdit"
+    private static let customReplacementRulesKey = "customReplacementRules"
     private static let placeholderPatterns = [
         #"\[(?:BLANK_AUDIO|SILENCE)\]"#,
         #"<\|nospeech\|>"#,
         #"\[\s*S\s*\]"#,
     ]
+    private static let fillerWordPattern =
+        #"(?i)(^|[\s,.;:!?])(?:uh+|um+|umm+|uhm+|erm+|hmm+)(?=$|[\s,.;:!?])[,.;:!?]?"#
     private static let noiseLabelTerms = [
         "applause",
         "background noise",
@@ -318,6 +322,82 @@ class WhisperService {
             options: .regularExpression
         )
 
+        normalized = applyAutoEdit(to: normalized)
+
         return normalized.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private struct AutoEditRule {
+        let source: String
+        let replacement: String
+    }
+
+    private static func applyAutoEdit(to text: String) -> String {
+        guard UserDefaults.standard.bool(forKey: autoEditEnabledKey) else {
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        var edited = text.replacingOccurrences(
+            of: fillerWordPattern,
+            with: "$1",
+            options: .regularExpression
+        )
+
+        for rule in customReplacementRules() {
+            edited = replace(rule.source, with: rule.replacement, in: edited)
+        }
+
+        edited = edited.replacingOccurrences(
+            of: #"\s+([,.;:!?])"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        edited = edited.replacingOccurrences(
+            of: #"\s+"#,
+            with: " ",
+            options: .regularExpression
+        )
+        return edited.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func customReplacementRules() -> [AutoEditRule] {
+        let rawRules = UserDefaults.standard.string(forKey: customReplacementRulesKey) ?? ""
+
+        return rawRules
+            .split(whereSeparator: \.isNewline)
+            .compactMap { rawLine in
+                let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !line.isEmpty else { return nil }
+
+                for separator in ["=>", "->", "="] {
+                    let parts = line.components(separatedBy: separator)
+                    guard parts.count >= 2 else { continue }
+
+                    let source = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                    let replacement = parts[1...].joined(separator: separator)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+
+                    guard !source.isEmpty else { return nil }
+                    return AutoEditRule(source: source, replacement: replacement)
+                }
+
+                return nil
+            }
+    }
+
+    private static func replace(_ source: String, with replacement: String, in text: String) -> String {
+        let escapedSource = NSRegularExpression.escapedPattern(for: source)
+            .replacingOccurrences(of: " ", with: #"\s+"#)
+        let needsLeadingBoundary = source.first?.isLetter == true || source.first?.isNumber == true
+        let needsTrailingBoundary = source.last?.isLetter == true || source.last?.isNumber == true
+        let pattern =
+            "\(needsLeadingBoundary ? #"\b"# : "")\(escapedSource)\(needsTrailingBoundary ? #"\b"# : "")"
+
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            return text
+        }
+
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: replacement)
     }
 }

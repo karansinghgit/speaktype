@@ -43,6 +43,8 @@ class AudioRecordingService: NSObject, ObservableObject {
     private var chunkFileURL: URL?
     private var isRotatingChunk = false  // Prevents concurrent rotations
     private var shouldDiscardCurrentRecordingOutput = false
+    private var smoothedAudioLevel: Float = 0.0
+    private var smoothedAudioFrequency: Float = 0.0
 
     private let audioQueue = DispatchQueue(label: "com.speaktype.audioQueue")
 
@@ -97,6 +99,8 @@ class AudioRecordingService: NSObject, ObservableObject {
         assetWriterInput = nil
         currentFileURL = nil
         isSessionStarted = false
+        smoothedAudioLevel = 0.0
+        smoothedAudioFrequency = 0.0
     }
 
     private func resetChunkWriterState() {
@@ -591,129 +595,150 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
             let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription)?.pointee
         else { return }
 
-        var audioBufferList = AudioBufferList()
+        var audioBufferListSizeNeeded = 0
         var blockBuffer: CMBlockBuffer?
+        let bufferFlags = UInt32(kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment)
 
-        CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+        let sizeQueryStatus = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
             sampleBuffer,
-            bufferListSizeNeededOut: nil,
-            bufferListOut: &audioBufferList,
-            bufferListSize: MemoryLayout<AudioBufferList>.size,
+            bufferListSizeNeededOut: &audioBufferListSizeNeeded,
+            bufferListOut: nil,
+            bufferListSize: 0,
             blockBufferAllocator: nil,
             blockBufferMemoryAllocator: nil,
-            flags: 0,
+            flags: bufferFlags,
             blockBufferOut: &blockBuffer
         )
 
-        guard let data = audioBufferList.mBuffers.mData else { return }
+        guard sizeQueryStatus == noErr, audioBufferListSizeNeeded > 0 else { return }
 
-        // Safety check for bytes per frame
-        let bytesPerFrame = Int(asbd.mBytesPerFrame)
-        guard bytesPerFrame > 0 else { return }
+        let audioBufferListStorage = UnsafeMutableRawPointer.allocate(
+            byteCount: audioBufferListSizeNeeded,
+            alignment: MemoryLayout<AudioBufferList>.alignment
+        )
+        defer { audioBufferListStorage.deallocate() }
 
-        let frameCount = Int(audioBufferList.mBuffers.mDataByteSize) / bytesPerFrame
-        let stride = 4
-        let samplesToRead = frameCount / stride
+        let audioBufferList = audioBufferListStorage.assumingMemoryBound(to: AudioBufferList.self)
 
-        guard samplesToRead > 0 else { return }
+        let bufferListStatus = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+            sampleBuffer,
+            bufferListSizeNeededOut: &audioBufferListSizeNeeded,
+            bufferListOut: audioBufferList,
+            bufferListSize: audioBufferListSizeNeeded,
+            blockBufferAllocator: nil,
+            blockBufferMemoryAllocator: nil,
+            flags: bufferFlags,
+            blockBufferOut: &blockBuffer
+        )
 
+        guard bufferListStatus == noErr else { return }
+
+        let audioBuffers = UnsafeMutableAudioBufferListPointer(audioBufferList)
+        let sampleStride = 4
         var sumSquares: Float = 0.0
-        var zeroCrossings: Int = 0
-        var previousSample: Float = 0.0
-        var peak: Float = 0.0  // max abs sample — drives the lively waveform
+        var peakLevel: Float = 0.0  // max abs sample — drives the lively waveform
+        var processedSampleCount = 0
+        var zeroCrossings = 0
+        var previousSample: Float?
 
-        if (asbd.mFormatFlags & kAudioFormatFlagIsFloat) != 0 {
-            // Float32 Processing (Standard on Mac)
-            let actualData = data.assumingMemoryBound(to: Float.self)
-            previousSample = actualData[0]
+        for audioBuffer in audioBuffers {
+            guard let data = audioBuffer.mData, audioBuffer.mDataByteSize > 0 else { continue }
 
-            for i in 0..<samplesToRead {
-                let sample = actualData[i * stride]
-                sumSquares += sample * sample
-                peak = max(peak, abs(sample))
+            if (asbd.mFormatFlags & kAudioFormatFlagIsFloat) != 0 {
+                let sampleCount = Int(audioBuffer.mDataByteSize) / MemoryLayout<Float>.size
+                guard sampleCount > 0 else { continue }
 
-                // Zero Crossing Check
-                if (previousSample > 0 && sample <= 0) || (previousSample <= 0 && sample > 0) {
-                    zeroCrossings += 1
-                }
-                previousSample = sample
-            }
-        } else {
-            // Int16 Processing (Fallback)
-            if asbd.mBitsPerChannel == 16 {
-                let actualData = data.assumingMemoryBound(to: Int16.self)
-                previousSample = Float(actualData[0])
-
-                for i in 0..<samplesToRead {
-                    let sample = Float(actualData[i * stride]) / 32768.0
+                let samples = data.assumingMemoryBound(to: Float.self)
+                for index in Swift.stride(from: 0, to: sampleCount, by: sampleStride) {
+                    let sample = samples[index]
+                    let amplitude = abs(sample)
                     sumSquares += sample * sample
-
-                    if (previousSample > 0 && sample <= 0) || (previousSample <= 0 && sample > 0) {
+                    peakLevel = max(peakLevel, amplitude)
+                    if let previousSample,
+                        (previousSample > 0 && sample <= 0) || (previousSample <= 0 && sample > 0)
+                    {
                         zeroCrossings += 1
                     }
                     previousSample = sample
+                    processedSampleCount += 1
+                }
+            } else if asbd.mBitsPerChannel == 16 {
+                let sampleCount = Int(audioBuffer.mDataByteSize) / MemoryLayout<Int16>.size
+                guard sampleCount > 0 else { continue }
+
+                let samples = data.assumingMemoryBound(to: Int16.self)
+                for index in Swift.stride(from: 0, to: sampleCount, by: sampleStride) {
+                    let sample = Float(samples[index]) / Float(Int16.max)
+                    let amplitude = abs(sample)
+                    sumSquares += sample * sample
+                    peakLevel = max(peakLevel, amplitude)
+                    if let previousSample,
+                        (previousSample > 0 && sample <= 0) || (previousSample <= 0 && sample > 0)
+                    {
+                        zeroCrossings += 1
+                    }
+                    previousSample = sample
+                    processedSampleCount += 1
                 }
             } else if asbd.mBitsPerChannel == 32 {
-                // Int32 Processing
-                let actualData = data.assumingMemoryBound(to: Int32.self)
-                previousSample = Float(actualData[0])
+                let sampleCount = Int(audioBuffer.mDataByteSize) / MemoryLayout<Int32>.size
+                guard sampleCount > 0 else { continue }
 
-                for i in 0..<samplesToRead {
-                    let sample = Float(actualData[i * stride]) / 2147483648.0
+                let samples = data.assumingMemoryBound(to: Int32.self)
+                for index in Swift.stride(from: 0, to: sampleCount, by: sampleStride) {
+                    let sample = Float(samples[index]) / Float(Int32.max)
+                    let amplitude = abs(sample)
                     sumSquares += sample * sample
-
-                    if (previousSample > 0 && sample <= 0) || (previousSample <= 0 && sample > 0) {
+                    peakLevel = max(peakLevel, amplitude)
+                    if let previousSample,
+                        (previousSample > 0 && sample <= 0) || (previousSample <= 0 && sample > 0)
+                    {
                         zeroCrossings += 1
                     }
                     previousSample = sample
+                    processedSampleCount += 1
                 }
             }
         }
 
-        let rms = sqrt(sumSquares / Float(samplesToRead))
+        guard processedSampleCount > 0 else { return }
+
+        let rms = sqrt(sumSquares / Float(processedSampleCount))
 
         // Convert to Decibels
         // 20 * log10(rms) gives dB.
         let dB = 20 * log10(rms > 0 ? rms : 0.0001)
+        let peakDB = 20 * log10(peakLevel > 0 ? peakLevel : 0.0001)
 
         // Normalize to 0...1 for UI
-        // Tuned to -50.0 dB for smoother response (less jittery than -60)
-        let lowerLimit: Float = -50.0
+        let lowerLimit: Float = -58.0
         let upperLimit: Float = 0.0
 
-        // Clamp
         let clamped = max(lowerLimit, min(upperLimit, dB))
+        let peakClamped = max(lowerLimit, min(upperLimit, peakDB))
 
-        // Linear mapping
-        var normalizedLevel = (clamped - lowerLimit) / (upperLimit - lowerLimit)
+        let normalizedRMS = (clamped - lowerLimit) / (upperLimit - lowerLimit)
+        let normalizedPeak = (peakClamped - lowerLimit) / (upperLimit - lowerLimit)
+        var normalizedLevel = max(normalizedRMS * 0.8, normalizedPeak)
 
-        // Signal Gate: Minimal gate to avoid absolute zero, but allow quiet sounds
-        if normalizedLevel < 0.01 {
+        if normalizedLevel < 0.015 {
             normalizedLevel = 0
             zeroCrossings = 0
         }
 
-        // Calculate approximate frequency from ZCR
-        // Frequency = (Zero Crossings * Sample Rate) / (2 * N)
-        // Note: 'stride' reduces effective sample rate for this calculation, so we adjust
-        let effectiveSampleRate = Float(asbd.mSampleRate) / Float(stride)
-        let _ = (Float(zeroCrossings) * effectiveSampleRate) / (2.0 * Float(samplesToRead))
-
-        // Normalize Frequency for UI (0...1)
-        // Human voice fundamental freq is roughly 85Hz - 255Hz, harmonics go higher.
-        // Let's map 0-3000Hz (speech range) to 0-1 for visualization
-        // But ZCR is noisy, so we just want "more zcr" = "higher pitch"
-        // Let's just normalize ZCR relative to the number of samples
-        let zcr = Float(zeroCrossings) / Float(samplesToRead)
-
-        // Empirically, ZCR for speech varies. Let's amplify likely speech range.
-        var normalizedFreq = zcr * 5.0  // Gain to make changes visible
+        let zcr = Float(zeroCrossings) / Float(processedSampleCount)
+        var normalizedFreq = zcr * 4.0
         normalizedFreq = max(0.0, min(1.0, normalizedFreq))
 
+        let levelSmoothing: Float = normalizedLevel > smoothedAudioLevel ? 0.55 : 0.18
+        let frequencySmoothing: Float = normalizedFreq > smoothedAudioFrequency ? 0.45 : 0.2
+        smoothedAudioLevel += (normalizedLevel - smoothedAudioLevel) * levelSmoothing
+        smoothedAudioFrequency += (normalizedFreq - smoothedAudioFrequency) * frequencySmoothing
+
         DispatchQueue.main.async {
-            self.audioLevel = normalizedLevel
-            self.audioFrequency = normalizedFreq
-            self.liveWaveSamples.append(min(1.0, peak))
+            self.audioLevel = self.smoothedAudioLevel
+            self.audioFrequency = self.smoothedAudioFrequency
+            self.liveWaveSamples.append(min(1.0, peakLevel))
             if self.liveWaveSamples.count > Self.maxLiveWaveSamples {
                 self.liveWaveSamples.removeFirst(
                     self.liveWaveSamples.count - Self.maxLiveWaveSamples)

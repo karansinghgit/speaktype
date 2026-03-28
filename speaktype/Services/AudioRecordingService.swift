@@ -160,13 +160,19 @@ class AudioRecordingService: NSObject, ObservableObject {
             self.availableDevices = discoverySession.devices.filter { device in
                 !device.localizedName.localizedCaseInsensitiveContains("Microsoft Teams")
             }
-            // Fall back to the first device when nothing is selected or the
-            // selected (possibly persisted) device is no longer connected.
+            // Keep the current (possibly persisted) selection if it is still
+            // connected; otherwise fall back to the first available device, or
+            // clear it when no inputs remain.
             let selectionIsAvailable = self.availableDevices.contains {
                 $0.uniqueID == self.selectedDeviceId
             }
-            if !selectionIsAvailable, let first = self.availableDevices.first {
-                self.selectedDeviceId = first.uniqueID
+            if !selectionIsAvailable {
+                if let first = self.availableDevices.first {
+                    print("🎤 Falling back to available input device: \(first.localizedName)")
+                    self.selectedDeviceId = first.uniqueID
+                } else {
+                    self.selectedDeviceId = nil
+                }
             }
         }
     }

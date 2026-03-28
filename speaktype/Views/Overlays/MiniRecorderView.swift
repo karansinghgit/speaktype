@@ -66,6 +66,21 @@ struct MiniRecorderView: View {
             "Spoken language hint: \(spokenLanguageDisplayName(for: transcriptionLanguage)). If this does not match the language you actually speak, the result may be inaccurate or come back in the wrong language."
     }
 
+    private var currentInputDeviceName: String {
+        guard
+            let selectedDeviceId = audioRecorder.selectedDeviceId,
+            let device = audioRecorder.availableDevices.first(where: { $0.uniqueID == selectedDeviceId })
+        else {
+            return "No input selected"
+        }
+
+        return device.localizedName
+    }
+
+    private var inputDeviceHelpText: String {
+        "Input device: \(currentInputDeviceName). Change microphones without going back to Settings."
+    }
+
     private var isAccessibilityEnabled: Bool {
         AXIsProcessTrusted()
     }
@@ -187,6 +202,46 @@ struct MiniRecorderView: View {
                         .fixedSize()
                         .help(spokenLanguageHelpText)
 
+                        Menu {
+                            if audioRecorder.availableDevices.isEmpty {
+                                Button("No input devices found") {}
+                                    .disabled(true)
+                            } else {
+                                ForEach(audioRecorder.availableDevices, id: \.uniqueID) { device in
+                                    Button {
+                                        selectAudioDevice(device.uniqueID)
+                                    } label: {
+                                        if audioRecorder.selectedDeviceId == device.uniqueID {
+                                            Label(device.localizedName, systemImage: "checkmark")
+                                        } else {
+                                            Text(device.localizedName)
+                                        }
+                                    }
+                                }
+                            }
+
+                            Divider()
+                            Button("Refresh inputs") {
+                                audioRecorder.fetchAvailableDevices()
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "mic.fill")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.92))
+
+                                DoubleChevronIcon(color: .white.opacity(0.92))
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.15))
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                        }
+                        .menuIndicator(.hidden)
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .help(inputDeviceHelpText)
+
                         // Recording mode indicator
                         Image(systemName: recordingMode == 0 ? "hand.tap.fill" : "repeat.1")
                             .font(.system(size: 14, weight: .semibold))
@@ -215,6 +270,7 @@ struct MiniRecorderView: View {
         }
         .onAppear {
             initializedService()
+            audioRecorder.fetchAvailableDevices()
 
             // Set up Escape key monitors
             globalEscapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
@@ -442,6 +498,37 @@ struct MiniRecorderView: View {
         debugLog("Starting recording...")
         audioRecorder.startRecording()
         isListening = true
+    }
+
+    private func selectAudioDevice(_ deviceId: String) {
+        guard audioRecorder.selectedDeviceId != deviceId else { return }
+
+        let shouldResumeRecording = isListening
+
+        Task {
+            if shouldResumeRecording {
+                await MainActor.run {
+                    isListening = false
+                    isProcessing = true
+                    statusMessage = "Switching input..."
+                }
+
+                _ = await audioRecorder.stopRecording(discardOutput: true)
+            }
+
+            await MainActor.run {
+                audioRecorder.selectedDeviceId = deviceId
+            }
+
+            guard shouldResumeRecording else { return }
+
+            audioRecorder.startRecording()
+
+            await MainActor.run {
+                isProcessing = false
+                isListening = true
+            }
+        }
     }
 
     private func stopAndTranscribe() {

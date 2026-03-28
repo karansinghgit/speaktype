@@ -237,6 +237,7 @@ struct MiniRecorderView: View {
             if let localEscapeMonitor = localEscapeMonitor {
                 NSEvent.removeMonitor(localEscapeMonitor)
             }
+            audioRecorder.stopSessionIfIdle()
         }
         .onChange(of: isListening) {
             // Only animate when actually recording to save CPU

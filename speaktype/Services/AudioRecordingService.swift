@@ -33,6 +33,7 @@ class AudioRecordingService: NSObject, ObservableObject {
     private var isSessionStarted = false
     private var setupTask: Task<Void, Never>?
     private var isStopping = false  // Flag to prevent appending during stop
+    private var idleSessionStopWorkItem: DispatchWorkItem?
 
     // MARK: - Chunking state
     private var chunkAssetWriter: AVAssetWriter?
@@ -188,6 +189,19 @@ class AudioRecordingService: NSObject, ObservableObject {
             // Give it a moment to fully initialize
             Thread.sleep(forTimeInterval: 0.3)
             print("🎤 Audio capture session ready")
+            self.scheduleIdleSessionStop()
+        }
+    }
+
+    /// Stop the prewarmed capture session when the recorder is no longer visible.
+    func stopSessionIfIdle() {
+        audioQueue.async {
+            self.cancelIdleSessionStop()
+            guard !self.isRecording, let session = self.captureSession, session.isRunning else {
+                return
+            }
+            print("🎤 Stopping idle audio capture session")
+            session.stopRunning()
         }
     }
 
@@ -204,6 +218,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         resetMainWriterState()
         resetChunkWriterState()
         isRecording = true
+        cancelIdleSessionStop()
 
         // 2. Wrap setup in a Task so stopRecording can wait for it
         setupTask = Task { @MainActor in
@@ -358,6 +373,7 @@ class AudioRecordingService: NSObject, ObservableObject {
 
                 finishGroup.notify(queue: self.audioQueue) {
                     // Keep microphone fully idle outside active recordings.
+                    self.cancelIdleSessionStop()
                     self.captureSession?.stopRunning()
                     self.isStopping = false
                     self.shouldDiscardCurrentRecordingOutput = false
@@ -415,6 +431,27 @@ class AudioRecordingService: NSObject, ObservableObject {
         )
 
         return chunksDir
+    }
+
+    private func scheduleIdleSessionStop(delay: TimeInterval = 8) {
+        cancelIdleSessionStop()
+
+        let work = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            guard !self.isRecording, let session = self.captureSession, session.isRunning else {
+                return
+            }
+            print("🎤 Auto-stopping prewarmed session to save resources")
+            session.stopRunning()
+        }
+
+        idleSessionStopWorkItem = work
+        audioQueue.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func cancelIdleSessionStop() {
+        idleSessionStopWorkItem?.cancel()
+        idleSessionStopWorkItem = nil
     }
 }
 

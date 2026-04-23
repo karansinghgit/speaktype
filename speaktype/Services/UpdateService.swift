@@ -1,10 +1,13 @@
 import AppKit
 import Combine
 import Foundation
+import Security
 
 /// Service to check for app updates and manage update preferences
 class UpdateService: NSObject, ObservableObject {
     static let shared = UpdateService()
+    static let trustedUpdateBundleIdentifier = "com.2048labs.speaktype"
+    static let trustedUpdateTeamIdentifier = "PCV4UMSRZX"
 
     @Published var availableUpdate: AppVersion?
     @Published var isCheckingForUpdates = false
@@ -178,13 +181,16 @@ class UpdateService: NSObject, ObservableObject {
                 }
                 let appInDMG = try findApp(in: mountPoint)
 
-                // 5. Replace the running app
+                // 5. Verify the mounted app is signed by the expected developer
+                try verifyCandidateApp(at: appInDMG)
+
+                // 6. Replace the running app
                 try replaceCurrentApp(with: appInDMG)
 
-                // 6. Detach the volume (best-effort)
+                // 7. Detach the volume (best-effort)
                 detachDMG(mountPoint: mountPoint)
 
-                // 7. Relaunch
+                // 8. Relaunch
                 await MainActor.run {
                     self.installPhase = "Relaunching"
                     self.installStatus = "Finishing update…"
@@ -277,6 +283,43 @@ class UpdateService: NSObject, ObservableObject {
         return appURL
     }
 
+    private func verifyCandidateApp(at appURL: URL) throws {
+        guard
+            let bundle = Bundle(url: appURL),
+            let bundleIdentifier = bundle.bundleIdentifier
+        else {
+            throw UpdateError.invalidCandidateApp(
+                "Downloaded update is missing a bundle identifier."
+            )
+        }
+
+        guard bundleIdentifier == Self.trustedUpdateBundleIdentifier else {
+            throw UpdateError.invalidCandidateApp(
+                "Downloaded update has an unexpected bundle identifier."
+            )
+        }
+
+        let staticCode = try Self.loadStaticCode(at: appURL)
+        let requirement = try Self.makeTrustedUpdateRequirement(
+            bundleIdentifier: Self.trustedUpdateBundleIdentifier,
+            teamIdentifier: Self.trustedUpdateTeamIdentifier
+        )
+
+        let validityStatus = SecStaticCodeCheckValidity(staticCode, SecCSFlags(), requirement)
+        guard validityStatus == errSecSuccess else {
+            throw UpdateError.signatureVerificationFailed
+        }
+
+        let signingInfo = try Self.copySigningInfo(from: staticCode)
+        try Self.validateSigningInfo(
+            signingInfo,
+            expectedBundleIdentifier: Self.trustedUpdateBundleIdentifier,
+            expectedTeamIdentifier: Self.trustedUpdateTeamIdentifier
+        )
+
+        try verifyGatekeeperAcceptance(of: appURL)
+    }
+
     private func replaceCurrentApp(with sourceApp: URL) throws {
         // Determine destination: where the current bundle lives
         let runningPath = Bundle.main.bundlePath
@@ -289,6 +332,20 @@ class UpdateService: NSObject, ObservableObject {
         }
         // Copy new app
         try fm.copyItem(at: sourceApp, to: destURL)
+    }
+
+    private func verifyGatekeeperAcceptance(of appURL: URL) throws {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/sbin/spctl")
+        proc.arguments = ["--assess", "--type", "execute", appURL.path]
+        proc.standardOutput = FileHandle.nullDevice
+        proc.standardError = Pipe()
+        try proc.run()
+        proc.waitUntilExit()
+
+        guard proc.terminationStatus == 0 else {
+            throw UpdateError.gatekeeperAssessmentFailed
+        }
     }
 
     private func detachDMG(mountPoint: URL) {
@@ -358,6 +415,78 @@ class UpdateService: NSObject, ObservableObject {
             continuation.resume(throwing: error)
         }
     }
+
+    static func trustedUpdateRequirementString(
+        bundleIdentifier: String,
+        teamIdentifier: String
+    ) -> String {
+        """
+        identifier "\(bundleIdentifier)" and anchor apple generic and certificate leaf[subject.OU] = "\(teamIdentifier)"
+        """
+    }
+
+    static func validateSigningInfo(
+        _ signingInfo: [String: Any],
+        expectedBundleIdentifier: String,
+        expectedTeamIdentifier: String
+    ) throws {
+        guard
+            let signingIdentifier = signingInfo[kSecCodeInfoIdentifier as String] as? String,
+            signingIdentifier == expectedBundleIdentifier
+        else {
+            throw UpdateError.invalidCandidateApp(
+                "Downloaded update has an unexpected bundle identifier."
+            )
+        }
+
+        guard
+            let teamIdentifier = signingInfo[kSecCodeInfoTeamIdentifier as String] as? String,
+            teamIdentifier == expectedTeamIdentifier
+        else {
+            throw UpdateError.untrustedDeveloper
+        }
+    }
+
+    private static func loadStaticCode(at appURL: URL) throws -> SecStaticCode {
+        var staticCode: SecStaticCode?
+        let status = SecStaticCodeCreateWithPath(appURL as CFURL, SecCSFlags(), &staticCode)
+        guard status == errSecSuccess, let staticCode else {
+            throw UpdateError.signatureVerificationFailed
+        }
+        return staticCode
+    }
+
+    private static func makeTrustedUpdateRequirement(
+        bundleIdentifier: String,
+        teamIdentifier: String
+    ) throws -> SecRequirement {
+        var requirement: SecRequirement?
+        let status = SecRequirementCreateWithString(
+            trustedUpdateRequirementString(
+                bundleIdentifier: bundleIdentifier,
+                teamIdentifier: teamIdentifier
+            ) as CFString,
+            SecCSFlags(),
+            &requirement
+        )
+        guard status == errSecSuccess, let requirement else {
+            throw UpdateError.signatureVerificationFailed
+        }
+        return requirement
+    }
+
+    private static func copySigningInfo(from staticCode: SecStaticCode) throws -> [String: Any] {
+        var signingInfo: CFDictionary?
+        let status = SecCodeCopySigningInformation(
+            staticCode,
+            SecCSFlags(rawValue: kSecCSSigningInformation),
+            &signingInfo
+        )
+        guard status == errSecSuccess, let info = signingInfo as? [String: Any] else {
+            throw UpdateError.signatureVerificationFailed
+        }
+        return info
+    }
 }
 
 extension UpdateService: URLSessionDownloadDelegate {
@@ -422,12 +551,16 @@ extension UpdateService: URLSessionDownloadDelegate {
 
 // MARK: - Errors
 
-enum UpdateError: LocalizedError {
+enum UpdateError: LocalizedError, Equatable {
     case downloadFailed(String)
     case mountFailed
     case appNotFoundInDMG
     case copyFailed(String)
     case verificationFailed
+    case invalidCandidateApp(String)
+    case signatureVerificationFailed
+    case untrustedDeveloper
+    case gatekeeperAssessmentFailed
 
     var errorDescription: String? {
         switch self {
@@ -436,6 +569,13 @@ enum UpdateError: LocalizedError {
         case .appNotFoundInDMG: return "Could not find the app inside the downloaded update."
         case .copyFailed(let msg): return "Failed to install: \(msg)"
         case .verificationFailed: return "The downloaded update failed verification."
+        case .invalidCandidateApp(let message): return message
+        case .signatureVerificationFailed:
+            return "The downloaded update is not signed by the expected developer."
+        case .untrustedDeveloper:
+            return "The downloaded update was signed by an unexpected developer."
+        case .gatekeeperAssessmentFailed:
+            return "macOS rejected the downloaded update during Gatekeeper assessment."
         }
     }
 }

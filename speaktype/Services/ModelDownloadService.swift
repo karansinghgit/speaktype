@@ -3,6 +3,112 @@ import Combine
 import FluidAudio
 import WhisperKit
 
+struct ModelCacheCleanupReport {
+    let deletedPaths: [URL]
+    let checkedPaths: [URL]
+}
+
+/// Resolves and removes cache directories for a WhisperKit model variant.
+///
+/// Safety (from #65): cleanup is limited to the exact per-variant subdirectories
+/// SpeakType itself owns — never a broad substring match over generic locations
+/// (Caches root, home dir, temp, `.cache/huggingface`) that could delete unrelated
+/// files. Storage layout (from #90 / `ModelStorage`): the only roots SpeakType
+/// writes CoreML variants into are the current Application Support location and the
+/// legacy `~/Documents/huggingface` location.
+enum ModelCachePathResolver {
+    /// The WhisperKit model roots SpeakType owns and is allowed to clean up:
+    /// `<AppSupport>/SpeakType/models/argmaxinc/whisperkit-coreml` plus the legacy
+    /// `~/Documents/huggingface/models/argmaxinc/whisperkit-coreml`.
+    static func repoOwnedModelRoots() -> [URL] {
+        var roots = [ModelStorage.whisperKitModelsDir]
+        if let legacy = ModelStorage.legacyModelsDir { roots.append(legacy) }
+        return roots
+    }
+
+    /// Exact per-variant candidate directories under the given repo-owned roots.
+    ///
+    /// For each root we consider both the slash ("openai/whisper-medium") and the
+    /// underscore ("openai_whisper-medium") spelling of the variant, plus any exact
+    /// `variant`-named directory found nested under the root (e.g. a hub-style
+    /// `.../snapshots/<hash>/<variant>` layout). Directories whose names merely
+    /// *contain* the variant (e.g. "<variant>-backup") are never matched.
+    static func candidatePaths(
+        for variant: String,
+        roots: [URL],
+        fileManager: FileManager = .default
+    ) -> [URL] {
+        var candidates = Set<URL>()
+
+        for root in roots {
+            for name in variantDirectoryNames(for: variant) {
+                candidates.insert(root.appendingPathComponent(name, isDirectory: true))
+            }
+            for match in exactVariantDirectories(named: variant, under: root, fileManager: fileManager) {
+                candidates.insert(match)
+            }
+        }
+
+        return candidates.sorted { $0.path < $1.path }
+    }
+
+    static func removeVariantDirectories(
+        for variant: String,
+        roots: [URL],
+        fileManager: FileManager = .default,
+        log: ((String) -> Void)? = nil
+    ) -> ModelCacheCleanupReport {
+        let candidates = candidatePaths(for: variant, roots: roots, fileManager: fileManager)
+        var deletedPaths: [URL] = []
+
+        for candidate in candidates where fileManager.fileExists(atPath: candidate.path) {
+            do {
+                try fileManager.removeItem(at: candidate)
+                deletedPaths.append(candidate)
+                log?("✅ Deleted cache: \(candidate.path)")
+            } catch {
+                log?("❌ Failed to delete \(candidate.path): \(error)")
+            }
+        }
+
+        return ModelCacheCleanupReport(deletedPaths: deletedPaths, checkedPaths: candidates)
+    }
+
+    private static func variantDirectoryNames(for variant: String) -> [String] {
+        Array(Set([variant, variant.replacingOccurrences(of: "/", with: "_")]))
+    }
+
+    private static func exactVariantDirectories(
+        named variant: String,
+        under root: URL,
+        fileManager: FileManager = .default
+    ) -> [URL] {
+        guard fileManager.fileExists(atPath: root.path) else { return [] }
+
+        guard
+            let enumerator = fileManager.enumerator(
+                at: root,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            )
+        else {
+            return []
+        }
+
+        var matches: [URL] = []
+
+        for case let url as URL in enumerator {
+            guard url.lastPathComponent == variant else { continue }
+            let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
+            guard values?.isDirectory == true else { continue }
+            matches.append(url)
+            enumerator.skipDescendants()
+        }
+
+        return matches
+    }
+}
+
 class ModelDownloadService: ObservableObject {
     static let shared = ModelDownloadService()
     
@@ -311,68 +417,24 @@ class ModelDownloadService: ObservableObject {
         }
 
         let fileManager = FileManager.default
-        let searchDirs: [FileManager.SearchPathDirectory] = [.documentDirectory, .applicationSupportDirectory, .cachesDirectory]
-        
-        // Parse variant: "openai/whisper-medium" or "openai_whisper-medium"
-        let variantParts = variant.split(separator: "/")
-        let modelName = variantParts.last ?? Substring(variant)
-        
-        // Also search for underscore version: openai_whisper-medium
-        let underscoreVariant = variant.replacingOccurrences(of: "/", with: "_")
-        
-        var deletedCount = 0
-        var checkedPaths: [String] = []
-        
-        print("🗑️ Searching for model caches matching: '\(modelName)' or '\(underscoreVariant)'")
-        
-        // 1. Check Standard macOS Paths
-        for searchDir in searchDirs {
-            guard let baseDir = fileManager.urls(for: searchDir, in: .userDomainMask).first else { continue }
-            
-            // Check ./huggingface/models (HuggingFace cache)
-            let hfModelsDir = baseDir.appendingPathComponent("huggingface/models")
-            checkedPaths.append(hfModelsDir.path)
-            deletedCount += cleanupDirectory(hfModelsDir, matchAny: [String(modelName), underscoreVariant])
-            
-            // Check ./huggingface/hub (Alternative HF structure)
-            let hfHubDir = baseDir.appendingPathComponent("huggingface/hub")
-            checkedPaths.append(hfHubDir.path)
-            deletedCount += cleanupDirectory(hfHubDir, matchAny: [String(modelName), underscoreVariant])
-            
-            // Skip the old SpeakType-specific directory (no longer used)
-            
-            // Check root directory (sometimes models are here)
-            deletedCount += cleanupDirectory(baseDir, matchAny: [String(modelName), underscoreVariant])
-        }
-        
-        // 2. Check ~/.cache (Common for Python/Unix HF tools)
-        let homeDir = fileManager.homeDirectoryForCurrentUser
-        let dotCacheModels = homeDir.appendingPathComponent(".cache/huggingface/models")
-        checkedPaths.append(dotCacheModels.path)
-        deletedCount += cleanupDirectory(dotCacheModels, matchAny: [String(modelName), underscoreVariant])
-        
-        let dotCacheHub = homeDir.appendingPathComponent(".cache/huggingface/hub")
-        checkedPaths.append(dotCacheHub.path)
-        deletedCount += cleanupDirectory(dotCacheHub, matchAny: [String(modelName), underscoreVariant])
-        
-        // 3. Check Temporary Directory
-        let tempDir = fileManager.temporaryDirectory
-        let tempHf = tempDir.appendingPathComponent("huggingface")
-        checkedPaths.append(tempHf.path)
-        deletedCount += cleanupDirectory(tempHf, matchAny: [String(modelName), underscoreVariant])
-        deletedCount += cleanupDirectory(tempDir, matchAny: [String(modelName), underscoreVariant])
-        
-        // 4. Check the current Application Support location and the legacy
-        //    Documents/huggingface location for whisperkit-coreml models.
-        var whisperKitModelDirs = [ModelStorage.whisperKitModelsDir]
-        if let legacy = ModelStorage.legacyModelsDir { whisperKitModelDirs.append(legacy) }
-        for whisperKitModels in whisperKitModelDirs {
-            checkedPaths.append(whisperKitModels.path)
-            deletedCount += cleanupDirectory(whisperKitModels, matchAny: [String(modelName), underscoreVariant])
-        }
-        
-        print("🗑️ Cleanup complete. Deleted \(deletedCount) items from \(checkedPaths.count) locations")
-        
+        // Only ever touch the WhisperKit model directories SpeakType itself owns:
+        // the current Application Support location and the legacy Documents location.
+        // Deletion is limited to the exact per-variant subdirectories under those
+        // roots — no broad substring matching over Caches/home/temp that could nuke
+        // unrelated files (the pre-#65 behavior).
+        let roots = ModelCachePathResolver.repoOwnedModelRoots()
+        let cleanupReport = ModelCachePathResolver.removeVariantDirectories(
+            for: variant,
+            roots: roots,
+            fileManager: fileManager,
+            log: { print($0) }
+        )
+
+        let deletedCount = cleanupReport.deletedPaths.count
+        let checkedPaths = cleanupReport.checkedPaths.map(\.path)
+
+        print("🗑️ Cleanup complete. Deleted \(deletedCount) repo-owned model caches")
+
         if deletedCount > 0 {
             await MainActor.run {
                 self.downloadProgress[variant] = 0.0
@@ -384,34 +446,11 @@ class ModelDownloadService: ObservableObject {
                 self.downloadProgress[variant] = 0.0
                 self.isDownloading[variant] = false
             }
-            return "No match for '\(modelName)' in \(checkedPaths.count) locations. checked: \(checkedPaths.map { $0.replacingOccurrences(of: homeDir.path, with: "~") }.joined(separator: ", "))"
+            let homePath = fileManager.homeDirectoryForCurrentUser.path
+            return "No repo-owned cache found for '\(variant)'. Checked: \(checkedPaths.map { $0.replacingOccurrences(of: homePath, with: "~") }.joined(separator: ", "))"
         }
     }
-    
-    private func cleanupDirectory(_ dir: URL, matchAny patterns: [String]) -> Int {
-        let fileManager = FileManager.default
-        guard let contents = try? fileManager.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return 0 }
-        
-        var count = 0
-        for url in contents {
-            let fileName = url.lastPathComponent
-            // Check if any pattern matches
-            let matches = patterns.contains { pattern in
-                fileName.contains(pattern) || fileName.contains(pattern.replacingOccurrences(of: "/", with: "--"))
-            }
-            
-            if matches {
-                do {
-                    try fileManager.removeItem(at: url)
-                    print("✅ Deleted cache: \(url.lastPathComponent)")
-                    count += 1
-                } catch {
-                    print("❌ Failed to delete \(url.lastPathComponent): \(error)")
-                }
-            }
-        }
-        return count
-    }
+
     func cancelDownload(for variant: String) {
         if let task = activeTasks[variant] {
             task.cancel()

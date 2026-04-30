@@ -89,6 +89,8 @@ struct GeneralSettingsTab: View {
     @AppStorage("autoUpdate") private var autoUpdate = true
     @AppStorage("selectedHotkey") private var selectedHotkey: HotkeyOption = .fn
     @AppStorage("recordingMode") private var recordingMode: Int = 0  // 0: Hold to record, 1: Toggle
+    @AppStorage("restoreClipboardAfterAutoPaste") private var restoreClipboardAfterAutoPaste =
+        false
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon: Bool = true
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
     @AppStorage("recentTranscriptionLanguages") private var recentLanguagesString: String = ""
@@ -206,6 +208,25 @@ struct GeneralSettingsTab: View {
                             Spacer()
                             Toggle("", isOn: $showMenuBarIcon)
                                 .labelsHidden()
+                        }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Restore clipboard after auto-paste")
+                                    .font(Typography.bodyMedium)
+                                    .foregroundStyle(Color.textPrimary)
+                                Spacer()
+                                Toggle("", isOn: $restoreClipboardAfterAutoPaste)
+                                    .labelsHidden()
+                            }
+
+                            Text(
+                                restoreClipboardAfterAutoPaste
+                                    ? "After SpeakType pastes into the active app, it restores whatever was already on your clipboard."
+                                    : "After SpeakType pastes into the active app, the transcript stays on your clipboard for manual pasting."
+                            )
+                            .font(Typography.captionSmall)
+                            .foregroundStyle(Color.textMuted)
                         }
                     }
                 }

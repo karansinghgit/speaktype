@@ -5,6 +5,9 @@ class MiniRecorderWindowController: NSObject {
     private var panel: NSPanel?
     private var hostingController: NSHostingController<AnyView>?
     private var lastActiveApp: NSRunningApplication?
+    private var shouldRestoreClipboardAfterAutoPaste: Bool {
+        UserDefaults.standard.object(forKey: "restoreClipboardAfterAutoPaste") as? Bool ?? false
+    }
 
     // Start recording - show panel and begin recording
     func startRecording() {
@@ -108,8 +111,14 @@ class MiniRecorderWindowController: NSObject {
 
     private func handleCommit(text: String) {
         Task {
-            // 1. Temporarily copy to clipboard so Cmd+V can insert it.
-            let previousClipboard = ClipboardService.shared.copyForTemporaryPaste(text: text)
+            // 1. Copy to clipboard for manual paste, or snapshot it first if the user wants it restored.
+            let previousClipboard: ClipboardService.ClipboardSnapshot?
+            if shouldRestoreClipboardAfterAutoPaste {
+                previousClipboard = ClipboardService.shared.copyForTemporaryPaste(text: text)
+            } else {
+                previousClipboard = nil
+                ClipboardService.shared.copy(text: text)
+            }
 
             // 2. Close panel
             await MainActor.run {
@@ -142,6 +151,8 @@ class MiniRecorderWindowController: NSObject {
             await MainActor.run {
                 ClipboardService.shared.paste()
             }
+
+            guard let previousClipboard else { return }
 
             try? await Task.sleep(nanoseconds: 350_000_000)
 

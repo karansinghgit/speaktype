@@ -108,8 +108,8 @@ class MiniRecorderWindowController: NSObject {
 
     private func handleCommit(text: String) {
         Task {
-            // 1. Copy to clipboard
-            ClipboardService.shared.copy(text: text)
+            // 1. Temporarily copy to clipboard so Cmd+V can insert it.
+            let previousClipboard = ClipboardService.shared.copyForTemporaryPaste(text: text)
 
             // 2. Close panel
             await MainActor.run {
@@ -141,6 +141,12 @@ class MiniRecorderWindowController: NSObject {
             // 6. Paste using CGEvent (Accessibility permission only)
             await MainActor.run {
                 ClipboardService.shared.paste()
+            }
+
+            try? await Task.sleep(nanoseconds: 350_000_000)
+
+            await MainActor.run {
+                ClipboardService.shared.restore(previousClipboard, ifCurrentStringMatches: text)
             }
         }
     }

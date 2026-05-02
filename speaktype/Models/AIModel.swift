@@ -78,7 +78,7 @@ struct AIModel: Identifiable, Equatable {
             accuracy: 6.0,  // ~12% WER
             expectedSizeBytes: 30_000_000,
             minimumRAMGB: 2
-        ),
+        )
     ]
 
     /// Returns the expected minimum size for a given model variant

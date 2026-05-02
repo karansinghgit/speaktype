@@ -240,4 +240,3 @@ struct LicenseView: View {
     LicenseView()
         .environmentObject(LicenseManager())
 }
-

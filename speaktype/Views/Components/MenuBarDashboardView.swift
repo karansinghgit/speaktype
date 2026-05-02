@@ -9,7 +9,7 @@ struct MenuBarDashboardView: View {
 
     private let statsColumns = [
         GridItem(.flexible(), spacing: 10),
-        GridItem(.flexible(), spacing: 10),
+        GridItem(.flexible(), spacing: 10)
     ]
 
     private var todayCount: Int {

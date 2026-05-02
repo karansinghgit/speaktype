@@ -1,6 +1,6 @@
-import Foundation
 import AVFoundation
 import Combine
+import Foundation
 
 /// Service for playing back audio recordings
 class AudioPlayerService: NSObject, ObservableObject, AVAudioPlayerDelegate {

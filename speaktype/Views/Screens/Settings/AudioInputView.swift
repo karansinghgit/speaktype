@@ -1,5 +1,5 @@
-import SwiftUI
 import AVFoundation
+import SwiftUI
 
 struct AudioInputView: View {
     @StateObject private var audioRecorder = AudioRecordingService.shared
@@ -26,10 +26,6 @@ struct AudioInputView: View {
                 
                 // Input Mode Section Removed
 
-                    
-
-
-                
                 // Available Devices Section
                 VStack(alignment: .leading, spacing: 15) {
                     HStack {
@@ -87,8 +83,6 @@ struct AudioInputView: View {
         }
     }
 }
-
-
 
 struct DeviceRow: View {
     let name: String

@@ -5,8 +5,8 @@
 //  Created on 2026-01-07.
 //
 
-import Foundation
 import AVFoundation
+import Foundation
 
 /// Represents an audio input device
 struct AudioDevice: Identifiable, Codable, Equatable {
@@ -122,7 +122,6 @@ enum AudioDeviceType: String, Codable, Equatable {
 extension AudioDevice {
     // Factory method removed as AVAudioSessionPortDescription is unavailable on macOS
 
-    
     /// System default device
     static var systemDefault: AudioDevice {
         AudioDevice(
@@ -192,4 +191,3 @@ enum InputMode: String, Codable, CaseIterable, Identifiable {
         }
     }
 }
-

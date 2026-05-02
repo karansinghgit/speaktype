@@ -1,5 +1,5 @@
-import Foundation
 import AppKit
+import Foundation
 
 /// Hotkey options for triggering SpeakType recording
 enum HotkeyOption: String, Codable, CaseIterable, Identifiable {

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Screen for managing AI transcription models

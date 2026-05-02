@@ -6,8 +6,8 @@
 //  Manages trial period and post-trial restrictions
 //
 
-import Foundation
 import Combine
+import Foundation
 
 class TrialManager: ObservableObject {
     static let shared = TrialManager()
@@ -150,4 +150,3 @@ enum TrialAction {
         }
     }
 }
-

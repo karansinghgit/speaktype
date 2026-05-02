@@ -8,7 +8,7 @@ class WhisperService {
     private static let placeholderPatterns = [
         #"\[(?:BLANK_AUDIO|SILENCE)\]"#,
         #"<\|nospeech\|>"#,
-        #"\[\s*S\s*\]"#,
+        #"\[\s*S\s*\]"#
     ]
     private static let noiseLabelTerms = [
         "applause",
@@ -37,7 +37,7 @@ class WhisperService {
         "unintelligible",
         "wind",
         "wind blowing",
-        "wind noise",
+        "wind noise"
     ]
     private static let bracketedNoisePattern: String = {
         let escaped = noiseLabelTerms.map(NSRegularExpression.escapedPattern(for:)).joined(
@@ -102,8 +102,7 @@ class WhisperService {
         print("💻 Device RAM: \(ramGB) GB")
 
         if let model = AIModel.availableModels.first(where: { $0.variant == variant }),
-            ramGB < model.minimumRAMGB
-        {
+            ramGB < model.minimumRAMGB {
             print(
                 "⚠️ WARNING: Model \(variant) recommends \(model.minimumRAMGB)GB+ RAM, device has \(ramGB)GB. Loading may fail or be very slow."
             )
@@ -120,21 +119,20 @@ class WhisperService {
         }
 
         do {
-            let documentDirectory = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask
-            ).first!
-            let modelFolderPath = documentDirectory.appendingPathComponent(
-                "huggingface/models/argmaxinc/whisperkit-coreml/\(variant)"
-            ).path
+            let storageURL = ModelDownloadService.shared.modelStorageURL
+            let modelFolderPath = storageURL
+                .appendingPathComponent("models/argmaxinc/whisperkit-coreml/\(variant)").path
 
             // Use WhisperKitConfig with optimized settings
             let config = WhisperKitConfig(
                 model: variant,
+                downloadBase: storageURL,
                 modelFolder: modelFolderPath,
-                computeOptions: ModelComputeOptions(),  // Uses GPU + Neural Engine
+                tokenizerFolder: storageURL,
+                computeOptions: ModelComputeOptions(),
                 verbose: false,
                 logLevel: .error,
-                prewarm: true,  // Built-in model specialization (replaces manual warmup)
+                prewarm: true,
                 load: true,
                 download: false  // Already downloaded via ModelDownloadService
             )

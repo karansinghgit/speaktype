@@ -42,4 +42,3 @@ enum Constants {
         static let userDefaultsSuiteName = "com.speaktype.defaults"
     }
 }
-

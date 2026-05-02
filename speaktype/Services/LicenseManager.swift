@@ -6,8 +6,8 @@
 //  License management and validation for Polar.sh integration
 //
 
-import Foundation
 import Combine
+import Foundation
 
 enum LicenseError: LocalizedError {
     case invalidKey
@@ -316,4 +316,3 @@ class LicenseManager: ObservableObject {
         print("ℹ️ License deactivated locally. Key removed from Keychain.")
     }
 }
-

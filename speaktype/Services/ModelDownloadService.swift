@@ -1,42 +1,38 @@
-import Foundation
 import Combine
+import Foundation
 import WhisperKit
 
 class ModelDownloadService: ObservableObject {
     static let shared = ModelDownloadService()
-    
-    @Published var downloadProgress: [String: Double] = [:] // Map Model Variant (String) to progress
-    @Published var downloadError: [String: String] = [:] // Debugging: track errors
+
+    static let storagePathKey = "modelStoragePath"
+
+    @Published var downloadProgress: [String: Double] = [:]
+    @Published var downloadError: [String: String] = [:]
     @Published var isDownloading: [String: Bool] = [:]
-    
-    private var activeTasks: [String: Task<Void, Never>] = [:] // Track running download tasks
-    
+
+    private var activeTasks: [String: Task<Void, Never>] = [:]
+
+    /// Root directory passed as `downloadBase` to WhisperKit/HubApi.
+    /// Defaults to ~/Library/Application Support/SpeakType/Models per Apple guidelines.
+    var modelStorageURL: URL {
+        let custom = UserDefaults.standard.string(forKey: Self.storagePathKey) ?? ""
+        if !custom.isEmpty {
+            return URL(fileURLWithPath: custom)
+        }
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport.appendingPathComponent("SpeakType/Models")
+    }
+
+    /// Path where WhisperKit stores individual model folders.
+    var whisperKitModelsURL: URL {
+        modelStorageURL.appendingPathComponent("models/argmaxinc/whisperkit-coreml")
+    }
+
     private init() {
-        // Force a custom cache directory to avoid "Multiple models found" conflicts
-        setupCustomCache()
-        
-        // Check for already-downloaded models on launch
         Task { @MainActor in
             await refreshDownloadedModels()
-            // Don't auto-select - let user explicitly pick a model which will load it
         }
-    }
-    
-    private func setupCustomCache() {
-        // Use the standard Documents/huggingface location that WhisperKit expects
-        guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
-        
-        let huggingfaceCache = documentsDir.appendingPathComponent("huggingface")
-        
-        do {
-            try FileManager.default.createDirectory(at: huggingfaceCache, withIntermediateDirectories: true)
-            print("✅ Using standard HuggingFace cache at: \(huggingfaceCache.path)")
-        } catch {
-            print("⚠️ Failed to create huggingface directory: \(error)")
-        }
-        
-        // Don't override HF_HUB_CACHE - let WhisperKit use its default behavior
-        // This ensures compatibility with the standard HuggingFace cache structure
     }
     
     // Check which models are already downloaded and update progress dictionary
@@ -50,53 +46,37 @@ class ModelDownloadService: ObservableObject {
         
         // Verify models actually exist on disk with proper size validation
         let fileManager = FileManager.default
-        if let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let whisperKitPath = documentsDir.appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml")
-            
-            if fileManager.fileExists(atPath: whisperKitPath.path) {
-                if let contents = try? fileManager.contentsOfDirectory(at: whisperKitPath, includingPropertiesForKeys: [.isDirectoryKey]) {
-                    print("📁 Found \(contents.count) items in WhisperKit cache at \(whisperKitPath.path)")
-                    
-                    for item in contents {
-                        let modelName = item.lastPathComponent
-                        
-                        // Skip non-model directories
-                        if modelName == "config.json" || modelName == ".DS_Store" {
-                            continue
-                        }
-                        
-                        // Verify this directory has actual model files (not just empty directory)
-                        if let subContents = try? fileManager.contentsOfDirectory(at: item, includingPropertiesForKeys: [.fileSizeKey]),
-                           !subContents.isEmpty {
-                            
-                            // Check if it has the essential files for a model (must have config.json)
-                            let hasConfigJson = subContents.contains(where: { $0.lastPathComponent == "config.json" })
-                            let hasModelFiles = subContents.contains(where: { $0.lastPathComponent.hasSuffix(".mlmodelc") })
-                            
-                            if hasConfigJson && hasModelFiles {
-                                // Calculate total directory size
-                                let directorySize = Self.calculateDirectorySize(at: item)
-                                let expectedSize = AIModel.expectedSize(for: modelName)
-                                
-                                // Model is complete if it's at least 80% of expected size
-                                let minAcceptableSize = Int64(Double(expectedSize) * 0.8)
-                                
-                                if directorySize >= minAcceptableSize {
-                                    print("✅ Model \(modelName) verified: \(Self.formatBytes(directorySize)) (expected ~\(Self.formatBytes(expectedSize)))")
-                                    foundModels.insert(modelName)
-                                } else {
-                                    print("⚠️ Model \(modelName) is INCOMPLETE: \(Self.formatBytes(directorySize)) < \(Self.formatBytes(minAcceptableSize)) minimum")
-                                }
-                            } else {
-                                print("⚠️ Model \(modelName) is incomplete (missing config.json or .mlmodelc files)")
-                            }
+        let whisperKitPath = whisperKitModelsURL
+
+        if fileManager.fileExists(atPath: whisperKitPath.path),
+           let contents = try? fileManager.contentsOfDirectory(at: whisperKitPath, includingPropertiesForKeys: [.isDirectoryKey]) {
+            print("📁 Found \(contents.count) items in WhisperKit cache at \(whisperKitPath.path)")
+
+            for item in contents {
+                let modelName = item.lastPathComponent
+                if modelName == "config.json" || modelName == ".DS_Store" { continue }
+
+                if let subContents = try? fileManager.contentsOfDirectory(at: item, includingPropertiesForKeys: [.fileSizeKey]),
+                   !subContents.isEmpty {
+                    let hasConfigJson = subContents.contains(where: { $0.lastPathComponent == "config.json" })
+                    let hasModelFiles = subContents.contains(where: { $0.lastPathComponent.hasSuffix(".mlmodelc") })
+
+                    if hasConfigJson && hasModelFiles {
+                        let directorySize = Self.calculateDirectorySize(at: item)
+                        let expectedSize = AIModel.expectedSize(for: modelName)
+                        let minAcceptableSize = Int64(Double(expectedSize) * 0.8)
+
+                        if directorySize >= minAcceptableSize {
+                            print("✅ Model \(modelName) verified: \(Self.formatBytes(directorySize))")
+                            foundModels.insert(modelName)
+                        } else {
+                            print("⚠️ Model \(modelName) incomplete: \(Self.formatBytes(directorySize)) < \(Self.formatBytes(minAcceptableSize))")
                         }
                     }
                 }
-            } else {
-                print("ℹ️ WhisperKit cache directory doesn't exist yet: \(whisperKitPath.path)")
-                print("   Models will be downloaded on first use.")
             }
+        } else {
+            print("ℹ️ No model storage directory yet — models will be downloaded on first use.")
         }
         
         await MainActor.run {
@@ -126,29 +106,21 @@ class ModelDownloadService: ObservableObject {
         downloadError[variant] = nil
         print("Starting WhisperKit download for: \(variant)")
         
+        let storageURL = modelStorageURL
         let task = Task {
-            // Debug: List what WhisperKit sees
-            // Note: WhisperKit API might differ, but let's try to see if we can get info.
-            // If fetchAvailableModels exists.
-            
             do {
-                // Determine model variant enum/string
-                // Note: WhisperKit.download(variant:from:) is the likely API.
-                // We use the "variant" string to fetch.
-                // Assuming `WhisperKit.download(variant: variant)` acts as the fetcher.
-                // Progress callback mock (since we might not have exact API signature yet):
-                
-                // Actual API (hypothetical based on search):
-                // let model = try await WhisperKit(model: variant) 
-                // OR
-                // try await WhisperKit.download(variant: variant) { progress in ... }
-                
-                // likely: download(variant:progressCallback:) - 'from' usually has a default
-                let _ = try await WhisperKit.download(variant: variant, progressCallback: { progress in
-                    DispatchQueue.main.async {
-                        self.downloadProgress[variant] = progress.fractionCompleted
+                // Create storage directory only now, on first actual download
+                try FileManager.default.createDirectory(at: storageURL, withIntermediateDirectories: true)
+
+                _ = try await WhisperKit.download(
+                    variant: variant,
+                    downloadBase: storageURL,
+                    progressCallback: { progress in
+                        DispatchQueue.main.async {
+                            self.downloadProgress[variant] = progress.fractionCompleted
+                        }
                     }
-                })
+                )
                 
                 // Check if task was cancelled before declaring success
                 if Task.isCancelled { return }
@@ -189,11 +161,15 @@ class ModelDownloadService: ObservableObject {
                      
                      // Retry download once
                      do {
-                         let _ = try await WhisperKit.download(variant: variant, progressCallback: { progress in
-                             DispatchQueue.main.async {
-                                 self.downloadProgress[variant] = progress.fractionCompleted
+                         _ = try await WhisperKit.download(
+                             variant: variant,
+                             downloadBase: storageURL,
+                             progressCallback: { progress in
+                                 DispatchQueue.main.async {
+                                     self.downloadProgress[variant] = progress.fractionCompleted
+                                 }
                              }
-                         })
+                         )
                          
                          if Task.isCancelled { return }
                          
@@ -284,11 +260,16 @@ class ModelDownloadService: ObservableObject {
         deletedCount += cleanupDirectory(tempHf, matchAny: [String(modelName), underscoreVariant])
         deletedCount += cleanupDirectory(tempDir, matchAny: [String(modelName), underscoreVariant])
         
-        // 4. Check Documents/huggingface/models/argmaxinc/whisperkit-coreml (standard location)
+        // 4. Check configured storage location (whisperKitModelsURL)
+        let configuredModelsPath = whisperKitModelsURL
+        checkedPaths.append(configuredModelsPath.path)
+        deletedCount += cleanupDirectory(configuredModelsPath, matchAny: [String(modelName), underscoreVariant])
+
+        // 5. Check legacy Documents/huggingface location (old default, kept for cleanup)
         if let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let whisperKitModels = documentsDir.appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml")
-            checkedPaths.append(whisperKitModels.path)
-            deletedCount += cleanupDirectory(whisperKitModels, matchAny: [String(modelName), underscoreVariant])
+            let legacyPath = documentsDir.appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml")
+            checkedPaths.append(legacyPath.path)
+            deletedCount += cleanupDirectory(legacyPath, matchAny: [String(modelName), underscoreVariant])
         }
         
         print("🗑️ Cleanup complete. Deleted \(deletedCount) items from \(checkedPaths.count) locations")

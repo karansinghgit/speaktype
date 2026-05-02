@@ -64,4 +64,3 @@ extension AppLogger {
         category.info("✅ \(message)")
     }
 }
-

@@ -1,6 +1,5 @@
-import SwiftUI
 import AVFoundation
-
+import SwiftUI
 
 struct PermissionsView: View {
     @State private var micStatus: AVAuthorizationStatus = .notDetermined
@@ -51,7 +50,6 @@ struct PermissionsView: View {
                         }
                     )
                     
-
                }
                 .padding(.horizontal, 40)
             }

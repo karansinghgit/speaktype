@@ -141,4 +141,3 @@ enum WhisperModel: String, Codable, CaseIterable, Identifiable {
         self == .base || self == .small
     }
 }
-

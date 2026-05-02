@@ -231,7 +231,7 @@ class AudioRecordingService: NSObject, ObservableObject {
                     AVLinearPCMBitDepthKey: 16,
                     AVLinearPCMIsFloatKey: false,
                     AVLinearPCMIsBigEndianKey: false,
-                    AVLinearPCMIsNonInterleaved: false,
+                    AVLinearPCMIsNonInterleaved: false
                 ]
 
                 assetWriterInput = AVAssetWriterInput(mediaType: .audio, outputSettings: settings)
@@ -271,8 +271,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         // Ensure minimum recording duration to prevent empty/corrupted WAV files
         if let startTime = currentFileURL?.path.components(separatedBy: "-").last?
             .replacingOccurrences(of: ".wav", with: ""),
-            let startTimestamp = Double(startTime)
-        {
+            let startTimestamp = Double(startTime) {
             let duration = Date().timeIntervalSince1970 - startTimestamp
             if duration < 0.5 {
                 try? await Task.sleep(nanoseconds: UInt64((0.5 - duration) * 1_000_000_000))
@@ -297,8 +296,7 @@ class AudioRecordingService: NSObject, ObservableObject {
                 if let lastChunkInput = self.chunkAssetWriterInput,
                     let lastChunkWriter = self.chunkAssetWriter,
                     let lastChunkURL = self.chunkFileURL,
-                    self.chunkIsSessionStarted
-                {
+                    self.chunkIsSessionStarted {
                     self.resetChunkWriterState()
 
                     finishGroup.enter()
@@ -494,7 +492,7 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
             AVLinearPCMBitDepthKey: 16,
             AVLinearPCMIsFloatKey: false,
             AVLinearPCMIsBigEndianKey: false,
-            AVLinearPCMIsNonInterleaved: false,
+            AVLinearPCMIsNonInterleaved: false
         ]
         let ci = AVAssetWriterInput(mediaType: .audio, outputSettings: settings)
         ci.expectsMediaDataInRealTime = true
@@ -651,7 +649,7 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
         // Frequency = (Zero Crossings * Sample Rate) / (2 * N)
         // Note: 'stride' reduces effective sample rate for this calculation, so we adjust
         let effectiveSampleRate = Float(asbd.mSampleRate) / Float(stride)
-        let _ = (Float(zeroCrossings) * effectiveSampleRate) / (2.0 * Float(samplesToRead))
+        _ = (Float(zeroCrossings) * effectiveSampleRate) / (2.0 * Float(samplesToRead))
 
         // Normalize Frequency for UI (0...1)
         // Human voice fundamental freq is roughly 85Hz - 255Hz, harmonics go higher.

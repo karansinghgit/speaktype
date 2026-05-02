@@ -6,7 +6,7 @@ struct OnboardingView: View {
     @State private var currentPage = 0
 
     var body: some View {
-        GeometryReader { geometry in
+        GeometryReader { _ in
             ZStack {
                 // Background - Match main app exactly
                 Color.bgApp.ignoresSafeArea()
@@ -310,7 +310,7 @@ struct PermissionsPage: View {
 
         case .notDetermined:
             // Show native permission prompt
-            AVCaptureDevice.requestAccess(for: .audio) { granted in
+            AVCaptureDevice.requestAccess(for: .audio) { _ in
                 DispatchQueue.main.async {
                     self.checkPermissions()
                 }
@@ -350,8 +350,7 @@ struct PermissionsPage: View {
     }
 
     func openSettings(for pane: String) {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")
-        {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") {
             NSWorkspace.shared.open(url)
         }
     }
@@ -413,7 +412,7 @@ struct FeatureCard: View {
                         LinearGradient(
                             colors: [
                                 Color.bgCard.opacity(0.8),
-                                Color.textSecondary.opacity(0.03),
+                                Color.textSecondary.opacity(0.03)
                             ],
                             startPoint: .top,
                             endPoint: .bottom

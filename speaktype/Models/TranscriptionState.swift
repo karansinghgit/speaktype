@@ -50,4 +50,3 @@ enum TranscriptionState: String, Codable, Equatable {
         }
     }
 }
-

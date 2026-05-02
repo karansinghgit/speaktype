@@ -5,8 +5,8 @@
 //  Created on 2026-01-07.
 //
 
-import Foundation
 import Carbon.HIToolbox
+import Foundation
 
 /// Configuration for global keyboard shortcuts
 struct HotkeyConfiguration: Codable, Equatable, Identifiable {
@@ -92,7 +92,7 @@ struct HotkeyConfiguration: Codable, Equatable, Identifiable {
             (UInt32(kVK_ANSI_Q), [.command]), // Quit
             (UInt32(kVK_ANSI_W), [.command]), // Close
             (UInt32(kVK_Tab), [.command]), // Switch apps
-            (UInt32(kVK_Space), [.command]), // Spotlight
+            (UInt32(kVK_Space), [.command]) // Spotlight
         ]
         
         return commonConflicts.contains { code, flags in
@@ -211,4 +211,3 @@ private func keyCodeToString(_ keyCode: UInt32) -> String {
         return String(format: "Key%02X", keyCode)
     }
 }
-

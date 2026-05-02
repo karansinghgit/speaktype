@@ -1,6 +1,6 @@
-import Foundation
-import AVFoundation
 import ApplicationServices
+import AVFoundation
+import Foundation
 
 class PermissionService {
     static let shared = PermissionService()

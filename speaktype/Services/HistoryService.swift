@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 import SwiftUI // For IndexSet operations if needed, though Foundation usually covers it, but error says missing import.
 
 struct HistoryStatsEntry: Identifiable, Codable, Hashable {
@@ -153,8 +153,7 @@ class HistoryService: ObservableObject {
             items = normalizedItems
 
             if normalizedItems.count != decoded.count
-                || zip(decoded, normalizedItems).contains(where: { $0.transcript != $1.transcript })
-            {
+                || zip(decoded, normalizedItems).contains(where: { $0.transcript != $1.transcript }) {
                 saveHistory()
             }
 

@@ -1,5 +1,5 @@
-import AVKit
 import AppKit
+import AVKit
 import CoreMedia
 import SwiftUI
 import UniformTypeIdentifiers
@@ -178,8 +178,7 @@ struct DashboardView: View {
         .onAppear {
             Task {
                 if !whisperService.isInitialized
-                    || whisperService.currentModelVariant != selectedModel
-                {
+                    || whisperService.currentModelVariant != selectedModel {
                     try? await whisperService.loadModel(variant: selectedModel)
                 }
             }
@@ -404,7 +403,7 @@ struct ActivityChartCard: View {
             HStack(alignment: .bottom, spacing: 14) {
                 let maxCount = max(weeklyData.map { $0.count }.max() ?? 1, 1)
 
-                ForEach(Array(weeklyData.enumerated()), id: \.offset) { index, data in
+                ForEach(Array(weeklyData.enumerated()), id: \.offset) { _, data in
                     VStack(spacing: 8) {
                         // Count label on top (only if > 0)
                         Text(data.count > 0 ? "\(data.count)" : "")

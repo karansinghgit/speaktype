@@ -13,7 +13,7 @@ struct StatisticsView: View {
     @StateObject private var historyService = HistoryService.shared
     @ObservedObject private var audioRecorder = AudioRecordingService.shared
     @State private var selectedPeriod: StatisticsPeriod = .week
-    @State private var timer: Timer? = nil
+    @State private var timer: Timer?
     @State private var timeTrigger = Date()
 
     var body: some View {
@@ -180,7 +180,7 @@ struct StatisticsView: View {
         .chartXAxis {
             if selectedPeriod == .year {
                 // For year (monthly view), show months
-                AxisMarks(values: .automatic) { value in
+                AxisMarks(values: .automatic) { _ in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                         .foregroundStyle(Color.border.opacity(0.2))
                     AxisValueLabel()
@@ -189,7 +189,7 @@ struct StatisticsView: View {
                 }
             } else if selectedPeriod == .month {
                 // For month view, show every 7 days
-                AxisMarks(values: .stride(by: .day, count: 7)) { value in
+                AxisMarks(values: .stride(by: .day, count: 7)) { _ in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                         .foregroundStyle(Color.border.opacity(0.2))
                     AxisValueLabel()
@@ -198,7 +198,7 @@ struct StatisticsView: View {
                 }
             } else {
                 // For week view, show all days
-                AxisMarks { value in
+                AxisMarks { _ in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                         .foregroundStyle(Color.border.opacity(0.2))
                     AxisValueLabel()
@@ -208,7 +208,7 @@ struct StatisticsView: View {
             }
         }
         .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 5)) { value in
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 5)) { _ in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                     .foregroundStyle(Color.border.opacity(0.2))
                 AxisValueLabel()

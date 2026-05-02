@@ -538,8 +538,7 @@ struct MiniRecorderView: View {
         debugLog("processRecording started with url: \(url.lastPathComponent)")
         do {
             // Ensure model is loaded before transcribing
-            if !whisperService.isInitialized || whisperService.currentModelVariant != selectedModel
-            {
+            if !whisperService.isInitialized || whisperService.currentModelVariant != selectedModel {
                 debugLog("Loading model: \(selectedModel)")
                 await MainActor.run { statusMessage = "Warming up model — first use is slower..." }
                 do {

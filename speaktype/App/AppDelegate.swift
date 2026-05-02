@@ -45,14 +45,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let eventSource = CGEventSource(stateID: .hidSystemState)
 
         if let keyDown = CGEvent(
-            keyboardEventSource: eventSource, virtualKey: dummyKeyCode, keyDown: true)
-        {
+            keyboardEventSource: eventSource, virtualKey: dummyKeyCode, keyDown: true) {
             keyDown.post(tap: .cghidEventTap)
         }
 
         if let keyUp = CGEvent(
-            keyboardEventSource: eventSource, virtualKey: dummyKeyCode, keyDown: false)
-        {
+            keyboardEventSource: eventSource, virtualKey: dummyKeyCode, keyDown: false) {
             keyUp.post(tap: .cghidEventTap)
         }
     }
@@ -225,8 +223,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if let rawValue = UserDefaults.standard.string(forKey: "selectedHotkey"),
-            let option = HotkeyOption(rawValue: rawValue)
-        {
+            let option = HotkeyOption(rawValue: rawValue) {
             return option
         }
 

@@ -5,8 +5,8 @@
 //  Created on 2026-01-07.
 //
 
-import Foundation
 import AVFoundation
+import Foundation
 
 /// Represents an active or completed audio recording session
 struct RecordingSession: Identifiable, Equatable {
@@ -199,4 +199,3 @@ extension RecordingSession {
         )
     }
 }
-

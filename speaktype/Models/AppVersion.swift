@@ -85,7 +85,7 @@ extension AppVersion {
             "GPT-5.2 model support",
             "Configurable audio resume delay for Bluetooth headphones",
             "Redesigned Power Mode & Enhancement UI",
-            "Minor bug fixes and improvements",
+            "Minor bug fixes and improvements"
         ],
         downloadURL: "https://speaktype.app/download/latest",
         isRequired: false,

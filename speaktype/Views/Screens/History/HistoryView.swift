@@ -4,8 +4,8 @@ struct HistoryView: View {
     @StateObject private var historyService = HistoryService.shared
     @StateObject private var audioPlayer = AudioPlayerService.shared
     @State private var showDeleteAlert = false
-    @State private var itemPendingDeletion: HistoryItem? = nil
-    @State private var expandedItemId: UUID? = nil
+    @State private var itemPendingDeletion: HistoryItem?
+    @State private var expandedItemId: UUID?
     @State private var showCopyToast = false
     
     var body: some View {
@@ -49,7 +49,6 @@ struct HistoryView: View {
                 .padding(.horizontal, 24)
                 .padding(.top, 20)
             
-                
                 if historyService.items.isEmpty {
                     // Empty state
                     VStack(spacing: 20) {

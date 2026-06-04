@@ -67,11 +67,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return terminalBundleIdentifiers.contains(bundleID)
     }
 
+    /// F19 — posted by suppressEmojiPicker(). The synthetic event inherits the live
+    /// modifier state (including the held Fn flag), so the modifier-combo cancel
+    /// guard must ignore this key code or it cancels the recording it just started.
+    private static let emojiSuppressionKeyCode: CGKeyCode = 0x50  // F19 (80)
+
     private func suppressEmojiPicker() {
         // A robust way to suppress the emoji picker is to post a harmless keydown/keyup
         // with the F19 key (a non-modifier key), which immediately breaks the Globe key's double-tap
         // or press-and-release listener without causing a spurious flagsChanged event.
-        let dummyKeyCode: CGKeyCode = 0x50  // F19 (80)
+        let dummyKeyCode = Self.emojiSuppressionKeyCode
         let eventSource = CGEventSource(stateID: .hidSystemState)
 
         if let keyDown = CGEvent(
@@ -230,6 +235,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard UserDefaults.standard.integer(forKey: "recordingMode") == 0 else { return }
         guard !event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty else { return }
         guard event.keyCode != getSelectedHotkey().keyCode else { return }
+        // Ignore the synthetic F19 posted by suppressEmojiPicker() — it carries the
+        // held Fn flag and would otherwise cancel the recording immediately.
+        guard event.keyCode != Self.emojiSuppressionKeyCode else { return }
 
         isHotkeyPressed = false
         miniRecorderController?.cancelRecording()

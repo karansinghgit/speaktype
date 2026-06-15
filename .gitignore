@@ -25,6 +25,10 @@ dist/
 # Logs
 *.log
 
+# Code coverage / profiling artifacts
+*.profraw
+*.profdata
+
 # Temporary files
 *.swp
 *.tmp
@@ -32,6 +36,11 @@ dist/
 
 # Cursor
 .cursor/
+
+# Agent / Codex tooling
+.agents/
+.codex/
+.claude/
 
 # App-specific
 *.app

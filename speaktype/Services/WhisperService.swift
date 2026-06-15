@@ -50,8 +50,15 @@ class WhisperService {
     var isTranscribing = false
     var isLoading = false
     var loadingStage: String = ""  // Descriptive stage for UI
+    var loadingModelVariant: String = ""
+    var loadingStartedAt: Date?
 
     var currentModelVariant: String = ""  // No default - must be explicitly set
+    private var lastLoadDuration: TimeInterval?
+
+    @MainActor private var activeLoadTask: Task<Void, Error>?
+    @MainActor private var activeLoadVariant: String = ""
+    @MainActor private var activeLoadToken: UUID?
 
     /// Device RAM in GB (cached on init)
     static let deviceRAMGB: Int = {
@@ -79,11 +86,13 @@ class WhisperService {
     init() {}
 
     // Default initialization (loads default or saved model)
+    @MainActor
     func initialize() async throws {
         try await loadModel(variant: currentModelVariant)
     }
 
     // Dynamic model loading with optimized WhisperKitConfig
+    @MainActor
     func loadModel(variant: String) async throws {
         // Already loaded this exact model
         if isInitialized && variant == currentModelVariant && pipe != nil {
@@ -91,12 +100,54 @@ class WhisperService {
             return
         }
 
-        // Prevent concurrent loading
-        guard !isLoading else {
-            print("⚠️ Model loading already in progress, skipping")
-            throw TranscriptionError.alreadyLoading
+        if let activeLoadTask {
+            let inFlightVariant = activeLoadVariant
+
+            if inFlightVariant == variant {
+                loadingStage = "Model is still warming up..."
+                print("⏳ Model \(variant) load already in progress, waiting for completion")
+                try await activeLoadTask.value
+                return
+            }
+
+            loadingStage = "Finishing current model load..."
+            print("⏳ Waiting for current model load (\(inFlightVariant)) to finish before loading \(variant)")
+            do {
+                try await activeLoadTask.value
+            } catch {
+                // If another model failed to warm up, still try the model the caller asked for.
+                print(
+                    "⚠️ In-flight model load (\(inFlightVariant)) failed while waiting: \(error.localizedDescription). Continuing with \(variant)."
+                )
+            }
+
+            if isInitialized && variant == currentModelVariant && pipe != nil {
+                print("✅ Model \(variant) became ready while waiting, skipping duplicate load")
+                return
+            }
         }
 
+        let token = UUID()
+        let task = Task { @MainActor in
+            try await self.performModelLoad(variant: variant)
+        }
+        activeLoadTask = task
+        activeLoadVariant = variant
+        activeLoadToken = token
+
+        defer {
+            if activeLoadToken == token {
+                activeLoadTask = nil
+                activeLoadVariant = ""
+                activeLoadToken = nil
+            }
+        }
+
+        try await task.value
+    }
+
+    @MainActor
+    private func performModelLoad(variant: String) async throws {
         let ramGB = Self.deviceRAMGB
         print("🔄 Initializing WhisperKit with model: \(variant)...")
         print("💻 Device RAM: \(ramGB) GB")
@@ -111,10 +162,13 @@ class WhisperService {
 
         isLoading = true
         isInitialized = false
-        loadingStage = "Preparing model..."
+        loadingModelVariant = variant
+        loadingStartedAt = Date()
+        loadingStage = "Preparing \(modelDisplayName(for: variant))..."
 
         // Release existing model to free memory
         if pipe != nil {
+            loadingStage = "Switching models and freeing memory..."
             print("🗑️ Releasing previous model from memory...")
             pipe = nil
         }
@@ -139,7 +193,7 @@ class WhisperService {
                 download: false  // Already downloaded via ModelDownloadService
             )
 
-            loadingStage = "Loading AI model..."
+            loadingStage = "Loading model into memory..."
 
             // Start a watchdog timer that will flag a timeout
             let loadStart = Date()
@@ -147,20 +201,29 @@ class WhisperService {
             pipe = try await WhisperKit(config)
 
             let loadDuration = Date().timeIntervalSince(loadStart)
+            lastLoadDuration = loadDuration
             print("⏱️ Model loaded in \(String(format: "%.1f", loadDuration))s")
 
             currentModelVariant = variant
             isInitialized = true
             isLoading = false
             loadingStage = ""
+            loadingModelVariant = ""
+            loadingStartedAt = nil
             print("✅ WhisperKit initialized and prewarmed with \(variant)")
         } catch {
             isLoading = false
             loadingStage = ""
+            loadingModelVariant = ""
+            loadingStartedAt = nil
             print(
                 "❌ Failed to initialize WhisperKit with \(variant): \(error.localizedDescription)")
             throw error
         }
+    }
+
+    private func modelDisplayName(for variant: String) -> String {
+        AIModel.availableModels.first(where: { $0.variant == variant })?.name ?? variant
     }
 
     func transcribe(audioFile: URL, language: String = "auto") async throws -> String {

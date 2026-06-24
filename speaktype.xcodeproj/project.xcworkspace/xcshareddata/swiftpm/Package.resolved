@@ -1,6 +1,15 @@
 {
-  "originHash" : "9a97c8073af9b07b8c46128893fdd0b6f4eb090da4c6175aa09be32df1ea140f",
+  "originHash" : "b28772f685604de88d5055d6f958f79dae695dcf96bf27ca2f286a28a550539e",
   "pins" : [
+    {
+      "identity" : "dswaveformimage",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/dmrschmidt/DSWaveformImage",
+      "state" : {
+        "revision" : "00afb7930863b9cc3bd011389d601735e548093c",
+        "version" : "14.5.0"
+      }
+    },
     {
       "identity" : "keyboardshortcuts",
       "kind" : "remoteSourceControl",

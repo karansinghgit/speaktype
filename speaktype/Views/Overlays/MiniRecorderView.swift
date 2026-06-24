@@ -1,6 +1,9 @@
 import AVFoundation
+import AppKit
 import Combine
 import CoreMedia
+import DSWaveformImage
+import DSWaveformImageViews
 import SwiftUI
 
 struct MiniRecorderView: View {
@@ -78,6 +81,20 @@ struct MiniRecorderView: View {
     // MARK: - State for Animation
     @State private var phase: CGFloat = 0
 
+    // MARK: - Live waveform (DSWaveformImage)
+    /// Rolling buffer of recent normalized mic levels fed to WaveformLiveCanvas.
+    @State private var liveSamples: [Float] = []
+    private let waveSampleTimer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+    private static let maxLiveSamples = 28
+    private static let liveWaveConfiguration = Waveform.Configuration(
+        backgroundColor: .clear,
+        style: .striped(
+            .init(color: NSColor.white.withAlphaComponent(0.85), width: 2.5, spacing: 2, lineCap: .round)),
+        damping: .init(percentage: 0.16, sides: .both),
+        verticalScalingFactor: 0.9,
+        shouldAntialias: true
+    )
+
     // Default Init for Preview
     init(onCommit: ((String) -> Void)? = nil, onCancel: (() -> Void)? = nil) {
         self.onCommit = onCommit
@@ -107,33 +124,22 @@ struct MiniRecorderView: View {
                 HStack(spacing: 12) {
                     stopButton
 
-                    // Waveform — a real flowing sine wave that rises with audio level
-                    TimelineView(.animation) { timeline in
-                        let t = timeline.date.timeIntervalSinceReferenceDate
-                        let phase = CGFloat(t.truncatingRemainder(dividingBy: 100)) * 3.4
-                        let level = max(0.06, CGFloat(audioRecorder.audioLevel))
-                        let amplitude = 2.5 + level * 9.5
-
-                        ZStack {
-                            // Trailing echo wave adds depth
-                            HorizontalWave(phase: phase - 0.7, amplitude: amplitude * 0.65, frequency: 2.6)
-                                .stroke(
-                                    Color.white.opacity(0.22),
-                                    style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
-
-                            // Main wave with a soft horizontal gradient
-                            HorizontalWave(phase: phase, amplitude: amplitude, frequency: 2.0)
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.white.opacity(0.5), Color.white,
-                                            Color.white.opacity(0.5),
-                                        ],
-                                        startPoint: .leading, endPoint: .trailing),
-                                    style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    // Waveform — live render of the actual microphone input.
+                    // Calm/flat when silent, peaks on speech; no arbitrary drift.
+                    WaveformLiveCanvas(
+                        samples: liveSamples,
+                        configuration: Self.liveWaveConfiguration,
+                        renderer: LinearWaveformRenderer(),
+                        shouldDrawSilencePadding: true
+                    )
+                    .frame(width: 96, height: 26)
+                    .onAppear { liveSamples = [] }
+                    .onReceive(waveSampleTimer) { _ in
+                        liveSamples.append(audioRecorder.audioLevel)
+                        if liveSamples.count > Self.maxLiveSamples {
+                            liveSamples.removeFirst(liveSamples.count - Self.maxLiveSamples)
                         }
                     }
-                    .frame(width: 92, height: 30)
 
                     HStack(spacing: 8) {
                         Menu {
@@ -636,47 +642,6 @@ struct MiniRecorderView: View {
 }
 
 // MARK: - Helper Shapes & Views
-
-struct HorizontalWave: Shape {
-    var phase: CGFloat
-    var amplitude: CGFloat
-    var frequency: CGFloat
-
-    // Allow animation of phase, amplitude, AND frequency
-    var animatableData: AnimatablePair<CGFloat, AnimatablePair<CGFloat, CGFloat>> {
-        get { AnimatablePair(phase, AnimatablePair(amplitude, frequency)) }
-        set {
-            phase = newValue.first
-            amplitude = newValue.second.first
-            frequency = newValue.second.second
-        }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let width = rect.width
-        let height = rect.height
-        let midHeight = height / 2
-
-        // Start at left middle
-        path.move(to: CGPoint(x: 0, y: midHeight))
-
-        for x in stride(from: 0, through: width, by: 1) {
-            let relativeX = x / width
-
-            // Sine wave formula: y = A * sin(kx - wt)
-            // k = 2pi * frequency (cycles across width)
-            // wt = phase
-            let sine = sin((relativeX * .pi * 2 * frequency) - phase)
-
-            let y = midHeight + sine * amplitude
-
-            path.addLine(to: CGPoint(x: x, y: y))
-        }
-
-        return path
-    }
-}
 
 struct ChevronShape: Shape {
     let pointsUp: Bool

@@ -16,7 +16,7 @@ class TranscriptionManager {
     // MARK: - Engines
 
     private let whisper = WhisperService.shared
-    // Phase 2: private let parakeet = ParakeetEngine.shared
+    private let parakeet = ParakeetEngine.shared
 
     /// Which backend currently owns the loaded model. Drives display state.
     private(set) var activeKind: TranscriptionEngineKind = .whisper
@@ -29,29 +29,56 @@ class TranscriptionManager {
         case .whisper:
             return whisper
         case .parakeet:
-            // Phase 2 wires the Parakeet engine here. Until then, Parakeet
-            // models are not present in the catalog so this is unreachable.
-            return whisper
+            return parakeet
         }
     }
 
     // MARK: - Display state
     //
-    // Phase 1 reads the Whisper engine directly (the only backend), which keeps
-    // SwiftUI observation tracking on the concrete `@Observable` instance.
-    // Phase 2 will switch these on `activeKind`.
+    // These switch on `activeKind` and read the concrete `@Observable` engine
+    // directly so SwiftUI observation tracks the active backend's state.
 
-    var isInitialized: Bool { whisper.isInitialized }
-    var isLoading: Bool { whisper.isLoading }
-    var isTranscribing: Bool { whisper.isTranscribing }
-    var loadingStage: String { whisper.loadingStage }
-    var currentModelVariant: String { whisper.currentModelVariant }
+    var isInitialized: Bool {
+        switch activeKind {
+        case .whisper: return whisper.isInitialized
+        case .parakeet: return parakeet.isInitialized
+        }
+    }
+    var isLoading: Bool {
+        switch activeKind {
+        case .whisper: return whisper.isLoading
+        case .parakeet: return parakeet.isLoading
+        }
+    }
+    var isTranscribing: Bool {
+        switch activeKind {
+        case .whisper: return whisper.isTranscribing
+        case .parakeet: return parakeet.isTranscribing
+        }
+    }
+    var loadingStage: String {
+        switch activeKind {
+        case .whisper: return whisper.loadingStage
+        case .parakeet: return parakeet.loadingStage
+        }
+    }
+    var currentModelVariant: String {
+        switch activeKind {
+        case .whisper: return whisper.currentModelVariant
+        case .parakeet: return parakeet.currentModelVariant
+        }
+    }
 
     // MARK: - Actions
 
     /// Load the engine's saved/default model (mirrors `WhisperService.initialize`).
+    ///
+    /// Whisper restores its previously selected model; Parakeet is always
+    /// loaded explicitly via `loadModel`, so there is nothing to restore for it.
     func initialize() async throws {
-        try await whisper.initialize()
+        if activeKind == .whisper {
+            try await whisper.initialize()
+        }
     }
 
     /// Load a specific model variant, routing to its owning engine.

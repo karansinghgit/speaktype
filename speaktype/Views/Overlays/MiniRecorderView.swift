@@ -78,20 +78,6 @@ struct MiniRecorderView: View {
     // MARK: - State for Animation
     @State private var phase: CGFloat = 0
 
-    // Calculate bar height based on audio level and position
-    private func barHeight(for index: Int) -> CGFloat {
-        let level = CGFloat(audioRecorder.audioLevel)
-        let baseHeight: CGFloat = 4
-        let maxHeight: CGFloat = 28
-
-        // Create wave pattern that responds to audio
-        let waveOffset = sin(CGFloat(index) * 0.5 + phase) * 0.3
-        let audioMultiplier = sqrt(level) * (0.8 + waveOffset)
-
-        let height = baseHeight + (maxHeight - baseHeight) * audioMultiplier
-        return max(baseHeight, min(height, maxHeight))
-    }
-
     // Default Init for Preview
     init(onCommit: ((String) -> Void)? = nil, onCancel: (() -> Void)? = nil) {
         self.onCommit = onCommit
@@ -121,17 +107,33 @@ struct MiniRecorderView: View {
                 HStack(spacing: 12) {
                     stopButton
 
-                    // Waveform - bar visualizer style
-                    HStack(spacing: 3) {
-                        ForEach(0..<15) { index in
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(Color.white.opacity(0.7))
-                                .frame(width: 3, height: barHeight(for: index))
-                                .animation(
-                                    .easeInOut(duration: 0.15), value: audioRecorder.audioLevel)
+                    // Waveform — a real flowing sine wave that rises with audio level
+                    TimelineView(.animation) { timeline in
+                        let t = timeline.date.timeIntervalSinceReferenceDate
+                        let phase = CGFloat(t.truncatingRemainder(dividingBy: 100)) * 3.4
+                        let level = max(0.06, CGFloat(audioRecorder.audioLevel))
+                        let amplitude = 2.5 + level * 9.5
+
+                        ZStack {
+                            // Trailing echo wave adds depth
+                            HorizontalWave(phase: phase - 0.7, amplitude: amplitude * 0.65, frequency: 2.6)
+                                .stroke(
+                                    Color.white.opacity(0.22),
+                                    style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+
+                            // Main wave with a soft horizontal gradient
+                            HorizontalWave(phase: phase, amplitude: amplitude, frequency: 2.0)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.5), Color.white,
+                                            Color.white.opacity(0.5),
+                                        ],
+                                        startPoint: .leading, endPoint: .trailing),
+                                    style: StrokeStyle(lineWidth: 2, lineCap: .round))
                         }
                     }
-                    .frame(height: 30)
+                    .frame(width: 92, height: 30)
 
                     HStack(spacing: 8) {
                         Menu {

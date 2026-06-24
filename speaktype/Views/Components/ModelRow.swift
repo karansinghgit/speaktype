@@ -38,6 +38,26 @@ struct ModelRow: View {
         downloadService.downloadError[model.variant]
     }
 
+    /// Accent color identifying the model's engine family.
+    private var engineColor: Color {
+        switch model.engine {
+        case .whisper: return Color.accentCool       // blue
+        case .parakeet: return Color(hex: "8B5CF6")  // violet
+        }
+    }
+
+    /// Small capsule badge showing which engine powers the model.
+    private var engineBadge: some View {
+        Text(model.engine.displayName.uppercased())
+            .font(Typography.badge)
+            .tracking(0.4)
+            .foregroundStyle(engineColor)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(engineColor.opacity(0.12))
+            .clipShape(Capsule())
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -45,13 +65,16 @@ struct ModelRow: View {
             HStack(alignment: .top) {
                 // Model Info
                 VStack(alignment: .leading, spacing: 10) {
-                    // Model Name
-                    Text(model.name)
-                        .font(Typography.cardTitle)
-                        .foregroundStyle(Color.textPrimary)
+                    // Model Name + engine badge
+                    HStack(spacing: 8) {
+                        Text(model.name)
+                            .font(Typography.cardTitle)
+                            .foregroundStyle(Color.textPrimary)
+                        engineBadge
+                    }
 
                     // Model Details - Icons and stats
-                    HStack(spacing: 14) {
+                    HStack(spacing: 16) {
                         ModelMetaItem(
                             icon: model.isEnglishOnly ? "character.book.closed" : "globe",
                             text: model.languageSupportLabel
@@ -59,24 +82,26 @@ struct ModelRow: View {
                         ModelMetaItem(icon: "arrow.down.circle", text: model.size)
 
                         // Speed rating
-                        HStack(spacing: 4) {
+                        HStack(spacing: 5) {
                             Text("Speed")
-                                .font(Typography.cardMeta)
+                                .font(Typography.cardMetaBold)
                             RatingDots(value: model.speed, maxValue: 10, color: .orange)
                             Text(String(format: "%.1f", model.speed))
                                 .font(Typography.cardMetaBold)
+                                .foregroundStyle(Color.textPrimary)
                         }
-                        .foregroundStyle(Color.textMuted)
+                        .foregroundStyle(Color.textSecondary)
 
                         // Accuracy rating
-                        HStack(spacing: 4) {
+                        HStack(spacing: 5) {
                             Text("Accuracy")
-                                .font(Typography.cardMeta)
+                                .font(Typography.cardMetaBold)
                             RatingDots(value: model.accuracy, maxValue: 10, color: .green)
                             Text(String(format: "%.1f", model.accuracy))
                                 .font(Typography.cardMetaBold)
+                                .foregroundStyle(Color.textPrimary)
                         }
-                        .foregroundStyle(Color.textMuted)
+                        .foregroundStyle(Color.textSecondary)
                     }
 
                     // Description
@@ -120,15 +145,23 @@ struct ModelRow: View {
                 downloadProgressSection
             }
         }
-        .background(Color.bgCard)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(
-                    isActive ? Color.textPrimary.opacity(0.3) : Color.border.opacity(0.5),
-                    lineWidth: 1)
+        .background(
+            ZStack {
+                Color.bgCard
+                // Subtle engine-tinted wash on the active model card
+                if isActive {
+                    engineColor.opacity(0.05)
+                }
+            }
         )
-        .cardShadow()
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(
+                    isActive ? engineColor.opacity(0.55) : Color.border.opacity(0.5),
+                    lineWidth: isActive ? 1.5 : 1)
+        )
+        .if(isActive, if: { $0.elevatedShadow() }, else: { $0.cardShadow() })
     }
 
     // MARK: - Subviews
@@ -365,13 +398,13 @@ private struct ModelMetaItem: View {
     let text: String
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 11))
+                .font(.system(size: 11, weight: .medium))
             Text(text)
-                .font(Typography.cardMeta)
+                .font(Typography.cardMetaBold)
         }
-        .foregroundStyle(Color.textMuted)
+        .foregroundStyle(Color.textSecondary)
     }
 }
 

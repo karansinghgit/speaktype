@@ -119,14 +119,26 @@ struct AIModelsView: View {
     }
 
     private var modelsListSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 24) {
             Text("Available Models")
                 .font(Typography.headlineLarge)
                 .foregroundStyle(Color.textPrimary)
 
-            VStack(spacing: 12) {
-                ForEach($models) { $model in
-                    ModelRow(model: $model, selectedModel: $selectedModel)
+            // Grouped by engine family for a cleaner, scannable layout.
+            ForEach(TranscriptionEngineKind.allCases, id: \.self) { engine in
+                let groupIndices = models.indices.filter { models[$0].engine == engine }
+                if !groupIndices.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(engine.displayName)
+                            .font(Typography.headlineSmall)
+                            .foregroundStyle(Color.textSecondary)
+                            .textCase(.uppercase)
+                            .tracking(0.5)
+
+                        ForEach(groupIndices, id: \.self) { index in
+                            ModelRow(model: $models[index], selectedModel: $selectedModel)
+                        }
+                    }
                 }
             }
         }

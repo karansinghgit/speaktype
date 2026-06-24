@@ -13,6 +13,10 @@ class AudioRecordingService: NSObject, ObservableObject {
     @Published var isRecording = false
     @Published var audioLevel: Float = 0.0
     @Published var audioFrequency: Float = 0.0  // Normalized 0...1 representation of pitch
+    /// Rolling window of recent normalized mic levels for the live waveform UI.
+    /// Updated on every audio buffer while recording (independent of any view timer).
+    @Published var liveWaveSamples: [Float] = []
+    private static let maxLiveWaveSamples = 48
     @Published var availableDevices: [AVCaptureDevice] = []
     @Published var selectedDeviceId: String? {
         didSet {
@@ -196,6 +200,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         // 1. Reset flags and stale writer state before any new samples arrive.
         isStopping = false
         shouldDiscardCurrentRecordingOutput = false
+        liveWaveSamples = []
         resetMainWriterState()
         resetChunkWriterState()
         isRecording = true
@@ -667,6 +672,11 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
         DispatchQueue.main.async {
             self.audioLevel = normalizedLevel
             self.audioFrequency = normalizedFreq
+            self.liveWaveSamples.append(normalizedLevel)
+            if self.liveWaveSamples.count > Self.maxLiveWaveSamples {
+                self.liveWaveSamples.removeFirst(
+                    self.liveWaveSamples.count - Self.maxLiveWaveSamples)
+            }
         }
     }
 }

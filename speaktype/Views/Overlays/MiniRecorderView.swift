@@ -82,16 +82,14 @@ struct MiniRecorderView: View {
     @State private var phase: CGFloat = 0
 
     // MARK: - Live waveform (DSWaveformImage)
-    /// Rolling buffer of recent normalized mic levels fed to WaveformLiveCanvas.
-    @State private var liveSamples: [Float] = []
-    private let waveSampleTimer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
-    private static let maxLiveSamples = 28
+    // Samples come from AudioRecordingService.liveWaveSamples (updated on every
+    // audio buffer while recording), so the waveform reliably reflects the mic.
     private static let liveWaveConfiguration = Waveform.Configuration(
         backgroundColor: .clear,
         style: .striped(
-            .init(color: NSColor.white.withAlphaComponent(0.85), width: 2.5, spacing: 2, lineCap: .round)),
+            .init(color: NSColor.white.withAlphaComponent(0.9), width: 2.5, spacing: 2, lineCap: .round)),
         damping: .init(percentage: 0.16, sides: .both),
-        verticalScalingFactor: 0.9,
+        verticalScalingFactor: 0.95,
         shouldAntialias: true
     )
 
@@ -127,19 +125,12 @@ struct MiniRecorderView: View {
                     // Waveform — live render of the actual microphone input.
                     // Calm/flat when silent, peaks on speech; no arbitrary drift.
                     WaveformLiveCanvas(
-                        samples: liveSamples,
+                        samples: audioRecorder.liveWaveSamples,
                         configuration: Self.liveWaveConfiguration,
                         renderer: LinearWaveformRenderer(),
                         shouldDrawSilencePadding: true
                     )
                     .frame(width: 96, height: 26)
-                    .onAppear { liveSamples = [] }
-                    .onReceive(waveSampleTimer) { _ in
-                        liveSamples.append(audioRecorder.audioLevel)
-                        if liveSamples.count > Self.maxLiveSamples {
-                            liveSamples.removeFirst(liveSamples.count - Self.maxLiveSamples)
-                        }
-                    }
 
                     HStack(spacing: 8) {
                         Menu {

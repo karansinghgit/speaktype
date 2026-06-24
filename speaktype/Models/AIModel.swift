@@ -115,6 +115,19 @@ struct AIModel: Identifiable, Equatable {
             engine: .parakeet,
             englishOnlyOverride: true
         ),
+        AIModel(
+            name: "Parakeet TDT-CTC 110M",
+            variant: ParakeetCatalog.ctc110mVariant,
+            details: "English-only • Tiny & fast • Small download",
+            rating: "Great",
+            size: "~450 MB",
+            speed: 9.9,
+            accuracy: 8.5,
+            expectedSizeBytes: 200_000_000,
+            minimumRAMGB: 2,
+            engine: .parakeet,
+            englishOnlyOverride: true
+        ),
     ]
 
     /// Returns the expected minimum size for a given model variant

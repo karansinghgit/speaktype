@@ -9,14 +9,16 @@ import FluidAudio
 enum ParakeetCatalog {
     static let v3Variant = "parakeet-tdt-0.6b-v3"
     static let v2Variant = "parakeet-tdt-0.6b-v2"
+    static let ctc110mVariant = "parakeet-tdt-ctc-110m"
 
-    /// All Parakeet variants SpeakType ships, newest first.
-    static let variants = [v3Variant, v2Variant]
+    /// All Parakeet variants SpeakType ships.
+    static let variants = [v3Variant, v2Variant, ctc110mVariant]
 
     /// FluidAudio model version for a given catalog variant.
     static func version(for variant: String) -> AsrModelVersion {
         switch variant {
         case v2Variant: return .v2
+        case ctc110mVariant: return .tdtCtc110m
         default: return .v3
         }
     }

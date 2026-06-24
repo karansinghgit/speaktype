@@ -37,6 +37,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Emoji Picker Suppression
 
+    /// Terminal emulators (and editors with integrated terminals) that render the
+    /// synthetic F19 from `suppressEmojiPicker()` as stray control characters in
+    /// the prompt. We skip emoji-picker suppression while one of these is
+    /// frontmost so the injected key never leaks into the terminal.
+    private static let terminalBundleIdentifiers: Set<String> = [
+        "com.apple.Terminal",
+        "com.googlecode.iterm2",
+        "com.mitchellh.ghostty",
+        "io.alacritty",
+        "org.alacritty",
+        "net.kovidgoyal.kitty",
+        "com.github.wez.wezterm",
+        "dev.warp.Warp-Stable",
+        "dev.warp.Warp",
+        "co.zeit.hyper",
+        "org.tabby",
+        "com.microsoft.VSCode",
+        "com.vscodium",
+        "com.todesktop.230313mzl4w4u92",  // Cursor
+    ]
+
+    /// Whether the frontmost app is a terminal where injecting a synthetic key
+    /// would surface as visible garbage characters.
+    private static func isFrontmostAppTerminal() -> Bool {
+        guard let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else {
+            return false
+        }
+        return terminalBundleIdentifiers.contains(bundleID)
+    }
+
     private func suppressEmojiPicker() {
         // A robust way to suppress the emoji picker is to post a harmless keydown/keyup
         // with the F19 key (a non-modifier key), which immediately breaks the Globe key's double-tap
@@ -168,7 +198,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if isPressed && !isHotkeyPressed {
             isHotkeyPressed = true
 
-            if currentHotkey == .fn {
+            // Skip the synthetic F19 emoji-picker suppression when a terminal is
+            // frontmost — terminals echo the injected key as stray control
+            // characters in the prompt (e.g. Claude Code, iTerm, Ghostty).
+            if currentHotkey == .fn && !Self.isFrontmostAppTerminal() {
                 suppressEmojiPicker()
             }
 

@@ -2,8 +2,10 @@
 
 set -euo pipefail
 
+source "$(dirname "$0")/lib/common.sh"
+
 APP_NAME="SpeakType-Dev"
-BUNDLE_ID="com.2048labs.speaktype.dev"
+BUNDLE_ID="$DEV_BUNDLE_ID"
 DERIVED_DATA_PATH="$PWD/build/dev-derived"
 BUILD_PRODUCTS_PATH="$DERIVED_DATA_PATH/Build/Products/Debug"
 DEST_APP_PATH="$HOME/Applications/${APP_NAME}.app"

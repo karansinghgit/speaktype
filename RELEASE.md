@@ -1,6 +1,13 @@
 # Release Process
 
-SpeakType releases are **fully automated** with a single command. The script handles everything: version bumping, building, signing, notarization, and uploading.
+SpeakType releases run in **two steps**:
+
+1. **Build** (`make create-release`) — bump version, build, sign, notarize, and produce a signed DMG in `dist/`. Nothing leaves your machine.
+2. **Deploy** (`make deploy-release`) — push the release commit + tag and upload the DMG to GitHub.
+
+This split lets you build and test the DMG locally before publishing. Shared
+settings (signing identity, Apple ID, team ID, bundle IDs, repo) live in one
+place: `scripts/lib/common.sh`.
 
 ## Release Criteria
 Use your judgment, but a release is usually warranted when:
@@ -37,51 +44,41 @@ gh auth login
 
 ## Creating a Release
 
-### Auto-Bump Patch Version (Recommended)
+### Step 1 — Build (`make create-release`)
 
 ```bash
-./scripts/release.sh
+make create-release            # auto-bump patch (e.g. 1.0.14 → 1.0.15)
+make create-release VERSION=2.0.0   # or specify the version
 ```
 
 **What happens:**
 
-1. ✅ **Checks for uncommitted changes** - Script fails if you have any uncommitted work
-2. ✅ **Auto-bumps patch version** (e.g., 1.0.14 → 1.0.15)
-3. ✅ **Updates version in Xcode project** - MARKETING_VERSION and CURRENT_PROJECT_VERSION
-4. ✅ **Updates CHANGELOG** with release date
-5. ✅ **Commits changes locally** - Creates commit and git tag (not pushed yet!)
-6. ✅ **Builds and signs the app** - Release configuration with Developer ID
-7. ✅ **Creates and signs DMG**
-8. ✅ **Submits to Apple for notarization** (~2-5 minutes)
-9. ✅ **Staples the notarization ticket**
-10. ✅ **Prompts: Push to GitHub?** - Only after successful build
-11. ✅ **Prompts: Upload release?** - Only if you pushed
+1. ✅ **Checks for uncommitted changes** — fails if you have uncommitted work
+2. ✅ **Resolves the version** — auto-bumps patch, or uses `VERSION=`
+3. ✅ **Updates the Xcode project** — MARKETING_VERSION and CURRENT_PROJECT_VERSION
+4. ✅ **Updates CHANGELOG** with the release date
+5. ✅ **Commits + tags locally** (not pushed yet)
+6. ✅ **Builds and signs the app** (Release config, Developer ID)
+7. ✅ **Creates and signs the DMG** in `dist/`
+8. ✅ **Notarizes with Apple** (~2-5 minutes) and **staples** the ticket
+
+The DMG path and version are written to `dist/.release-version` / `dist/.release-dmg`
+so step 2 can pick them up automatically. Inspect/test the DMG before deploying.
+
+### Step 2 — Deploy (`make deploy-release`)
+
+```bash
+make deploy-release                  # reads version from dist/.release-version
+make deploy-release VERSION=2.0.0    # or pass it explicitly
+```
+
+Pushes the release commit + tag and creates the GitHub Release with the DMG
+attached (release notes generated from the commit log).
 
 **Total time: ~6-8 minutes**
 
-### Specify Version Manually
-
-```bash
-./scripts/release.sh 2.0.0
-```
-
-Same workflow, but uses your specified version.
-
----
-
-## What You'll Be Asked
-
-The script prompts you at key decision points:
-
-1. **🔼 Push v1.0.15 to GitHub? (y/n)**
-   - Asked AFTER successful build/notarization
-   - If you say `n`, the script exits and tells you how to undo the local commit
-   - Safe to say `n` to test the DMG first
-
-2. **📦 Upload DMG to GitHub releases? (y/n)**
-   - Only asked if you said `y` to push
-   - Uses GitHub CLI to create the release
-   - You can always upload manually later with: `gh release create v1.0.15 SpeakType-1.0.15.dmg --generate-notes`
+> You can also call the scripts directly: `./scripts/create-release.sh [version]`
+> then `./scripts/deploy-release.sh [version]`.
 
 ---
 

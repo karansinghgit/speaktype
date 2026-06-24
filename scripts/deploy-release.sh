@@ -7,6 +7,8 @@
 
 set -e
 
+source "$(dirname "$0")/lib/common.sh"
+
 echo "🚀 SpeakType Release Deployer"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
@@ -97,7 +99,7 @@ fi
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🎉  v${VERSION} is live!"
-echo "    https://github.com/karansinghgit/speaktype/releases/tag/v${VERSION}"
+echo "    https://github.com/${GITHUB_REPO}/releases/tag/v${VERSION}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Clean up marker files

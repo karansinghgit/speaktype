@@ -7,44 +7,19 @@
 
 set -e
 
+source "$(dirname "$0")/lib/common.sh"
+
 echo "🚀 SpeakType Release Builder"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# ── Preflight: must be at repo root ───────────────────────────────────────────
-PROJECT_FILE="speaktype.xcodeproj/project.pbxproj"
-CHANGELOG="CHANGELOG.md"
-
-if [ ! -f "$PROJECT_FILE" ]; then
-  echo "❌ Error: Must run from project root"
-  exit 1
-fi
-
-# ── Preflight: no uncommitted changes ─────────────────────────────────────────
-if ! git diff-index --quiet HEAD --; then
-  echo "❌ Error: You have uncommitted changes"
-  echo ""
-  git status --short
-  exit 1
-fi
+# ── Preflight ─────────────────────────────────────────────────────────────────
+require_repo_root
+require_clean_tree
 
 # ── Step 1: Determine version ──────────────────────────────────────────────────
-CURRENT_VERSION=$(perl -ne 'print $1 and exit if /MARKETING_VERSION = ([^;]+);/' "$PROJECT_FILE")
-
-if [ -z "$1" ]; then
-  MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
-  MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
-  PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
-  VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
-  echo "📈 Auto-bumping: v${CURRENT_VERSION} → v${VERSION}"
-else
-  VERSION="$1"
-  if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "❌ Error: Version must be semver (e.g., 1.2.3)"
-    exit 1
-  fi
-  echo "📋 Using specified version: v${VERSION}"
-fi
+VERSION="$(resolve_version "${1:-}")"
+echo "📦 Releasing v${VERSION}"
 echo ""
 
 # ── Step 2: Bump version in project ───────────────────────────────────────────
@@ -79,29 +54,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🔐 Checking notarization credentials..."
 echo ""
-
-if ! xcrun notarytool history --keychain-profile "AC_PASSWORD" &>/dev/null; then
-  echo "❌ Keychain profile 'AC_PASSWORD' not found"
-  echo ""
-  echo "You need an app-specific password for notarization."
-  echo "  1. Go to: https://appleid.apple.com"
-  echo "  2. Sign in with: mail2048labs@gmail.com"
-  echo "  3. Security → App-Specific Passwords → Generate"
-  echo ""
-  read -p "Enter app-specific password: " -s APP_PASSWORD
-  echo ""
-  [ -z "$APP_PASSWORD" ] && { echo "❌ Password required"; exit 1; }
-
-  xcrun notarytool store-credentials "AC_PASSWORD" \
-    --apple-id "mail2048labs@gmail.com" \
-    --team-id "PCV4UMSRZX" \
-    --password "$APP_PASSWORD"
-  echo ""
-  echo "✅ Credentials stored. Continuing..."
-  echo ""
-fi
-
-APPLE_TEAM_ID="${APPLE_TEAM_ID:-PCV4UMSRZX}"
+ensure_notary_credentials
 
 # ── Step 6: Build ─────────────────────────────────────────────────────────────
 echo ""
@@ -109,10 +62,10 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "🏗️  Building Release..."
 echo ""
 
-xcodebuild -scheme "speaktype" \
+xcodebuild -scheme "$SCHEME" \
   -configuration Release \
   -derivedDataPath build \
-  CODE_SIGN_IDENTITY="Developer ID Application" \
+  CODE_SIGN_IDENTITY="$SIGN_IDENTITY" \
   CODE_SIGN_STYLE=Manual \
   DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
   ENABLE_HARDENED_RUNTIME=YES \
@@ -124,9 +77,9 @@ APP_PATH="build/Build/Products/Release/speaktype.app"
 [ -z "$APP_PATH" ] && { echo "❌ Could not find speaktype.app!"; exit 1; }
 [ -d "$APP_PATH" ] || { echo "❌ Release app not found at $APP_PATH"; exit 1; }
 
-APP_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Contents/Info.plist")
-if [ "$APP_BUNDLE_ID" != "com.2048labs.speaktype" ]; then
-  echo "❌ Refusing to package unexpected app bundle: $APP_BUNDLE_ID"
+BUILT_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Contents/Info.plist")
+if [ "$BUILT_BUNDLE_ID" != "$APP_BUNDLE_ID" ]; then
+  echo "❌ Refusing to package unexpected app bundle: $BUILT_BUNDLE_ID"
   exit 1
 fi
 
@@ -167,7 +120,7 @@ create-dmg \
 
 echo ""
 echo "🔐 Signing DMG..."
-codesign --sign "Developer ID Application" --force --timestamp --options runtime "$DMG_PATH"
+codesign --sign "$SIGN_IDENTITY" --force --timestamp --options runtime "$DMG_PATH"
 codesign --verify --deep --strict "$DMG_PATH"
 echo "✅ DMG signed"
 
@@ -178,7 +131,7 @@ echo "🔒 Submitting for notarization (2-5 min)..."
 echo ""
 
 SUBMIT_OUTPUT=$(xcrun notarytool submit "$DMG_PATH" \
-  --keychain-profile "AC_PASSWORD" \
+  --keychain-profile "$NOTARY_PROFILE" \
   --wait 2>&1)
 
 echo "$SUBMIT_OUTPUT"
@@ -212,7 +165,7 @@ else
   if [ -n "$SUBMISSION_ID" ]; then
     echo ""
     echo "Fetching detailed logs..."
-    xcrun notarytool log "$SUBMISSION_ID" --keychain-profile "AC_PASSWORD"
+    xcrun notarytool log "$SUBMISSION_ID" --keychain-profile "$NOTARY_PROFILE"
   fi
   exit 1
 fi

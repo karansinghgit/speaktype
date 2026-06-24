@@ -5,6 +5,8 @@
 
 set -e
 
+source "$(dirname "$0")/lib/common.sh"
+
 echo "🧹 Cleaning SpeakType (dev + release)..."
 echo ""
 
@@ -16,21 +18,21 @@ sleep 1
 echo "✅ Killed all running instances"
 
 # Reset ALL permissions
-tccutil reset Microphone com.2048labs.speaktype 2>/dev/null || true
-tccutil reset Accessibility com.2048labs.speaktype 2>/dev/null || true
-tccutil reset Microphone com.2048labs.speaktype.dev 2>/dev/null || true
-tccutil reset Accessibility com.2048labs.speaktype.dev 2>/dev/null || true
+tccutil reset Microphone ${APP_BUNDLE_ID} 2>/dev/null || true
+tccutil reset Accessibility ${APP_BUNDLE_ID} 2>/dev/null || true
+tccutil reset Microphone ${APP_BUNDLE_ID}.dev 2>/dev/null || true
+tccutil reset Accessibility ${APP_BUNDLE_ID}.dev 2>/dev/null || true
 echo "✅ Reset microphone & accessibility permissions"
 
 # Remove app preferences and data
-defaults delete com.2048labs.speaktype 2>/dev/null || true
-defaults delete com.2048labs.speaktype.dev 2>/dev/null || true
-rm -rf ~/Library/Caches/com.2048labs.speaktype 2>/dev/null || true
-rm -rf ~/Library/Caches/com.2048labs.speaktype.dev 2>/dev/null || true
-rm -rf ~/Library/Saved\ Application\ State/com.2048labs.speaktype.savedState 2>/dev/null || true
-rm -rf ~/Library/Saved\ Application\ State/com.2048labs.speaktype.dev.savedState 2>/dev/null || true
-rm -rf ~/Library/Preferences/com.2048labs.speaktype.plist 2>/dev/null || true
-rm -rf ~/Library/Preferences/com.2048labs.speaktype.dev.plist 2>/dev/null || true
+defaults delete ${APP_BUNDLE_ID} 2>/dev/null || true
+defaults delete ${APP_BUNDLE_ID}.dev 2>/dev/null || true
+rm -rf ~/Library/Caches/${APP_BUNDLE_ID} 2>/dev/null || true
+rm -rf ~/Library/Caches/${APP_BUNDLE_ID}.dev 2>/dev/null || true
+rm -rf ~/Library/Saved\ Application\ State/${APP_BUNDLE_ID}.savedState 2>/dev/null || true
+rm -rf ~/Library/Saved\ Application\ State/${APP_BUNDLE_ID}.dev.savedState 2>/dev/null || true
+rm -rf ~/Library/Preferences/${APP_BUNDLE_ID}.plist 2>/dev/null || true
+rm -rf ~/Library/Preferences/${APP_BUNDLE_ID}.dev.plist 2>/dev/null || true
 rm -rf ~/Library/Application\ Support/SpeakType 2>/dev/null || true
 rm -rf ~/Library/Application\ Support/SpeakType-Dev 2>/dev/null || true
 echo "✅ Removed app preferences & data"

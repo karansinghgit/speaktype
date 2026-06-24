@@ -581,6 +581,7 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
         var sumSquares: Float = 0.0
         var zeroCrossings: Int = 0
         var previousSample: Float = 0.0
+        var peak: Float = 0.0  // max abs sample — drives the lively waveform
 
         if (asbd.mFormatFlags & kAudioFormatFlagIsFloat) != 0 {
             // Float32 Processing (Standard on Mac)
@@ -590,6 +591,7 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
             for i in 0..<samplesToRead {
                 let sample = actualData[i * stride]
                 sumSquares += sample * sample
+                peak = max(peak, abs(sample))
 
                 // Zero Crossing Check
                 if (previousSample > 0 && sample <= 0) || (previousSample <= 0 && sample > 0) {
@@ -672,7 +674,7 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
         DispatchQueue.main.async {
             self.audioLevel = normalizedLevel
             self.audioFrequency = normalizedFreq
-            self.liveWaveSamples.append(normalizedLevel)
+            self.liveWaveSamples.append(min(1.0, peak))
             if self.liveWaveSamples.count > Self.maxLiveWaveSamples {
                 self.liveWaveSamples.removeFirst(
                     self.liveWaveSamples.count - Self.maxLiveWaveSamples)

@@ -1,9 +1,6 @@
 import AVFoundation
-import AppKit
 import Combine
 import CoreMedia
-import DSWaveformImage
-import DSWaveformImageViews
 import SwiftUI
 
 struct MiniRecorderView: View {
@@ -81,17 +78,12 @@ struct MiniRecorderView: View {
     // MARK: - State for Animation
     @State private var phase: CGFloat = 0
 
-    // MARK: - Live waveform (DSWaveformImage)
-    // Samples come from AudioRecordingService.liveWaveSamples (updated on every
-    // audio buffer while recording), so the waveform reliably reflects the mic.
-    private static let liveWaveConfiguration = Waveform.Configuration(
-        backgroundColor: .clear,
-        style: .striped(
-            .init(color: NSColor.white.withAlphaComponent(0.9), width: 2.5, spacing: 2, lineCap: .round)),
-        damping: .init(percentage: 0.16, sides: .both),
-        verticalScalingFactor: 0.95,
-        shouldAntialias: true
-    )
+    // MARK: - Live waveform
+    // Samples come from AudioRecordingService.liveWaveSamples (peak amplitude per
+    // audio buffer while recording). Rendered with a SwiftUI Canvas so it redraws
+    // on every sample change.
+    private static let waveBarWidth: CGFloat = 2.5
+    private static let waveBarSpacing: CGFloat = 2.0
 
     // Default Init for Preview
     init(onCommit: ((String) -> Void)? = nil, onCancel: (() -> Void)? = nil) {
@@ -123,13 +115,29 @@ struct MiniRecorderView: View {
                     stopButton
 
                     // Waveform — live render of the actual microphone input.
-                    // Calm/flat when silent, peaks on speech; no arbitrary drift.
-                    WaveformLiveCanvas(
-                        samples: audioRecorder.liveWaveSamples,
-                        configuration: Self.liveWaveConfiguration,
-                        renderer: LinearWaveformRenderer(),
-                        shouldDrawSilencePadding: true
-                    )
+                    // Calm/flat when silent, peaks on speech.
+                    Canvas { context, size in
+                        let raw = audioRecorder.liveWaveSamples
+                        guard !raw.isEmpty else { return }
+                        let step = Self.waveBarWidth + Self.waveBarSpacing
+                        let maxBars = max(1, Int(size.width / step))
+                        // Noise-gate, then auto-gain to the recent peak so the
+                        // waveform stays lively and well-scaled at any volume.
+                        let visible = raw.suffix(maxBars).map { max(0, $0 - 0.02) }
+                        let recentPeak = max(visible.max() ?? 0, 0.05)
+                        let midY = size.height / 2
+                        for (i, sample) in visible.enumerated() {
+                            let norm = CGFloat(min(1, sample / recentPeak))
+                            let barHeight = max(2.5, norm * size.height)
+                            let x = CGFloat(i) * step
+                            let rect = CGRect(
+                                x: x, y: midY - barHeight / 2,
+                                width: Self.waveBarWidth, height: barHeight)
+                            context.fill(
+                                Path(roundedRect: rect, cornerRadius: Self.waveBarWidth / 2),
+                                with: .color(.white.opacity(0.9)))
+                        }
+                    }
                     .frame(width: 96, height: 26)
 
                     HStack(spacing: 8) {

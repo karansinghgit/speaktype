@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import FluidAudio
 import WhisperKit
 
 class ModelDownloadService: ObservableObject {
@@ -99,10 +100,22 @@ class ModelDownloadService: ObservableObject {
             }
         }
         
+        // Check Parakeet (FluidAudio) models, which live in their own cache dir.
+        for variant in ParakeetCatalog.variants {
+            let version = ParakeetCatalog.version(for: variant)
+            let cacheDir = AsrModels.defaultCacheDirectory(for: version)
+            if fileManager.fileExists(atPath: cacheDir.path),
+               let contents = try? fileManager.contentsOfDirectory(atPath: cacheDir.path),
+               !contents.isEmpty {
+                foundModels.insert(variant)
+                print("✅ Parakeet model \(variant) found in cache")
+            }
+        }
+
         await MainActor.run {
             // Clear all previous progress
             self.downloadProgress.removeAll()
-            
+
             // Only mark models that actually exist
             for variant in foundModels {
                 self.downloadProgress[variant] = 1.0
@@ -120,7 +133,13 @@ class ModelDownloadService: ObservableObject {
     // Asynchronous download using WhisperKit
     func downloadModel(variant: String) {
         guard isDownloading[variant] != true else { return }
-        
+
+        // Route Parakeet variants to FluidAudio.
+        if AIModel.engineKind(for: variant) == .parakeet {
+            downloadParakeetModel(variant: variant)
+            return
+        }
+
         isDownloading[variant] = true
         downloadProgress[variant] = 0.0
         downloadError[variant] = nil
@@ -230,8 +249,65 @@ class ModelDownloadService: ObservableObject {
         activeTasks[variant] = task
     }
     
+    // Download a Parakeet model via FluidAudio (CoreML weights from Hugging Face).
+    private func downloadParakeetModel(variant: String) {
+        isDownloading[variant] = true
+        downloadProgress[variant] = 0.0
+        downloadError[variant] = nil
+        print("Starting FluidAudio (Parakeet) download for: \(variant)")
+
+        let version = ParakeetCatalog.version(for: variant)
+
+        let task = Task {
+            do {
+                _ = try await AsrModels.download(
+                    version: version,
+                    progressHandler: { progress in
+                        DispatchQueue.main.async {
+                            self.downloadProgress[variant] = progress.fractionCompleted
+                        }
+                    })
+
+                if Task.isCancelled { return }
+                print("Parakeet model downloaded successfully")
+
+                DispatchQueue.main.async {
+                    self.isDownloading[variant] = false
+                    self.downloadProgress[variant] = 1.0
+                    self.activeTasks[variant] = nil
+                }
+            } catch {
+                if Task.isCancelled {
+                    print("Parakeet download cancelled for \(variant)")
+                    return
+                }
+                print("FluidAudio download error: \(error)")
+                DispatchQueue.main.async {
+                    self.isDownloading[variant] = false
+                    self.downloadProgress[variant] = 0.0
+                    self.downloadError[variant] = error.localizedDescription
+                    self.activeTasks[variant] = nil
+                }
+            }
+        }
+
+        activeTasks[variant] = task
+    }
+
     // Aggressively deletes any potential cache for this variant
     func deleteModel(variant: String) async -> String {
+        // Parakeet models are managed by FluidAudio in its own cache directory.
+        if AIModel.engineKind(for: variant) == .parakeet {
+            let version = ParakeetCatalog.version(for: variant)
+            let cacheDir = AsrModels.defaultCacheDirectory(for: version)
+            try? FileManager.default.removeItem(at: cacheDir)
+            await MainActor.run {
+                self.downloadProgress[variant] = 0.0
+                self.isDownloading[variant] = false
+            }
+            return "Deleted Parakeet model cache for \(variant)"
+        }
+
         let fileManager = FileManager.default
         let searchDirs: [FileManager.SearchPathDirectory] = [.documentDirectory, .applicationSupportDirectory, .cachesDirectory]
         

@@ -12,15 +12,20 @@ struct AIModel: Identifiable, Equatable {
     let expectedSizeBytes: Int64  // Minimum expected size in bytes for validation
     let minimumRAMGB: Int  // Minimum device RAM in GB for reliable loading
     /// Which backend runs this model. Defaults to `.whisper` so existing
-    /// catalog entries and call sites are unaffected.
-    let engine: TranscriptionEngineKind = .whisper
+    /// catalog entries and call sites are unaffected. (Declared `var` so it is
+    /// part of the synthesized memberwise initializer with a default.)
+    var engine: TranscriptionEngineKind = .whisper
+    /// Explicit English-only flag for engines that don't encode it in the
+    /// variant name (e.g. Parakeet). When nil, falls back to the Whisper
+    /// `.en` suffix convention.
+    var englishOnlyOverride: Bool? = nil
 
     var languageSupportLabel: String {
         isEnglishOnly ? "English-only" : "Multilingual"
     }
 
     var isEnglishOnly: Bool {
-        variant.hasSuffix(".en")
+        englishOnlyOverride ?? variant.hasSuffix(".en")
     }
 
     // Speed/Accuracy based on OpenAI Whisper benchmarks (WER on LibriSpeech test-clean)
@@ -81,6 +86,34 @@ struct AIModel: Identifiable, Equatable {
             accuracy: 6.0,  // ~12% WER
             expectedSizeBytes: 30_000_000,
             minimumRAMGB: 2
+        ),
+        // NVIDIA Parakeet (run on-device via FluidAudio / CoreML).
+        // Transducer (TDT) models: much faster than Whisper at similar accuracy.
+        // Download size is approximate (FluidAudio fetches the int8 weight set).
+        AIModel(
+            name: "Parakeet TDT v3",
+            variant: ParakeetCatalog.v3Variant,
+            details: "Multilingual (25 languages) • Very fast • NVIDIA Parakeet",
+            rating: "Excellent",
+            size: "~2 GB",
+            speed: 9.7,
+            accuracy: 9.2,
+            expectedSizeBytes: 500_000_000,
+            minimumRAMGB: 4,
+            engine: .parakeet
+        ),
+        AIModel(
+            name: "Parakeet TDT v2",
+            variant: ParakeetCatalog.v2Variant,
+            details: "English-only • Fastest • Highest English recall",
+            rating: "Excellent",
+            size: "~2 GB",
+            speed: 9.8,
+            accuracy: 9.1,
+            expectedSizeBytes: 500_000_000,
+            minimumRAMGB: 4,
+            engine: .parakeet,
+            englishOnlyOverride: true
         ),
     ]
 

@@ -81,9 +81,17 @@ class ParakeetEngine: SpeechToTextEngine {
         defer { isTranscribing = false }
 
         // One-shot (batch) transcription: a fresh decoder state per file.
-        // `language: nil` lets the multilingual model auto-detect.
-        var decoderState = try TdtDecoderState()
-        let result = try await manager.transcribe(audioFile, decoderState: &decoderState)
-        return result.text
+        // The decoder state must match the model's decoder-layer count — the
+        // TDT-CTC 110M model has 1 layer while the 0.6B models have 2 — or
+        // transcription fails. `language: nil` lets the model auto-detect.
+        let version = ParakeetCatalog.version(for: currentModelVariant)
+        do {
+            var decoderState = try TdtDecoderState(decoderLayers: version.decoderLayers)
+            let result = try await manager.transcribe(audioFile, decoderState: &decoderState)
+            return result.text
+        } catch {
+            print("❌ Parakeet transcription failed (\(currentModelVariant)): \(error)")
+            throw error
+        }
     }
 }

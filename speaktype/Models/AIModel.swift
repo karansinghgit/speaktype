@@ -11,6 +11,9 @@ struct AIModel: Identifiable, Equatable {
     let accuracy: Double  // Score relative to 10
     let expectedSizeBytes: Int64  // Minimum expected size in bytes for validation
     let minimumRAMGB: Int  // Minimum device RAM in GB for reliable loading
+    /// Which backend runs this model. Defaults to `.whisper` so existing
+    /// catalog entries and call sites are unaffected.
+    let engine: TranscriptionEngineKind = .whisper
 
     var languageSupportLabel: String {
         isEnglishOnly ? "English-only" : "Multilingual"
@@ -85,6 +88,17 @@ struct AIModel: Identifiable, Equatable {
     static func expectedSize(for variant: String) -> Int64 {
         return availableModels.first(where: { $0.variant == variant })?.expectedSizeBytes
             ?? 50_000_000
+    }
+
+    /// Returns which backend owns a given model variant.
+    /// Defaults to `.whisper` for unknown variants so existing behavior is preserved.
+    static func engineKind(for variant: String) -> TranscriptionEngineKind {
+        return availableModels.first(where: { $0.variant == variant })?.engine ?? .whisper
+    }
+
+    /// All models for a given engine.
+    static func models(for engine: TranscriptionEngineKind) -> [AIModel] {
+        availableModels.filter { $0.engine == engine }
     }
 
     /// Returns the best model recommended for this device's RAM

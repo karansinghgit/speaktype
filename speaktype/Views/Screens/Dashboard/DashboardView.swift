@@ -8,7 +8,7 @@ struct DashboardView: View {
     @Binding var selection: SidebarItem?
     @StateObject private var historyService = HistoryService.shared
     @StateObject private var audioRecorder = AudioRecordingService()
-    private var whisperService: WhisperService { WhisperService.shared }
+    private var transcription: TranscriptionManager { TranscriptionManager.shared }
     @State private var leftColumnHeight: CGFloat = 0
 
     // Trial & License
@@ -177,16 +177,16 @@ struct DashboardView: View {
         }
         .onAppear {
             Task {
-                if !whisperService.isInitialized
-                    || whisperService.currentModelVariant != selectedModel
+                if !transcription.isInitialized
+                    || transcription.currentModelVariant != selectedModel
                 {
-                    try? await whisperService.loadModel(variant: selectedModel)
+                    try? await transcription.loadModel(variant: selectedModel)
                 }
             }
         }
         .onChange(of: selectedModel) {
             Task {
-                try? await whisperService.loadModel(variant: selectedModel)
+                try? await transcription.loadModel(variant: selectedModel)
             }
         }
     }
@@ -248,9 +248,9 @@ struct DashboardView: View {
             transcriptionStatus = "Transcribing..."
 
             do {
-                if !whisperService.isInitialized { try? await whisperService.initialize() }
+                if !transcription.isInitialized { try? await transcription.initialize() }
 
-                let text = try await whisperService.transcribe(audioFile: url, language: transcriptionLanguage)
+                let text = try await transcription.transcribe(audioFile: url, language: transcriptionLanguage)
                 let duration = try await getAudioDuration(url: url)
                 let modelName =
                     AIModel.availableModels.first(where: { $0.variant == selectedModel })?.name

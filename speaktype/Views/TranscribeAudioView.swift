@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 struct TranscribeAudioView: View {
     @StateObject private var audioRecorder = AudioRecordingService()
-    private var whisperService: WhisperService { WhisperService.shared }
+    private var transcription: TranscriptionManager { TranscriptionManager.shared }
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
     @State private var transcribedText: String = ""
     @State private var isTranscribing = false
@@ -172,8 +172,8 @@ struct TranscribeAudioView: View {
         }
         .onAppear {
             Task {
-                if !whisperService.isInitialized {
-                    try? await whisperService.initialize()
+                if !transcription.isInitialized {
+                    try? await transcription.initialize()
                 }
             }
         }
@@ -240,7 +240,7 @@ struct TranscribeAudioView: View {
         Task {
             isTranscribing = true
             do {
-                transcribedText = try await whisperService.transcribe(audioFile: url, language: transcriptionLanguage)
+                transcribedText = try await transcription.transcribe(audioFile: url, language: transcriptionLanguage)
                 // Save to History
                 let duration = try await getAudioDuration(url: url)
                 HistoryService.shared.addItem(transcript: transcribedText, duration: duration, audioFileURL: url)

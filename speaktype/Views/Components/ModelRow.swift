@@ -6,8 +6,8 @@ struct ModelRow: View {
     @Binding var selectedModel: String
     @ObservedObject var downloadService = ModelDownloadService.shared
 
-    // Use the shared WhisperService for loading state
-    private var whisperService: WhisperService { WhisperService.shared }
+    // Route model loading/state through the unified transcription manager
+    private var transcription: TranscriptionManager { TranscriptionManager.shared }
 
     // State for model loading
     @State private var isLoadingModel = false
@@ -216,8 +216,8 @@ struct ModelRow: View {
                                 .scaleEffect(0.7)
                                 .frame(width: 12, height: 12)
                             Text(
-                                whisperService.loadingStage.isEmpty
-                                    ? "Loading..." : whisperService.loadingStage
+                                transcription.loadingStage.isEmpty
+                                    ? "Loading..." : transcription.loadingStage
                             )
                             .font(Typography.buttonLabelSmall)
                         }
@@ -329,7 +329,7 @@ struct ModelRow: View {
                 print("🔄 Loading model into shared service: \(model.variant)")
 
                 // Load into the SHARED WhisperService so MiniRecorderView can use it
-                try await whisperService.loadModel(variant: model.variant)
+                try await transcription.loadModel(variant: model.variant)
 
                 print("✅ Model loaded successfully: \(model.variant)")
 

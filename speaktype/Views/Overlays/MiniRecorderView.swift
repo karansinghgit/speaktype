@@ -5,7 +5,7 @@ import SwiftUI
 
 struct MiniRecorderView: View {
     @ObservedObject private var audioRecorder = AudioRecordingService.shared
-    private var whisperService: WhisperService { WhisperService.shared }
+    private var transcription: TranscriptionManager { TranscriptionManager.shared }
     @State private var isListening = false
 
     @State private var isProcessing = false
@@ -102,7 +102,7 @@ struct MiniRecorderView: View {
         ZStack {
             backgroundView
 
-            if isWarmingUp || whisperService.isLoading {
+            if isWarmingUp || transcription.isLoading {
                 HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
@@ -315,7 +315,7 @@ struct MiniRecorderView: View {
                     Task {
                         await MainActor.run { isWarmingUp = true }
                         do {
-                            try await whisperService.loadModel(variant: model.variant)
+                            try await transcription.loadModel(variant: model.variant)
                             debugLog("Model pre-loaded after switch: \(model.variant)")
                         } catch {
                             debugLog("Model pre-load failed: \(error.localizedDescription)")
@@ -347,7 +347,7 @@ struct MiniRecorderView: View {
         Task {
             debugLog("Initializing WhisperService with model: \(selectedModel)")
             do {
-                try await whisperService.loadModel(variant: selectedModel)
+                try await transcription.loadModel(variant: selectedModel)
                 debugLog("Model preloaded successfully")
             } catch {
                 debugLog("Model preload failed: \(error.localizedDescription)")
@@ -485,7 +485,7 @@ struct MiniRecorderView: View {
     }
 
     private func handleEscape() {
-        guard isListening || isProcessing || isWarmingUp || whisperService.isLoading else { return }
+        guard isListening || isProcessing || isWarmingUp || transcription.isLoading else { return }
 
         debugLog("Escape pressed - cancelling immediate commit")
         cancelCommit = true
@@ -538,12 +538,12 @@ struct MiniRecorderView: View {
         debugLog("processRecording started with url: \(url.lastPathComponent)")
         do {
             // Ensure model is loaded before transcribing
-            if !whisperService.isInitialized || whisperService.currentModelVariant != selectedModel
+            if !transcription.isInitialized || transcription.currentModelVariant != selectedModel
             {
                 debugLog("Loading model: \(selectedModel)")
                 await MainActor.run { statusMessage = "Warming up model — first use is slower..." }
                 do {
-                    try await whisperService.loadModel(variant: selectedModel)
+                    try await transcription.loadModel(variant: selectedModel)
                     debugLog("Model loaded successfully")
                 } catch {
                     debugLog("Model load failed: \(error.localizedDescription)")
@@ -564,7 +564,7 @@ struct MiniRecorderView: View {
             if !cancelCommit {
                 await MainActor.run { statusMessage = "Transcribing..." }
             }
-            let text = try await whisperService.transcribe(audioFile: url, language: transcriptionLanguage)
+            let text = try await transcription.transcribe(audioFile: url, language: transcriptionLanguage)
             debugLog("Transcription result: \(text.prefix(50))...")
 
             guard !text.isEmpty else {

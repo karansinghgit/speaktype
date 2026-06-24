@@ -22,6 +22,7 @@ xcodebuild \
   -configuration Debug \
   -derivedDataPath "$DERIVED_DATA_PATH" \
   PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
+  APP_DISPLAY_NAME="$APP_NAME" \
   build
 
 BUILD_APP_PATH="$(find "$BUILD_PRODUCTS_PATH" -maxdepth 1 -name "*.app" -type d | head -n 1)"

@@ -1,6 +1,6 @@
 # Makefile for SpeakType
 
-.PHONY: help build clean clean-dev test lint format run run-dev run-release setup logs logs-live logs-errors logs-export install uninstall reinstall
+.PHONY: help build clean clean-dev test lint format ci run run-dev run-release setup logs logs-live logs-errors logs-export install uninstall reinstall
 
 # Default target
 help:
@@ -33,6 +33,7 @@ help:
 	@echo "Code Quality:"
 	@echo "  make lint          - Run SwiftLint"
 	@echo "  make format        - Format code with SwiftLint"
+	@echo "  make ci            - Reproduce CI checks locally (build + unit tests + lint)"
 	@echo ""
 	@echo "Logging:"
 	@echo "  make logs          - View live logs"
@@ -105,6 +106,14 @@ test-ui:
 # Run SwiftLint
 lint:
 	@echo "Running SwiftLint..."
+	@which swiftlint > /dev/null && swiftlint || echo "⚠️  SwiftLint not installed"
+
+# Reproduce the GitHub Actions CI checks locally (build + unit tests + lint)
+ci:
+	@echo "Running CI checks locally..."
+	xcodebuild -scheme speaktype -configuration Debug build CODE_SIGNING_ALLOWED=NO
+	xcodebuild test -scheme speaktype -destination 'platform=macOS' -only-testing:speaktypeTests CODE_SIGNING_ALLOWED=NO
+	@echo "--- SwiftLint (advisory) ---"
 	@which swiftlint > /dev/null && swiftlint || echo "⚠️  SwiftLint not installed"
 
 # Auto-fix SwiftLint issues

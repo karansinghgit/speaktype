@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Unit Test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode.app
+
+      - name: Show versions
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Build (Debug)
+        run: xcodebuild -scheme speaktype -configuration Debug build CODE_SIGNING_ALLOWED=NO
+
+      - name: Unit tests
+        run: |
+          xcodebuild test \
+            -scheme speaktype \
+            -destination 'platform=macOS' \
+            -only-testing:speaktypeTests \
+            CODE_SIGNING_ALLOWED=NO
+
+  lint:
+    name: SwiftLint
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      # Advisory only: the codebase has a large pre-existing violation
+      # backlog, so the step is allowed to fail without failing the job.
+      # Remove continue-on-error once the backlog is cleared to make it a gate.
+      - name: Run SwiftLint
+        continue-on-error: true
+        run: swiftlint

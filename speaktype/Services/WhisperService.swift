@@ -398,6 +398,9 @@ class WhisperService {
         }
 
         let range = NSRange(text.startIndex..., in: text)
-        return regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: replacement)
+        // Escape the user-supplied replacement so `$` / `\` are treated literally,
+        // not as regex template tokens.
+        let template = NSRegularExpression.escapedTemplate(for: replacement)
+        return regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: template)
     }
 }

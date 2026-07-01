@@ -218,7 +218,9 @@ class AudioRecordingService: NSObject, ObservableObject {
         resetMainWriterState()
         resetChunkWriterState()
         isRecording = true
-        cancelIdleSessionStop()
+        // Hop onto audioQueue: idleSessionStopWorkItem is only ever touched there,
+        // and startRecording runs on the main thread.
+        audioQueue.async { self.cancelIdleSessionStop() }
 
         // 2. Wrap setup in a Task so stopRecording can wait for it
         setupTask = Task { @MainActor in

@@ -150,7 +150,6 @@ struct PermissionsPage: View {
     var finishAction: () -> Void
     @State private var micStatus: AVAuthorizationStatus = .notDetermined
     @State private var accessibilityStatus: Bool = false
-    @State private var documentsAccessGranted: Bool = false
     @State private var timer: Timer?
 
     var body: some View {
@@ -185,15 +184,6 @@ struct PermissionsPage: View {
                     action: requestMicPermission
                 )
 
-                // Documents Folder
-                OnboardingPermissionRow(
-                    icon: "folder.fill",
-                    title: "Documents Folder",
-                    description: "To store AI models locally on your Mac",
-                    isGranted: documentsAccessGranted,
-                    action: requestDocumentsAccess
-                )
-
                 // Accessibility
                 OnboardingPermissionRow(
                     icon: "hand.raised.fill",
@@ -209,8 +199,7 @@ struct PermissionsPage: View {
             Spacer()
 
             ContinueButton(
-                isEnabled: micStatus == .authorized && accessibilityStatus
-                    && documentsAccessGranted,
+                isEnabled: micStatus == .authorized && accessibilityStatus,
                 action: finishAction
             )
             .padding(.bottom, 48)
@@ -252,50 +241,6 @@ struct PermissionsPage: View {
             print("🔐 Accessibility status changed: \(accessibilityStatus) → \(newAccessStatus)")
         }
         accessibilityStatus = newAccessStatus
-
-        // Check documents access by verifying the huggingface folder exists or can be created
-        checkDocumentsAccess()
-    }
-
-    func checkDocumentsAccess() {
-        guard
-            let documentsDir = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask
-            ).first
-        else {
-            documentsAccessGranted = false
-            return
-        }
-
-        let huggingfacePath = documentsDir.appendingPathComponent("huggingface")
-        // If the folder exists or we can access it, permission was granted
-        documentsAccessGranted =
-            FileManager.default.fileExists(atPath: huggingfacePath.path)
-            || FileManager.default.isReadableFile(atPath: documentsDir.path)
-    }
-
-    func requestDocumentsAccess() {
-        guard
-            let documentsDir = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask
-            ).first
-        else {
-            return
-        }
-
-        let huggingfacePath = documentsDir.appendingPathComponent("huggingface")
-
-        // Creating a directory in Documents triggers the permission prompt
-        do {
-            try FileManager.default.createDirectory(
-                at: huggingfacePath, withIntermediateDirectories: true)
-            print("✅ Documents folder access granted - created huggingface directory")
-            documentsAccessGranted = true
-        } catch {
-            print("⚠️ Documents folder access error: \(error)")
-            // Permission may have been denied, or there was another error
-            documentsAccessGranted = false
-        }
     }
 
     func requestMicPermission() {

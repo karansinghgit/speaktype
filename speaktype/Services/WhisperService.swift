@@ -174,17 +174,25 @@ class WhisperService {
         }
 
         do {
-            let documentDirectory = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask
-            ).first!
-            let modelFolderPath = documentDirectory.appendingPathComponent(
-                "huggingface/models/argmaxinc/whisperkit-coreml/\(variant)"
-            ).path
+            // Prefer the current Application Support location; fall back to the legacy
+            // Documents location so users who downloaded before the move keep working.
+            let newModelFolder = ModelStorage.whisperKitModelsDir
+                .appendingPathComponent(variant)
+            var modelFolder = newModelFolder
+            if !FileManager.default.fileExists(atPath: newModelFolder.path),
+                let legacyFolder = ModelStorage.legacyModelsDir?.appendingPathComponent(variant),
+                FileManager.default.fileExists(atPath: legacyFolder.path)
+            {
+                modelFolder = legacyFolder
+            }
 
-            // Use WhisperKitConfig with optimized settings
+            // Use WhisperKitConfig with optimized settings.
+            // `downloadBase` keeps any tokenizer configs WhisperKit fetches out of
+            // ~/Documents (the root cause of model-load failures on macOS 15, #38).
             let config = WhisperKitConfig(
                 model: variant,
-                modelFolder: modelFolderPath,
+                downloadBase: ModelStorage.whisperKitBase,
+                modelFolder: modelFolder.path,
                 computeOptions: ModelComputeOptions(),  // Uses GPU + Neural Engine
                 verbose: false,
                 logLevel: .error,

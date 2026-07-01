@@ -5,7 +5,7 @@ struct AIModelsView: View {
     // MARK: - Properties
 
     @StateObject private var downloadService = ModelDownloadService.shared
-    @AppStorage("selectedModelVariant") private var selectedModel: String = ""
+    @AppStorage(ModelSelection.defaultsKey) private var selectedModel: String = ModelSelection.none
     @State private var models = AIModel.availableModels
 
     // MARK: - Computed Properties
@@ -39,30 +39,13 @@ struct AIModelsView: View {
         }
         .background(Color.clear)
         .onAppear {
-            // Refresh model download status when view appears
+            // Refresh model download status when view appears.
+            // We deliberately do NOT overwrite `selectedModel` here: the disk scan is
+            // async and a transient miss used to wipe the persisted selection on every
+            // launch (#79). The selection only changes on explicit user actions —
+            // picking a model, or deleting the currently-selected one.
             Task {
                 await downloadService.refreshDownloadedModels()
-
-                // Auto-fallback: If selected model isn't downloaded, switch to first available
-                if !selectedModel.isEmpty {
-                    let isSelectedModelDownloaded =
-                        downloadService.downloadProgress[selectedModel] ?? 0.0 >= 1.0
-
-                    if !isSelectedModelDownloaded {
-                        // Find first downloaded model
-                        if let firstDownloaded = downloadService.downloadProgress.first(where: {
-                            $0.value >= 1.0
-                        })?.key {
-                            print(
-                                "⚠️ Selected model '\(selectedModel)' not found. Auto-switching to '\(firstDownloaded)'"
-                            )
-                            selectedModel = firstDownloaded
-                        } else {
-                            print("⚠️ No models downloaded. Please download a model to use the app.")
-                            selectedModel = ""  // Clear invalid selection
-                        }
-                    }
-                }
             }
         }
     }

@@ -15,7 +15,7 @@ struct DashboardView: View {
     @EnvironmentObject var trialManager: TrialManager
     @EnvironmentObject var licenseManager: LicenseManager
 
-    @AppStorage("selectedModelVariant") private var selectedModel: String = "openai_whisper-base"
+    @AppStorage(ModelSelection.defaultsKey) private var selectedModel: String = ModelSelection.none
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
     @State private var showFileImporter = false
     @State private var isTranscribing = false
@@ -177,6 +177,7 @@ struct DashboardView: View {
         }
         .onAppear {
             Task {
+                guard !selectedModel.isEmpty else { return }
                 if !transcription.isInitialized
                     || transcription.currentModelVariant != selectedModel
                 {
@@ -186,6 +187,7 @@ struct DashboardView: View {
         }
         .onChange(of: selectedModel) {
             Task {
+                guard !selectedModel.isEmpty else { return }
                 try? await transcription.loadModel(variant: selectedModel)
             }
         }

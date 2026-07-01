@@ -15,7 +15,7 @@ struct MiniRecorderView: View {
     var onCommit: ((String) -> Void)?
     var onCancel: (() -> Void)?
 
-    @AppStorage("selectedModelVariant") private var selectedModel: String = ""
+    @AppStorage(ModelSelection.defaultsKey) private var selectedModel: String = ModelSelection.none
     @AppStorage("recordingMode") private var recordingMode: Int = 0
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
     @AppStorage("recentTranscriptionLanguages") private var recentLanguagesString: String = ""

@@ -258,6 +258,11 @@ struct ModelRow: View {
             Button(action: {
                 Task {
                     _ = await downloadService.deleteModel(variant: model.variant)
+                    // If the model we just removed was the active selection, clear it
+                    // so nothing tries to load a model that's no longer on disk.
+                    if selectedModel == model.variant {
+                        selectedModel = ModelSelection.none
+                    }
                 }
             }) {
                 Image(systemName: "trash")

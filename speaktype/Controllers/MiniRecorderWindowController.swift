@@ -6,7 +6,7 @@ class MiniRecorderWindowController: NSObject {
     private var hostingController: NSHostingController<AnyView>?
     private var lastActiveApp: NSRunningApplication?
     private var shouldRestoreClipboardAfterAutoPaste: Bool {
-        UserDefaults.standard.object(forKey: "restoreClipboardAfterAutoPaste") as? Bool ?? false
+        UserDefaults.standard.object(forKey: "restoreClipboardAfterAutoPaste") as? Bool ?? true
     }
 
     // Start recording - show panel and begin recording

@@ -443,7 +443,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
-				APP_DISPLAY_NAME = SpeakType;
+				APP_DISPLAY_NAME = "SpeakType-Dev";
 				INFOPLIST_FILE = speaktype/Resources/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -451,7 +451,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.2048labs.speaktype;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.2048labs.speaktype.dev";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

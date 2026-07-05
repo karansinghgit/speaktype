@@ -16,17 +16,27 @@ class AudioRecordingService: NSObject, ObservableObject {
     @Published var availableDevices: [AVCaptureDevice] = []
     @Published var selectedDeviceId: String? {
         didSet {
-            setupSession()
+            let sessionReady = setupSession()
             // If a dictation is in flight (device unplugged mid-recording, or a
             // switch from settings), restart the rebuilt session so capture
             // continues — setupSession alone leaves the new session stopped and
-            // the recording would silently go dead until the user stops.
+            // the recording would silently go dead until the user stops. But
+            // only when setupSession actually installed a usable input: with no
+            // input remaining (all mics gone), starting an inputless session
+            // would just spin a dead capture. Leave the recording active but
+            // paused — fetchAvailableDevices reassigns selectedDeviceId when a
+            // mic reconnects, which restarts capture here, and the partial
+            // (plus any resumed audio) still finalizes on the user's stop.
             if isRecording {
-                audioQueue.async {
-                    if self.captureSession?.isRunning != true {
-                        print("🎤 Restarting capture session after device change mid-recording")
-                        self.captureSession?.startRunning()
+                if sessionReady {
+                    audioQueue.async {
+                        if self.captureSession?.isRunning != true {
+                            print("🎤 Restarting capture session after device change mid-recording")
+                            self.captureSession?.startRunning()
+                        }
                     }
+                } else {
+                    print("🎤 No usable audio input after device change; recording paused until an input returns")
                 }
             }
             // Persist so the selection survives app restarts.

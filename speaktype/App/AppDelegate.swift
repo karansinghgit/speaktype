@@ -39,6 +39,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in
             self?.reconfigureHotkeyMonitoringIfNeeded()
+            self?.miniRecorderController?.applyIdlePillPreference()
+        }
+        // Also retry after returning from System Settings (Accessibility grant).
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.reconfigureHotkeyMonitoringIfNeeded()
         }
 
         schedulePeriodicUpdateChecks()
@@ -184,7 +191,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func reconfigureHotkeyMonitoringIfNeeded() {
         let current = getSelectedHotkey()
-        guard current != configuredHotkey else { return }
+        // Rebuild when the selection changed, or when Accessibility was
+        // granted after launch — the suppressing tap could not be created
+        // without it, and previously stayed dead until an app restart
+        // (leaving global hotkeys broken outside the app).
+        let tapNowPossible = hotkeyEventTap == nil && AXIsProcessTrusted()
+        guard current != configuredHotkey || tapNowPossible else { return }
         teardownHotkeyMonitoring()
         setupHotkeyMonitoring()
     }

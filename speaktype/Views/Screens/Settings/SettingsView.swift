@@ -91,6 +91,7 @@ struct GeneralSettingsTab: View {
     @AppStorage("restoreClipboardAfterAutoPaste") private var restoreClipboardAfterAutoPaste =
         true
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon: Bool = true
+    @AppStorage(MiniRecorderWindowController.showIdlePillDefaultsKey) private var showIdlePill = true
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
     @AppStorage("recentTranscriptionLanguages") private var recentLanguagesString: String = ""
     @AppStorage("enableAutoEdit") private var enableAutoEdit: Bool = false
@@ -209,6 +210,20 @@ struct GeneralSettingsTab: View {
                             Spacer()
                             Toggle("", isOn: $showMenuBarIcon)
                                 .labelsHidden()
+                        }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Show floating pill when idle")
+                                    .font(Typography.bodyMedium)
+                                    .foregroundStyle(Color.textPrimary)
+                                Spacer()
+                                Toggle("", isOn: $showIdlePill)
+                                    .labelsHidden()
+                            }
+                            Text("When off, the pill appears only while recording or transcribing.")
+                                .font(Typography.captionSmall)
+                                .foregroundStyle(Color.textMuted)
                         }
 
                         VStack(alignment: .leading, spacing: 6) {

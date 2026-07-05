@@ -8,6 +8,10 @@ class MiniRecorderWindowController: NSObject {
     private var shouldRestoreClipboardAfterAutoPaste: Bool {
         UserDefaults.standard.object(forKey: "restoreClipboardAfterAutoPaste") as? Bool ?? true
     }
+    static let showIdlePillDefaultsKey = "showIdleRecorderPill"
+    private var showIdlePill: Bool {
+        UserDefaults.standard.object(forKey: Self.showIdlePillDefaultsKey) as? Bool ?? true
+    }
 
     /// Show the always-present resting pill. Called once at launch; the pill then
     /// lives on screen and morphs into the recording HUD on demand.
@@ -22,9 +26,21 @@ class MiniRecorderWindowController: NSObject {
         // behind it so the transparent window never blocks the desktop or dock.
         panel.ignoresMouseEvents = true
 
+        guard showIdlePill else {
+            panel.orderOut(nil)
+            return
+        }
+
         if !panel.isVisible {
             panel.orderFrontRegardless()
         }
+    }
+
+    /// Re-apply idle visibility when the user flips the setting. Only acts
+    /// while the pill is actually idle (interactive = recording/processing).
+    func applyIdlePillPreference() {
+        guard let panel, panel.ignoresMouseEvents else { return }
+        showIdleRecorder()
     }
 
     // Start recording - show panel and begin recording
@@ -68,9 +84,13 @@ class MiniRecorderWindowController: NSObject {
         }
     }
 
-    /// Return the pill to its passive resting state without hiding it.
+    /// Return the pill to its passive resting state (hidden entirely when the
+    /// user has turned the idle pill off).
     private func returnToIdle() {
         panel?.ignoresMouseEvents = true
+        if !showIdlePill {
+            panel?.orderOut(nil)
+        }
     }
 
     // Stop recording - trigger transcription and paste

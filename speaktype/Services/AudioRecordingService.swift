@@ -396,7 +396,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         }
     }
 
-    private func getRecordingsDirectory() -> URL {
+    static func recordingsDirectory() -> URL {
         // Use Application Support instead of Documents for app-managed storage
         let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,
@@ -415,6 +415,10 @@ class AudioRecordingService: NSObject, ObservableObject {
         )
 
         return recordingsDir
+    }
+
+    private func getRecordingsDirectory() -> URL {
+        Self.recordingsDirectory()
     }
 
     private func scheduleIdleSessionStop(delay: TimeInterval = 8) {

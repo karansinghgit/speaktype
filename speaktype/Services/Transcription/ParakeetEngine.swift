@@ -67,8 +67,16 @@ class ParakeetEngine: SpeechToTextEngine {
         let version = ParakeetCatalog.version(for: variant)
         loadingStage = "Loading Parakeet model…"
 
-        // Downloads from Hugging Face on first use, then loads from cache.
-        let models = try await AsrModels.downloadAndLoad(version: version)
+        // Load strictly from the local cache. downloadAndLoad used to kick off
+        // a silent multi-hundred-MB Hugging Face fetch here when files were
+        // missing — with no progress UI and contradicting the offline-first
+        // promise. Downloads belong to ModelDownloadService.
+        let cacheDir = AsrModels.defaultCacheDirectory(for: version)
+        guard AsrModels.modelsExist(at: cacheDir, version: version) else {
+            loadingStage = ""
+            throw WhisperService.TranscriptionError.modelFilesMissing
+        }
+        let models = try await AsrModels.load(from: cacheDir, version: version)
         let manager = AsrManager(config: .default)
         try await manager.loadModels(models)
 

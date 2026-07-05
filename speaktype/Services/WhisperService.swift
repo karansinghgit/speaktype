@@ -75,6 +75,7 @@ class WhisperService {
         case alreadyLoading
         case loadingTimeout
         case unsupportedModelVariant
+        case modelFilesMissing
 
         var errorDescription: String? {
             switch self {
@@ -85,6 +86,8 @@ class WhisperService {
                 return "Model loading timed out — your Mac may not have enough RAM for this model"
             case .unsupportedModelVariant:
                 return "The selected model is not supported."
+            case .modelFilesMissing:
+                return "Model files are missing or incomplete — download the model again in Settings → AI Models."
             }
         }
     }

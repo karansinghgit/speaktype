@@ -157,12 +157,13 @@ class ModelDownloadService: ObservableObject {
         }
         
         // Check Parakeet (FluidAudio) models, which live in their own cache dir.
+        // Use FluidAudio's own required-files check — a merely non-empty cache
+        // (failed or interrupted download) used to show as "Installed" forever.
         for variant in ParakeetCatalog.variants {
             let version = ParakeetCatalog.version(for: variant)
             let cacheDir = AsrModels.defaultCacheDirectory(for: version)
             if fileManager.fileExists(atPath: cacheDir.path),
-               let contents = try? fileManager.contentsOfDirectory(atPath: cacheDir.path),
-               !contents.isEmpty {
+               AsrModels.modelsExist(at: cacheDir, version: version) {
                 foundModels.insert(variant)
                 print("✅ Parakeet model \(variant) found in cache")
             }

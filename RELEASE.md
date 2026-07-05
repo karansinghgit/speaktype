@@ -110,8 +110,7 @@ Error: HTTP status code: 401. Unable to authenticate.
 ```bash
 xcrun notarytool store-credentials "AC_PASSWORD" \
   --apple-id "mail2048labs@gmail.com" \
-  --team-id "PCV4UMSRZX" \
-  --password "NEW_PASSWORD_HERE"
+  --team-id "PCV4UMSRZX"
 ```
 
 ### Notarization Rejected

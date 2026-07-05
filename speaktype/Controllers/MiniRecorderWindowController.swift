@@ -8,6 +8,10 @@ class MiniRecorderWindowController: NSObject {
     private var shouldRestoreClipboardAfterAutoPaste: Bool {
         UserDefaults.standard.object(forKey: "restoreClipboardAfterAutoPaste") as? Bool ?? true
     }
+    static let showIdlePillDefaultsKey = "showIdleRecorderPill"
+    private var showIdlePill: Bool {
+        UserDefaults.standard.object(forKey: Self.showIdlePillDefaultsKey) as? Bool ?? true
+    }
 
     /// Show the always-present resting pill. Called once at launch; the pill then
     /// lives on screen and morphs into the recording HUD on demand.
@@ -22,9 +26,21 @@ class MiniRecorderWindowController: NSObject {
         // behind it so the transparent window never blocks the desktop or dock.
         panel.ignoresMouseEvents = true
 
+        guard showIdlePill else {
+            panel.orderOut(nil)
+            return
+        }
+
         if !panel.isVisible {
             panel.orderFrontRegardless()
         }
+    }
+
+    /// Re-apply idle visibility when the user flips the setting. Only acts
+    /// while the pill is actually idle (interactive = recording/processing).
+    func applyIdlePillPreference() {
+        guard let panel, panel.ignoresMouseEvents else { return }
+        showIdleRecorder()
     }
 
     // Start recording - show panel and begin recording
@@ -68,9 +84,13 @@ class MiniRecorderWindowController: NSObject {
         }
     }
 
-    /// Return the pill to its passive resting state without hiding it.
+    /// Return the pill to its passive resting state (hidden entirely when the
+    /// user has turned the idle pill off).
     private func returnToIdle() {
         panel?.ignoresMouseEvents = true
+        if !showIdlePill {
+            panel?.orderOut(nil)
+        }
     }
 
     // Stop recording - trigger transcription and paste
@@ -176,24 +196,38 @@ class MiniRecorderWindowController: NSObject {
                 return
             }
 
-            // 4. Re-activate the target app
-            if let app = self.lastActiveApp {
-                _ = await MainActor.run {
-                    app.activate()
+            // 4. Re-activate the target app and wait until it is actually
+            // frontmost. The panel is non-activating, so focus usually never
+            // left the target — in that common case this adds zero delay
+            // (previously every paste ate an unconditional 500ms here).
+            let target = self.lastActiveApp ?? NSWorkspace.shared.frontmostApplication
+            if let app = target,
+                NSWorkspace.shared.frontmostApplication?.processIdentifier
+                    != app.processIdentifier
+            {
+                _ = await MainActor.run { app.activate() }
+                for _ in 0..<25 {
+                    if NSWorkspace.shared.frontmostApplication?.processIdentifier
+                        == app.processIdentifier
+                    {
+                        break
+                    }
+                    try? await Task.sleep(nanoseconds: 20_000_000)
                 }
             }
 
-            // 5. Wait for focus
-            try? await Task.sleep(nanoseconds: 500_000_000)
-
-            // 6. Paste using CGEvent (Accessibility permission only)
+            // 5. Paste using CGEvent (Accessibility permission only)
             await MainActor.run {
                 ClipboardService.shared.paste()
             }
 
             guard let previousClipboard else { return }
 
-            try? await Task.sleep(nanoseconds: 350_000_000)
+            // Give slow apps (Electron, remote desktops) time to service the
+            // Cmd+V before the clipboard is restored. A longer window is safe:
+            // restore() only fires if the pasteboard still holds the transcript,
+            // so a user copy in the meantime cancels it.
+            try? await Task.sleep(nanoseconds: 800_000_000)
 
             await MainActor.run {
                 ClipboardService.shared.restore(previousClipboard, ifCurrentStringMatches: text)

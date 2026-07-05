@@ -162,15 +162,17 @@ struct AIModel: Identifiable, Equatable {
     ]
 
     /// Returns the expected minimum size for a given model variant
-    static func expectedSize(for variant: String) -> Int64 {
-        return availableModels.first(where: { $0.variant == variant })?.expectedSizeBytes
-            ?? 50_000_000
+    static func expectedSize(for variant: String) -> Int64? {
+        return model(for: variant)?.expectedSizeBytes
     }
 
     /// Returns which backend owns a given model variant.
-    /// Defaults to `.whisper` for unknown variants so existing behavior is preserved.
-    static func engineKind(for variant: String) -> TranscriptionEngineKind {
-        return availableModels.first(where: { $0.variant == variant })?.engine ?? .whisper
+    static func engineKind(for variant: String) -> TranscriptionEngineKind? {
+        return model(for: variant)?.engine
+    }
+
+    static func model(for variant: String) -> AIModel? {
+        availableModels.first { $0.variant == variant }
     }
 
     /// All models for a given engine.

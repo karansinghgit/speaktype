@@ -275,7 +275,7 @@ struct MiniRecorderView: View {
     private var pillWidth: CGFloat {
         switch displayPhase {
         case .idle: return 58
-        case .warming: return 200
+        case .warming: return 280  // fits stage text + elapsed seconds
         case .processing: return 210
         case .recording: return expanded ? 460 : 250
         }
@@ -314,11 +314,32 @@ struct MiniRecorderView: View {
             ProgressView()
                 .controlSize(.small)
                 .colorScheme(.dark)
-            Text("Warming up model...")
-                .font(Typography.pillLabel)
-                .foregroundColor(.white.opacity(0.9))
+            // Cold loads run 30-60s; show the live stage and elapsed seconds so
+            // a long warm-up reads as progress, not a hang.
+            TimelineView(.periodic(from: .now, by: 1)) { _ in
+                Text(warmingLabel)
+                    .font(Typography.pillLabel)
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(1)
+            }
         }
         .transition(.opacity)
+    }
+
+    private var warmingLabel: String {
+        // The first load after download includes a one-time CoreML/ANE
+        // compile that can run minutes for large models; say so, or the
+        // pill reads as hung.
+        let firstLoad = !WhisperService.hasCompletedFirstLoad(variant: selectedModel)
+        let stage = transcription.loadingStage
+        let base = firstLoad
+            ? "First-time setup — optimizing model for your Mac…"
+            : (stage.isEmpty ? "Warming up model..." : stage)
+        if let started = transcription.loadingStartedAt {
+            let seconds = Int(Date().timeIntervalSince(started))
+            if seconds >= 5 { return "\(base) (\(seconds)s)" }
+        }
+        return base
     }
 
     private var processingContent: some View {
@@ -450,30 +471,13 @@ struct MiniRecorderView: View {
         .onAppear {
             initializedService()
             audioRecorder.fetchAvailableDevices()
-
-            // Set up Escape key monitors
-            globalEscapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
-                if event.keyCode == 53 {
-                    Task { @MainActor in self.handleEscape() }
-                }
-            }
-            localEscapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                if event.keyCode == 53 {
-                    Task { @MainActor in self.handleEscape() }
-                    return nil  // swallow Escape
-                }
-                return event
-            }
         }
         .onDisappear {
-            if let globalEscapeMonitor = globalEscapeMonitor {
-                NSEvent.removeMonitor(globalEscapeMonitor)
-            }
-            if let localEscapeMonitor = localEscapeMonitor {
-                NSEvent.removeMonitor(localEscapeMonitor)
-            }
+            removeEscapeMonitors()
             audioRecorder.stopSessionIfIdle()
         }
+        .onChange(of: isListening) { updateEscapeMonitors() }
+        .onChange(of: isProcessing) { updateEscapeMonitors() }
         .onChange(of: isListening) {
             // Only animate when actually recording to save CPU
             if isListening {
@@ -632,6 +636,15 @@ struct MiniRecorderView: View {
                             debugLog("Model pre-loaded after switch: \(model.variant)")
                         } catch {
                             debugLog("Model pre-load failed: \(error.localizedDescription)")
+                            // Don't leave the app switched to a model that can't
+                            // load (not downloaded, load failed/timed out) — revert
+                            // the selection so dictation keeps using the old model.
+                            // Only revert if THIS attempt is still the active
+                            // selection; the user may have picked another model
+                            // since, and reverting would clobber that newer choice.
+                            await MainActor.run {
+                                if selectedModel == model.variant { selectedModel = previousModel }
+                            }
                         }
                         await MainActor.run { isWarmingUp = false }
                     }
@@ -719,6 +732,22 @@ struct MiniRecorderView: View {
             }
         #endif
 
+        // Denied mic access previously produced a silent zero-byte recording;
+        // tell the user what is wrong instead.
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        guard micStatus == .authorized || micStatus == .notDetermined else {
+            debugLog("Microphone access denied - showing error")
+            isProcessing = true
+            statusMessage = "Mic access off — System Settings → Privacy & Security"
+
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                isProcessing = false
+                onCancel?()
+            }
+            return
+        }
+
         // Check if model is selected BEFORE starting recording
         guard !selectedModel.isEmpty else {
             debugLog("No model selected - showing error")
@@ -733,9 +762,12 @@ struct MiniRecorderView: View {
             return
         }
 
-        // Check if model is downloaded
+        // Check if model is downloaded. Until the launch disk scan finishes,
+        // treat the model as present — a hotkey press seconds after login used
+        // to flash a false "Model not downloaded" (transcription still fails
+        // with a real error in the rare case the model is genuinely missing).
         let progress = ModelDownloadService.shared.downloadProgress[selectedModel] ?? 0
-        guard progress >= 1.0 else {
+        guard progress >= 1.0 || !ModelDownloadService.shared.hasCompletedInitialScan else {
             debugLog("Model not downloaded - showing error")
             isProcessing = true
             statusMessage = "Model not downloaded"
@@ -751,8 +783,24 @@ struct MiniRecorderView: View {
         cancelCommit = false
 
         debugLog("Starting recording...")
-        audioRecorder.startRecording()
-        isListening = true
+        // Enter the "listening" HUD only once capture actually begins. On first
+        // run the mic prompt resolves asynchronously; flipping isListening
+        // eagerly left the pill stuck showing "recording" if the user denied.
+        audioRecorder.startRecording { started in
+            guard started else {
+                debugLog("Recording did not start (microphone permission)")
+                isListening = false
+                isProcessing = true
+                statusMessage = "Mic access off — System Settings → Privacy & Security"
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    isProcessing = false
+                    onCancel?()
+                }
+                return
+            }
+            isListening = true
+        }
     }
 
     private func selectAudioDevice(_ deviceId: String) {
@@ -777,11 +825,21 @@ struct MiniRecorderView: View {
 
             guard shouldResumeRecording else { return }
 
-            audioRecorder.startRecording()
-
+            // Resume on the new device, but only re-enter the recording HUD if
+            // capture actually restarts — a device that can't be added (unplugged
+            // in the same instant, grabbed exclusively by another app) must not
+            // leave the pill showing a live HUD over nothing. onStarted resolves
+            // once the writer setup task confirms capture, keeping "Switching
+            // input…" up until then.
             await MainActor.run {
-                isProcessing = false
-                isListening = true
+                audioRecorder.startRecording { started in
+                    isProcessing = false
+                    isListening = started
+                    if !started {
+                        statusMessage = "Couldn't switch input"
+                        onCancel?()
+                    }
+                }
             }
         }
     }
@@ -834,6 +892,45 @@ struct MiniRecorderView: View {
         }
     }
 
+    /// Escape monitors live only while a recording or processing pass is
+    /// active. A permanent global keyDown monitor woke the app on every
+    /// keystroke system-wide just to check for Escape.
+    private func updateEscapeMonitors() {
+        if isListening || isProcessing {
+            installEscapeMonitors()
+        } else {
+            removeEscapeMonitors()
+        }
+    }
+
+    private func installEscapeMonitors() {
+        guard globalEscapeMonitor == nil && localEscapeMonitor == nil else { return }
+
+        globalEscapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == 53 {
+                Task { @MainActor in self.handleEscape() }
+            }
+        }
+        localEscapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == 53 {
+                Task { @MainActor in self.handleEscape() }
+                return nil  // swallow Escape
+            }
+            return event
+        }
+    }
+
+    private func removeEscapeMonitors() {
+        if let globalEscapeMonitor {
+            NSEvent.removeMonitor(globalEscapeMonitor)
+            self.globalEscapeMonitor = nil
+        }
+        if let localEscapeMonitor {
+            NSEvent.removeMonitor(localEscapeMonitor)
+            self.localEscapeMonitor = nil
+        }
+    }
+
     private func handleEscape() {
         guard isListening || isProcessing || isWarmingUp || transcription.isLoading else { return }
 
@@ -868,20 +965,10 @@ struct MiniRecorderView: View {
         }
     }
 
-    private func debugLog(_ message: String) {
-        let logPath = "/tmp/speaktype_debug.log"
-        let logEntry = "[\(Date())] \(message)\n"
-        if let data = logEntry.data(using: .utf8) {
-            if FileManager.default.fileExists(atPath: logPath) {
-                if let handle = FileHandle(forWritingAtPath: logPath) {
-                    handle.seekToEndOfFile()
-                    handle.write(data)
-                    handle.closeFile()
-                }
-            } else {
-                FileManager.default.createFile(atPath: logPath, contents: data)
-            }
-        }
+    private func debugLog(_ message: @autoclosure () -> String) {
+        #if DEBUG
+            AppLogger.debug(message(), category: AppLogger.ui)
+        #endif
     }
 
     private func processRecording(url: URL) async {
@@ -915,7 +1002,7 @@ struct MiniRecorderView: View {
                 await MainActor.run { statusMessage = "Transcribing..." }
             }
             let text = try await transcription.transcribe(audioFile: url, language: transcriptionLanguage)
-            debugLog("Transcription result: \(text.prefix(50))...")
+            debugLog("Transcription completed")
 
             guard !text.isEmpty else {
                 debugLog("Empty text, cancelling")

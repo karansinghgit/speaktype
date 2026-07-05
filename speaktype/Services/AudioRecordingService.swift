@@ -6,10 +6,6 @@ import Foundation
 class AudioRecordingService: NSObject, ObservableObject {
     static let shared = AudioRecordingService()  // Shared instance for settings/dashboard sync
 
-    // Chunk publisher: emits the URL of each completed ~4-second audio chunk while recording
-    let chunkPublisher = PassthroughSubject<URL, Never>()
-    private static let chunkDuration: TimeInterval = 4.0
-
     @Published var isRecording = false
     @Published var audioLevel: Float = 0.0
     @Published var audioFrequency: Float = 0.0  // Normalized 0...1 representation of pitch
@@ -20,7 +16,29 @@ class AudioRecordingService: NSObject, ObservableObject {
     @Published var availableDevices: [AVCaptureDevice] = []
     @Published var selectedDeviceId: String? {
         didSet {
-            setupSession()
+            let sessionReady = setupSession()
+            // If a dictation is in flight (device unplugged mid-recording, or a
+            // switch from settings), restart the rebuilt session so capture
+            // continues — setupSession alone leaves the new session stopped and
+            // the recording would silently go dead until the user stops. But
+            // only when setupSession actually installed a usable input: with no
+            // input remaining (all mics gone), starting an inputless session
+            // would just spin a dead capture. Leave the recording active but
+            // paused — fetchAvailableDevices reassigns selectedDeviceId when a
+            // mic reconnects, which restarts capture here, and the partial
+            // (plus any resumed audio) still finalizes on the user's stop.
+            if isRecording {
+                if sessionReady {
+                    audioQueue.async {
+                        if self.captureSession?.isRunning != true {
+                            print("🎤 Restarting capture session after device change mid-recording")
+                            self.captureSession?.startRunning()
+                        }
+                    }
+                } else {
+                    print("🎤 No usable audio input after device change; recording paused until an input returns")
+                }
+            }
             // Persist so the selection survives app restarts.
             if let selectedDeviceId {
                 UserDefaults.standard.set(selectedDeviceId, forKey: Self.selectedDeviceDefaultsKey)
@@ -41,16 +59,23 @@ class AudioRecordingService: NSObject, ObservableObject {
     private var isStopping = false  // Flag to prevent appending during stop
     private var idleSessionStopWorkItem: DispatchWorkItem?
 
-    // MARK: - Chunking state
-    private var chunkAssetWriter: AVAssetWriter?
-    private var chunkAssetWriterInput: AVAssetWriterInput?
-    private var chunkIsSessionStarted = false
-    private var chunkStartTime: Date?
-    private var chunkFileURL: URL?
-    private var isRotatingChunk = false  // Prevents concurrent rotations
     private var shouldDiscardCurrentRecordingOutput = false
     private var smoothedAudioLevel: Float = 0.0
     private var smoothedAudioFrequency: Float = 0.0
+
+    // Coalesce level/waveform publishes to ~30 Hz (audioQueue-confined).
+    // Publishing three @Published values per audio buffer re-rendered the
+    // whole observing pill 50-100x/s for no visible gain.
+    private var pendingWavePeak: Float = 0
+    private var lastLevelPublishUptime: TimeInterval = 0
+    private static let levelPublishInterval: TimeInterval = 1.0 / 30.0
+
+    /// Buffers captured before the asset writer is ready (audioQueue-confined).
+    /// Without this, everything the user says between pressing the hotkey and
+    /// the writer being wired up — session cold start plus writer setup — was
+    /// silently dropped, cutting off the first word(s) of every dictation.
+    private var pendingSampleBuffers: [CMSampleBuffer] = []
+    private static let maxPendingSampleBuffers = 600
 
     private let audioQueue = DispatchQueue(label: "com.speaktype.audioQueue")
 
@@ -107,15 +132,6 @@ class AudioRecordingService: NSObject, ObservableObject {
         isSessionStarted = false
         smoothedAudioLevel = 0.0
         smoothedAudioFrequency = 0.0
-    }
-
-    private func resetChunkWriterState() {
-        chunkAssetWriter = nil
-        chunkAssetWriterInput = nil
-        chunkIsSessionStarted = false
-        chunkStartTime = nil
-        chunkFileURL = nil
-        isRotatingChunk = false
     }
 
     override init() {
@@ -177,21 +193,24 @@ class AudioRecordingService: NSObject, ObservableObject {
         }
     }
 
-    func setupSession() {
+    /// Builds the capture session. Returns whether a usable input was installed
+    /// — false when the selected device is missing or can't be added, which
+    /// leaves an inputless session that would capture nothing.
+    @discardableResult
+    func setupSession() -> Bool {
         captureSession?.stopRunning()
         captureSession = AVCaptureSession()
 
         guard let deviceId = selectedDeviceId,
             let device = AVCaptureDevice(uniqueID: deviceId),
-            let input = try? AVCaptureDeviceInput(device: device)
+            let input = try? AVCaptureDeviceInput(device: device),
+            captureSession?.canAddInput(input) == true
         else {
             print("Failed to find or add device with ID: \(selectedDeviceId ?? "nil")")
-            return
+            return false
         }
 
-        if captureSession?.canAddInput(input) == true {
-            captureSession?.addInput(input)
-        }
+        captureSession?.addInput(input)
 
         audioOutput = AVCaptureAudioDataOutput()
         // Pin a fixed Linear PCM output format so the live level meter always sees a
@@ -215,6 +234,7 @@ class AudioRecordingService: NSObject, ObservableObject {
 
         // Don't start session here - only start when recording begins
         // This prevents continuous CPU usage when idle
+        return true
     }
 
     /// Pre-warm the capture session so first recording starts instantly
@@ -244,51 +264,79 @@ class AudioRecordingService: NSObject, ObservableObject {
         }
     }
 
-    func startRecording() {
-        requestPermission()
+    /// Start recording. `onStarted` fires with `true` once capture actually
+    /// begins and `false` if permission is denied — so callers can flip their
+    /// "recording" UI only when a take is really underway, instead of guessing
+    /// before the (possibly asynchronous) permission answer.
+    func startRecording(onStarted: ((Bool) -> Void)? = nil) {
+        guard !isRecording else {
+            onStarted?(false)
+            return
+        }
 
-        guard !isRecording else { return }
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            beginAuthorizedRecording(onStarted: onStarted)
+        case .notDetermined:
+            // First run: wait for the user's answer to the system prompt.
+            // Starting immediately used to record into a mic we might never
+            // get, producing an empty take even when the user granted access —
+            // and callers must not enter "recording" state until this resolves.
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                DispatchQueue.main.async {
+                    guard granted else {
+                        print("Microphone access denied")
+                        onStarted?(false)
+                        return
+                    }
+                    self.beginAuthorizedRecording(onStarted: onStarted)
+                }
+            }
+        default:
+            print("Microphone access denied")
+            onStarted?(false)
+        }
+    }
+
+    private func beginAuthorizedRecording(onStarted: ((Bool) -> Void)?) {
+        guard !isRecording else { onStarted?(false); return }
         if captureSession == nil { setupSession() }
+
+        // A missing/unpluggable device leaves an inputless session that would
+        // capture nothing. Rebuild once in case the session is merely stale, and
+        // report failure (rather than entering a false "recording" state) if we
+        // still have no usable input.
+        if captureSession?.inputs.isEmpty != false {
+            setupSession()
+        }
+        guard captureSession?.inputs.isEmpty == false else {
+            print("No usable audio input; not starting recording")
+            onStarted?(false)
+            return
+        }
 
         // 1. Reset flags and stale writer state before any new samples arrive.
         isStopping = false
         shouldDiscardCurrentRecordingOutput = false
         liveWaveSamples = []
         resetMainWriterState()
-        resetChunkWriterState()
+        // Clear stale pending buffers on the audio queue before new samples can
+        // accumulate (the delegate only buffers while isRecording is true, and
+        // audioQueue is serial, so this runs first).
+        audioQueue.async {
+            self.cancelIdleSessionStop()
+            self.pendingSampleBuffers.removeAll()
+            self.pendingWavePeak = 0
+            self.lastLevelPublishUptime = 0
+        }
         isRecording = true
         recordingStartTime = Date()
-        // Hop onto audioQueue: idleSessionStopWorkItem is only ever touched there,
-        // and startRecording runs on the main thread.
-        audioQueue.async { self.cancelIdleSessionStop() }
 
-        // 2. Wrap setup in a Task so stopRecording can wait for it
+        // 2. Wrap setup in a Task so stopRecording can wait for it.
+        // The writer is wired up BEFORE the capture session starts, and any
+        // buffers that beat it (prewarmed session already running) are retained
+        // in pendingSampleBuffers — so no audio is lost on either path.
         setupTask = Task { @MainActor in
-            // Ensure the capture session is running before setting up the writer.
-            let didColdStart = await withCheckedContinuation {
-                (continuation: CheckedContinuation<Bool, Never>) in
-                audioQueue.async {
-                    if self.captureSession?.isRunning != true {
-                        print("🎤 Starting capture session...")
-                        self.captureSession?.startRunning()
-                        continuation.resume(returning: true)
-                    } else {
-                        continuation.resume(returning: false)
-                    }
-                }
-            }
-            // Let the session settle before wiring the writer — but do NOT block the
-            // audio queue to do it. The capture delegate is delivered on `audioQueue`;
-            // the old code slept 0.3s ON that queue, so no buffers could arrive while
-            // it slept and the live waveform stayed empty for the first ~0.3s of every
-            // recording (text still worked — the writer just starts on the first
-            // buffer). Awaiting off-queue lets buffers, and the meter, flow while we
-            // wait, so the waveform is alive from the first frame.
-            if didColdStart {
-                try? await Task.sleep(nanoseconds: 300_000_000)
-                print("🎤 Capture session started")
-            }
-
             let url = getRecordingsDirectory().appendingPathComponent(
                 "recording-\(Date().timeIntervalSince1970).wav")
             currentFileURL = url
@@ -330,7 +378,22 @@ class AudioRecordingService: NSObject, ObservableObject {
                 audioQueue.async {
                     self.captureSession?.stopRunning()
                 }
+                onStarted?(false)
+                return
             }
+
+            audioQueue.async {
+                if self.captureSession?.isRunning != true {
+                    print("🎤 Starting capture session...")
+                    self.captureSession?.startRunning()
+                }
+            }
+
+            // Capture is genuinely underway now (usable input + writer created +
+            // session start scheduled) — only here do we tell the caller to
+            // enter the recording HUD, so a writer failure above can't leave a
+            // false "recording" state on screen.
+            onStarted?(true)
         }
     }
 
@@ -342,11 +405,8 @@ class AudioRecordingService: NSObject, ObservableObject {
         shouldDiscardCurrentRecordingOutput = discardOutput
 
         // Ensure minimum recording duration to prevent empty/corrupted WAV files
-        if let startTime = currentFileURL?.path.components(separatedBy: "-").last?
-            .replacingOccurrences(of: ".wav", with: ""),
-            let startTimestamp = Double(startTime)
-        {
-            let duration = Date().timeIntervalSince1970 - startTimestamp
+        if let startTime = recordingStartTime {
+            let duration = Date().timeIntervalSince(startTime)
             if duration < 0.5 {
                 try? await Task.sleep(nanoseconds: UInt64((0.5 - duration) * 1_000_000_000))
             }
@@ -363,42 +423,29 @@ class AudioRecordingService: NSObject, ObservableObject {
 
         return await withCheckedContinuation { continuation in
             audioQueue.async {
-                // --- Finalize the last in-flight chunk ---
                 let finishGroup = DispatchGroup()
                 var finalizedRecordingURL: URL?
                 let discardOutput = self.shouldDiscardCurrentRecordingOutput
 
-                if let lastChunkInput = self.chunkAssetWriterInput,
-                    let lastChunkWriter = self.chunkAssetWriter,
-                    let lastChunkURL = self.chunkFileURL,
-                    self.chunkIsSessionStarted
-                {
-                    self.resetChunkWriterState()
-
-                    finishGroup.enter()
-                    lastChunkInput.markAsFinished()
-                    lastChunkWriter.finishWriting {
-                        self.audioQueue.async {
-                            if discardOutput {
-                                try? FileManager.default.removeItem(at: lastChunkURL)
-                            } else if let validChunkURL = self.validatedAudioFileURL(
-                                at: lastChunkURL,
-                                writer: lastChunkWriter,
-                                label: "Final chunk"
-                            ) {
-                                print("🔪 Final chunk saved: \(validChunkURL.lastPathComponent)")
-                                self.chunkPublisher.send(validChunkURL)
-                            } else {
-                                try? FileManager.default.removeItem(at: lastChunkURL)
-                            }
-                            finishGroup.leave()
-                        }
-                    }
-                }
-
-                // --- Finalize main (full) recording ---
                 let writer = self.assetWriter
                 let writerInput = self.assetWriterInput
+
+                // Flush any buffers the writer never got to see (e.g. a very
+                // short recording stopped before the first delegate callback
+                // after the writer became ready).
+                if let writer, let writerInput, writer.status == .writing,
+                    !self.pendingSampleBuffers.isEmpty, !discardOutput
+                {
+                    if !self.isSessionStarted, let first = self.pendingSampleBuffers.first {
+                        writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(first))
+                        self.isSessionStarted = true
+                    }
+                    for buffered in self.pendingSampleBuffers
+                    where writerInput.isReadyForMoreMediaData {
+                        writerInput.append(buffered)
+                    }
+                }
+                self.pendingSampleBuffers.removeAll()
                 self.resetMainWriterState()
 
                 if let writer {
@@ -437,17 +484,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         }
     }
 
-    func requestPermission() {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized: break
-        case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .audio) { _ in }
-        default:
-            print("Microphone access denied")
-        }
-    }
-
-    private func getRecordingsDirectory() -> URL {
+    static func recordingsDirectory() -> URL {
         // Use Application Support instead of Documents for app-managed storage
         let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,
@@ -468,23 +505,8 @@ class AudioRecordingService: NSObject, ObservableObject {
         return recordingsDir
     }
 
-    private func getChunksDirectory() -> URL {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        )[0]
-
-        let chunksDir =
-            appSupport
-            .appendingPathComponent("SpeakType")
-            .appendingPathComponent("Chunks")
-
-        try? FileManager.default.createDirectory(
-            at: chunksDir,
-            withIntermediateDirectories: true
-        )
-
-        return chunksDir
+    private func getRecordingsDirectory() -> URL {
+        Self.recordingsDirectory()
     }
 
     private func scheduleIdleSessionStop(delay: TimeInterval = 8) {
@@ -521,120 +543,36 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
 
         // Don't append if we're stopping - prevents race condition crash
         guard !isStopping else { return }
-        guard let writer = assetWriter, let input = assetWriterInput else { return }
-
-        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-
-        // --- Main writer (full recording) ---
-        if writer.status == .writing {
-            if !isSessionStarted {
-                writer.startSession(atSourceTime: pts)
-                isSessionStarted = true
-            }
-
-            if input.isReadyForMoreMediaData {
-                guard !isStopping else { return }
-                input.append(sampleBuffer)
-            }
-        }
-
-        // --- Chunk writer (background segments) ---
-        appendToChunk(sampleBuffer: sampleBuffer, pts: pts)
-    }
-
-    // MARK: - Chunk Writer Helpers (audioQueue)
-
-    private func appendToChunk(sampleBuffer: CMSampleBuffer, pts: CMTime) {
-        guard !isStopping else { return }
-
-        // Initialize first chunk on first buffer
-        if chunkAssetWriter == nil {
-            startNewChunkWriter(startingAt: pts)
-        }
-
-        guard let cw = chunkAssetWriter, let ci = chunkAssetWriterInput,
-            cw.status == .writing
-        else { return }
-
-        if !chunkIsSessionStarted {
-            cw.startSession(atSourceTime: pts)
-            chunkIsSessionStarted = true
-            chunkStartTime = Date()
-        }
-
-        if ci.isReadyForMoreMediaData {
-            guard !isStopping else { return }
-            ci.append(sampleBuffer)
-        }
-
-        // Rotate chunk after chunkDuration seconds
-        guard !isRotatingChunk,
-            let start = chunkStartTime,
-            Date().timeIntervalSince(start) >= Self.chunkDuration
-        else { return }
-
-        rotateChunk(nextStartPTS: pts)
-    }
-
-    private func startNewChunkWriter(startingAt pts: CMTime) {
-        let url = getChunksDirectory().appendingPathComponent(
-            "chunk-\(Date().timeIntervalSince1970).wav")
-        chunkFileURL = url
-
-        guard let cw = try? AVAssetWriter(outputURL: url, fileType: .wav) else { return }
-
-        let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatLinearPCM,
-            AVSampleRateKey: 16000.0,
-            AVNumberOfChannelsKey: 1,
-            AVLinearPCMBitDepthKey: 16,
-            AVLinearPCMIsFloatKey: false,
-            AVLinearPCMIsBigEndianKey: false,
-            AVLinearPCMIsNonInterleaved: false,
-        ]
-        let ci = AVAssetWriterInput(mediaType: .audio, outputSettings: settings)
-        ci.expectsMediaDataInRealTime = true
-
-        if cw.canAdd(ci) { cw.add(ci) }
-        cw.startWriting()
-
-        chunkAssetWriter = cw
-        chunkAssetWriterInput = ci
-        chunkIsSessionStarted = false
-    }
-
-    private func rotateChunk(nextStartPTS: CMTime) {
-        isRotatingChunk = true
-
-        guard let oldWriter = chunkAssetWriter,
-            let oldInput = chunkAssetWriterInput,
-            let finishedURL = chunkFileURL
+        guard let writer = assetWriter, let input = assetWriterInput,
+            writer.status == .writing
         else {
-            isRotatingChunk = false
+            // Writer not wired up yet — retain the audio so the start of the
+            // dictation isn't lost; flushed below once the writer is ready.
+            pendingSampleBuffers.append(sampleBuffer)
+            if pendingSampleBuffers.count > Self.maxPendingSampleBuffers {
+                pendingSampleBuffers.removeFirst(
+                    pendingSampleBuffers.count - Self.maxPendingSampleBuffers)
+            }
             return
         }
 
-        // Detach before finishing so new samples go to the fresh writer
-        chunkAssetWriter = nil
-        chunkAssetWriterInput = nil
-        chunkIsSessionStarted = false
-        chunkStartTime = nil
-        chunkFileURL = nil
+        // --- Main writer (full recording) ---
+        if !isSessionStarted {
+            let firstBuffer = pendingSampleBuffers.first ?? sampleBuffer
+            writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(firstBuffer))
+            isSessionStarted = true
+        }
 
-        // Spin up the next chunk immediately so no audio is lost
-        startNewChunkWriter(startingAt: nextStartPTS)
-        isRotatingChunk = false
-
-        // Finish the old writer asynchronously
-        oldInput.markAsFinished()
-        oldWriter.finishWriting { [weak self] in
-            guard let self = self else { return }
-            if self.shouldDiscardCurrentRecordingOutput {
-                try? FileManager.default.removeItem(at: finishedURL)
-            } else {
-                print("🔪 Chunk saved: \(finishedURL.lastPathComponent)")
-                self.chunkPublisher.send(finishedURL)
+        if !pendingSampleBuffers.isEmpty {
+            for buffered in pendingSampleBuffers where input.isReadyForMoreMediaData {
+                input.append(buffered)
             }
+            pendingSampleBuffers.removeAll()
+        }
+
+        if input.isReadyForMoreMediaData {
+            guard !isStopping else { return }
+            input.append(sampleBuffer)
         }
     }
 
@@ -783,10 +721,19 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
         smoothedAudioLevel += (normalizedLevel - smoothedAudioLevel) * levelSmoothing
         smoothedAudioFrequency += (normalizedFreq - smoothedAudioFrequency) * frequencySmoothing
 
+        pendingWavePeak = max(pendingWavePeak, min(1.0, peakLevel))
+
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastLevelPublishUptime >= Self.levelPublishInterval else { return }
+        lastLevelPublishUptime = now
+
+        let wavePeak = pendingWavePeak
+        pendingWavePeak = 0
+
         DispatchQueue.main.async {
             self.audioLevel = self.smoothedAudioLevel
             self.audioFrequency = self.smoothedAudioFrequency
-            self.liveWaveSamples.append(min(1.0, peakLevel))
+            self.liveWaveSamples.append(wavePeak)
             if self.liveWaveSamples.count > Self.maxLiveWaveSamples {
                 self.liveWaveSamples.removeFirst(
                     self.liveWaveSamples.count - Self.maxLiveWaveSamples)

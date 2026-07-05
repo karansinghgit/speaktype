@@ -6,6 +6,7 @@ class WhisperService {
     // Shared singleton instance - use this everywhere
     static let shared = WhisperService()
     private static let autoEditEnabledKey = "enableAutoEdit"
+    private static let warmedUpVariantsKey = "modelWarmupCompletedVariants"
     private static let customReplacementRulesKey = "customReplacementRules"
     private static let placeholderPatterns = [
         #"\[(?:BLANK_AUDIO|SILENCE)\]"#,
@@ -64,6 +65,27 @@ class WhisperService {
     @MainActor private var activeLoadVariant: String = ""
     @MainActor private var activeLoadToken: UUID?
 
+    /// Whether this variant has ever completed a load on this machine. The
+    /// first load after download includes CoreML/ANE specialization (minutes
+    /// for large models, one-time, OS-cached); the UI uses this to set
+    /// expectations instead of looking hung.
+    static func hasCompletedFirstLoad(variant: String) -> Bool {
+        let done = UserDefaults.standard.stringArray(forKey: warmedUpVariantsKey) ?? []
+        return done.contains(variant)
+    }
+
+    /// Same as the private marker, callable from other engines (Parakeet).
+    static func markFirstLoadCompletedForUI(variant: String) {
+        markFirstLoadCompleted(variant: variant)
+    }
+
+    private static func markFirstLoadCompleted(variant: String) {
+        var done = UserDefaults.standard.stringArray(forKey: warmedUpVariantsKey) ?? []
+        guard !done.contains(variant) else { return }
+        done.append(variant)
+        UserDefaults.standard.set(done, forKey: warmedUpVariantsKey)
+    }
+
     /// Device RAM in GB (cached on init)
     static let deviceRAMGB: Int = {
         Int(ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024))
@@ -74,6 +96,8 @@ class WhisperService {
         case fileNotFound
         case alreadyLoading
         case loadingTimeout
+        case unsupportedModelVariant
+        case modelFilesMissing
 
         var errorDescription: String? {
             switch self {
@@ -81,7 +105,12 @@ class WhisperService {
             case .fileNotFound: return "Audio file not found"
             case .alreadyLoading: return "Model loading already in progress"
             case .loadingTimeout:
-                return "Model loading timed out — your Mac may not have enough RAM for this model"
+                return "Model loading stalled and was stopped. Try again — if it keeps happening, "
+                    + "re-download the model or pick a smaller one."
+            case .unsupportedModelVariant:
+                return "The selected model is not supported."
+            case .modelFilesMissing:
+                return "Model files are missing or incomplete — download the model again in Settings → AI Models."
             }
         }
     }
@@ -98,6 +127,10 @@ class WhisperService {
     // Dynamic model loading with optimized WhisperKitConfig
     @MainActor
     func loadModel(variant: String) async throws {
+        guard let model = AIModel.model(for: variant), model.engine == .whisper else {
+            throw TranscriptionError.unsupportedModelVariant
+        }
+
         // Already loaded this exact model
         if isInitialized && variant == currentModelVariant && pipe != nil {
             print("✅ Model \(variant) already loaded, skipping")
@@ -133,7 +166,7 @@ class WhisperService {
 
         let token = UUID()
         let task = Task { @MainActor in
-            try await self.performModelLoad(variant: variant)
+            try await self.performModelLoad(model: model)
         }
         activeLoadTask = task
         activeLoadVariant = variant
@@ -151,14 +184,36 @@ class WhisperService {
     }
 
     @MainActor
-    private func performModelLoad(variant: String) async throws {
+    func unloadModelIfCurrent(variant: String) {
+        // Also match a variant that is still mid-load (not yet "current") so
+        // deleting a model during warm-up doesn't leave its load running
+        // against deleted files.
+        guard currentModelVariant == variant || activeLoadVariant == variant
+            || loadingModelVariant == variant
+        else { return }
+
+        activeLoadTask?.cancel()
+        activeLoadTask = nil
+        activeLoadVariant = ""
+        activeLoadToken = nil
+        pipe = nil
+        currentModelVariant = ""
+        isInitialized = false
+        isLoading = false
+        isTranscribing = false
+        loadingStage = ""
+        loadingModelVariant = ""
+        loadingStartedAt = nil
+    }
+
+    @MainActor
+    private func performModelLoad(model: AIModel) async throws {
+        let variant = model.variant
         let ramGB = Self.deviceRAMGB
         print("🔄 Initializing WhisperKit with model: \(variant)...")
         print("💻 Device RAM: \(ramGB) GB")
 
-        if let model = AIModel.availableModels.first(where: { $0.variant == variant }),
-            ramGB < model.minimumRAMGB
-        {
+        if ramGB < model.minimumRAMGB {
             print(
                 "⚠️ WARNING: Model \(variant) recommends \(model.minimumRAMGB)GB+ RAM, device has \(ramGB)GB. Loading may fail or be very slow."
             )
@@ -207,15 +262,26 @@ class WhisperService {
 
             loadingStage = "Loading model into memory..."
 
-            // Start a watchdog timer that will flag a timeout
             let loadStart = Date()
 
-            pipe = try await WhisperKit(config)
+            // Watchdog: WhisperKit(config) can hang indefinitely (corrupt model
+            // dir, low-RAM swap spiral). Race it against a bounded timeout so
+            // the UI never sits on "Warming up model..." forever. The orphaned
+            // load can't be killed, but its late result is discarded below.
+            let timeout = Self.loadTimeout(ramGB: ramGB, minimumRAMGB: model.minimumRAMGB)
+            let loadedPipe = try await Self.loadPipelineWithTimeout(config: config, timeout: timeout)
+
+            // A concurrent unload reset state while we were loading; surface
+            // that as cancellation — returning normally made callers treat a
+            // deleted model as successfully loaded and re-select it.
+            guard loadingModelVariant == variant else { throw CancellationError() }
+            pipe = loadedPipe
 
             let loadDuration = Date().timeIntervalSince(loadStart)
             lastLoadDuration = loadDuration
             print("⏱️ Model loaded in \(String(format: "%.1f", loadDuration))s")
 
+            Self.markFirstLoadCompleted(variant: variant)
             currentModelVariant = variant
             isInitialized = true
             isLoading = false
@@ -231,6 +297,53 @@ class WhisperService {
             print(
                 "❌ Failed to initialize WhisperKit with \(variant): \(error.localizedDescription)")
             throw error
+        }
+    }
+
+    /// Ceiling for a wedged load, NOT a performance bound: the first load of a
+    /// large model includes CoreML/ANE specialization, which legitimately runs
+    /// several minutes (a 180s value here fired mid-load on a 16GB machine and
+    /// reported a healthy load as failed). Longer still below recommended RAM,
+    /// where swapping is slow but not stuck.
+    static func loadTimeout(ramGB: Int, minimumRAMGB: Int) -> TimeInterval {
+        ramGB < minimumRAMGB ? 1200 : 600
+    }
+
+    /// Awaits WhisperKit init, but never longer than `timeout`. A task group
+    /// won't do here: it awaits all children before returning, so a hung child
+    /// would defeat the watchdog. If the timeout wins, the orphaned load keeps
+    /// running (WhisperKit init is not cancellable) and its result is dropped.
+    private static func loadPipelineWithTimeout(
+        config: WhisperKitConfig, timeout: TimeInterval
+    ) async throws -> WhisperKit {
+        final class ResumeOnce: @unchecked Sendable {
+            private let lock = NSLock()
+            private var resumed = false
+            func claim() -> Bool {
+                lock.lock()
+                defer { lock.unlock() }
+                if resumed { return false }
+                resumed = true
+                return true
+            }
+        }
+
+        let once = ResumeOnce()
+        return try await withCheckedThrowingContinuation { continuation in
+            Task {
+                do {
+                    let loaded = try await WhisperKit(config)
+                    if once.claim() { continuation.resume(returning: loaded) }
+                } catch {
+                    if once.claim() { continuation.resume(throwing: error) }
+                }
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                if once.claim() {
+                    continuation.resume(throwing: TranscriptionError.loadingTimeout)
+                }
+            }
         }
     }
 
@@ -258,38 +371,12 @@ class WhisperService {
             let text = Self.normalizedTranscription(
                 from: results.map { $0.text }.joined(separator: " "))
 
-            print("Transcription complete: \(text.prefix(50))...")
+            AppLogger.success("Transcription complete", category: AppLogger.transcription)
             return text
         } catch {
             print("Transcription failed: \(error.localizedDescription)")
             throw error
         }
-    }
-
-    /// Transcribe a background audio chunk without affecting the global `isTranscribing` flag.
-    /// Chunk files are automatically deleted after transcription.
-    func transcribeChunk(audioFile: URL, language: String = "auto") async throws -> String {
-        guard let pipe = pipe, isInitialized else {
-            throw TranscriptionError.notInitialized
-        }
-
-        guard FileManager.default.fileExists(atPath: audioFile.path) else {
-            // Chunk file may have been cleaned up already - return empty gracefully
-            return ""
-        }
-
-        print("🔪 Chunk transcription started: \(audioFile.lastPathComponent)")
-
-        let results = try await pipe.transcribe(
-            audioPath: audioFile.path,
-            decodeOptions: decodingOptions(for: language)
-        )
-        let text = Self.normalizedTranscription(from: results.map { $0.text }.joined(separator: " "))
-
-        print("🔪 Chunk done: \(text.prefix(40))...")
-        // Clean up temp chunk file after transcription
-        try? FileManager.default.removeItem(at: audioFile)
-        return text
     }
 
     private func decodingOptions(for language: String) -> DecodingOptions {

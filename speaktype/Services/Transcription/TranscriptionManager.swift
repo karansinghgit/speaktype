@@ -62,6 +62,13 @@ class TranscriptionManager {
         case .parakeet: return parakeet.loadingStage
         }
     }
+    /// When the in-flight model load began (Whisper only), for elapsed-time UI.
+    var loadingStartedAt: Date? {
+        switch activeKind {
+        case .whisper: return whisper.loadingStartedAt
+        case .parakeet: return nil
+        }
+    }
     var currentModelVariant: String {
         switch activeKind {
         case .whisper: return whisper.currentModelVariant
@@ -83,14 +90,30 @@ class TranscriptionManager {
 
     /// Load a specific model variant, routing to its owning engine.
     func loadModel(variant: String) async throws {
-        let kind = AIModel.engineKind(for: variant)
+        guard let kind = AIModel.engineKind(for: variant) else {
+            throw WhisperService.TranscriptionError.unsupportedModelVariant
+        }
         try await engine(for: kind).loadModel(variant: variant)
         activeKind = kind
     }
 
+    /// Release the active in-memory model if its downloaded files were removed.
+    func unloadModelIfCurrent(variant: String) async {
+        let wasActive = currentModelVariant == variant
+
+        await whisper.unloadModelIfCurrent(variant: variant)
+        await parakeet.unloadModelIfCurrent(variant: variant)
+
+        if wasActive {
+            activeKind = .whisper
+        }
+    }
+
     /// Transcribe an audio file with the currently active engine.
     func transcribe(audioFile: URL, language: String = "auto") async throws -> String {
-        let kind = AIModel.engineKind(for: currentModelVariant)
+        guard let kind = AIModel.engineKind(for: currentModelVariant) else {
+            throw WhisperService.TranscriptionError.unsupportedModelVariant
+        }
         return try await engine(for: kind).transcribe(audioFile: audioFile, language: language)
     }
 }

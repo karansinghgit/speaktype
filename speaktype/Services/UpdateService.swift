@@ -8,10 +8,12 @@ class UpdateService: NSObject, ObservableObject {
     static let shared = UpdateService()
     static let trustedUpdateBundleIdentifier = "com.2048labs.speaktype"
     static let trustedUpdateTeamIdentifier = "PCV4UMSRZX"
+    static let autoUpdateDefaultsKey = "autoUpdate"
 
     @Published var availableUpdate: AppVersion?
     @Published var isCheckingForUpdates = false
     @Published var lastCheckDate: Date?
+    @Published var lastCheckError: String?
 
     // Install progress state
     @Published var isInstalling = false
@@ -26,7 +28,6 @@ class UpdateService: NSObject, ObservableObject {
     // User Defaults keys
     private let lastCheckDateKey = "lastUpdateCheckDate"
     private let skippedVersionKey = "skippedVersion"
-    private let autoUpdateKey = "autoUpdate"
     private let lastReminderDateKey = "lastUpdateReminderDate"
 
     private var activeDownloadSession: URLSession?
@@ -41,11 +42,18 @@ class UpdateService: NSObject, ObservableObject {
 
     // MARK: - Update Checking
 
+    static func registerDefaults(in defaults: UserDefaults = .standard) {
+        defaults.register(defaults: [autoUpdateDefaultsKey: true])
+    }
+
     /// Check for updates from server
     func checkForUpdates(silent: Bool = false) async {
         guard !isCheckingForUpdates else { return }
 
-        await MainActor.run { isCheckingForUpdates = true }
+        await MainActor.run {
+            isCheckingForUpdates = true
+            lastCheckError = nil
+        }
 
         do {
             let url = URL(
@@ -73,7 +81,10 @@ class UpdateService: NSObject, ObservableObject {
             }
         } catch {
             print("Failed to check for updates: \(error)")
-            await MainActor.run { self.isCheckingForUpdates = false }
+            await MainActor.run {
+                self.lastCheckError = error.localizedDescription
+                self.isCheckingForUpdates = false
+            }
         }
     }
 
@@ -125,14 +136,26 @@ class UpdateService: NSObject, ObservableObject {
     // MARK: - Auto Update
 
     var isAutoUpdateEnabled: Bool {
-        get { UserDefaults.standard.bool(forKey: autoUpdateKey) }
-        set { UserDefaults.standard.set(newValue, forKey: autoUpdateKey) }
+        get { UserDefaults.standard.bool(forKey: Self.autoUpdateDefaultsKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.autoUpdateDefaultsKey) }
     }
 
     // MARK: - Update Installation
 
     /// Download the DMG, mount it, copy the .app over the running installation, and relaunch.
-    func installUpdate(url downloadURLString: String) {
+    func installUpdate(_ update: AppVersion) {
+        installUpdate(
+            url: update.downloadURL,
+            expectedVersion: update.version,
+            expectedBuild: Self.normalizedExpectedBuild(update.buildNumber)
+        )
+    }
+
+    private func installUpdate(
+        url downloadURLString: String,
+        expectedVersion: String,
+        expectedBuild: String?
+    ) {
         guard let downloadURL = URL(string: downloadURLString) else {
             setError("Invalid download URL.")
             return
@@ -181,8 +204,12 @@ class UpdateService: NSObject, ObservableObject {
                 }
                 let appInDMG = try findApp(in: mountPoint)
 
-                // 5. Verify the mounted app is signed by the expected developer
-                try verifyCandidateApp(at: appInDMG)
+                // 5. Verify the mounted app is the expected version and signed by the expected developer
+                try verifyCandidateApp(
+                    at: appInDMG,
+                    expectedVersion: expectedVersion,
+                    expectedBuild: expectedBuild
+                )
 
                 // 6. Replace the running app
                 try replaceCurrentApp(with: appInDMG)
@@ -199,14 +226,26 @@ class UpdateService: NSObject, ObservableObject {
                 relaunch()
 
             } catch {
+                let userCancelled: Bool
+                if case UpdateError.downloadCancelled = error { userCancelled = true } else { userCancelled = false }
                 await MainActor.run {
                     self.isInstalling = false
-                    self.installError = error.localizedDescription
+                    self.installError = userCancelled ? nil : error.localizedDescription
                     self.installPhase = ""
                     self.installStatus = ""
                 }
             }
         }
+    }
+
+    /// Abort an in-flight update download. Only the download phase is
+    /// cancellable; once installation starts touching disk, finishing is
+    /// safer than stopping halfway. Without this, a stalled download left
+    /// the update sheet stuck on "Update in progress" with no way out.
+    func cancelInstall() {
+        guard isInstalling, activeDownloadContinuation != nil else { return }
+        activeDownloadSession?.invalidateAndCancel()
+        finishDownload(.failure(UpdateError.downloadCancelled))
     }
 
     // MARK: - Private Helpers
@@ -283,7 +322,11 @@ class UpdateService: NSObject, ObservableObject {
         return appURL
     }
 
-    private func verifyCandidateApp(at appURL: URL) throws {
+    private func verifyCandidateApp(
+        at appURL: URL,
+        expectedVersion: String,
+        expectedBuild: String?
+    ) throws {
         guard
             let bundle = Bundle(url: appURL),
             let bundleIdentifier = bundle.bundleIdentifier
@@ -298,6 +341,14 @@ class UpdateService: NSObject, ObservableObject {
                 "Downloaded update has an unexpected bundle identifier."
             )
         }
+
+        try Self.validateCandidateVersion(
+            candidateVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+                as? String,
+            candidateBuild: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
+            expectedVersion: expectedVersion,
+            expectedBuild: expectedBuild
+        )
 
         let staticCode = try Self.loadStaticCode(at: appURL)
         let requirement = try Self.makeTrustedUpdateRequirement(
@@ -325,13 +376,22 @@ class UpdateService: NSObject, ObservableObject {
         let runningPath = Bundle.main.bundlePath
         let destURL = URL(fileURLWithPath: runningPath)
         let fm = FileManager.default
+        let tempURL = destURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(".\(destURL.lastPathComponent).updating-\(UUID().uuidString)")
 
-        // Remove old app
-        if fm.fileExists(atPath: destURL.path) {
-            try fm.removeItem(at: destURL)
+        do {
+            try fm.copyItem(at: sourceApp, to: tempURL)
+
+            if fm.fileExists(atPath: destURL.path) {
+                _ = try fm.replaceItemAt(destURL, withItemAt: tempURL)
+            } else {
+                try fm.moveItem(at: tempURL, to: destURL)
+            }
+        } catch {
+            try? fm.removeItem(at: tempURL)
+            throw error
         }
-        // Copy new app
-        try fm.copyItem(at: sourceApp, to: destURL)
     }
 
     private func verifyGatekeeperAcceptance(of appURL: URL) throws {
@@ -358,18 +418,15 @@ class UpdateService: NSObject, ObservableObject {
     }
 
     private func relaunch() {
-        // Use a shell to wait for the current process to exit, then reopen the app
+        // Use a static shell script to wait for the current process to exit, then
+        // reopen the app. Dynamic values are passed as positional parameters so
+        // bundle path metacharacters never become shell source.
         let bundlePath = Bundle.main.bundlePath
         let pid = ProcessInfo.processInfo.processIdentifier
 
-        let script = """
-            while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done
-            open "\(bundlePath)"
-            """
-
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/bin/sh")
-        proc.arguments = ["-c", script]
+        proc.arguments = Self.relaunchShellArguments(pid: pid, bundlePath: bundlePath)
         try? proc.run()
 
         DispatchQueue.main.async {
@@ -445,6 +502,41 @@ class UpdateService: NSObject, ObservableObject {
         else {
             throw UpdateError.untrustedDeveloper
         }
+    }
+
+    static func validateCandidateVersion(
+        candidateVersion: String?,
+        candidateBuild: String?,
+        expectedVersion: String,
+        expectedBuild: String?
+    ) throws {
+        guard candidateVersion == expectedVersion else {
+            throw UpdateError.invalidCandidateApp(
+                "Downloaded update version does not match the advertised release."
+            )
+        }
+
+        guard let expectedBuild else { return }
+
+        guard candidateBuild == expectedBuild else {
+            throw UpdateError.invalidCandidateApp(
+                "Downloaded update build does not match the advertised release."
+            )
+        }
+    }
+
+    static func normalizedExpectedBuild(_ buildNumber: String) -> String? {
+        let trimmed = buildNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || trimmed == "0" ? nil : trimmed
+    }
+
+    static func relaunchShellArguments(pid: Int32, bundlePath: String) -> [String] {
+        let script = """
+            while kill -0 "$1" 2>/dev/null; do sleep 0.2; done
+            exec /usr/bin/open "$2"
+            """
+
+        return ["-c", script, "speaktype-relaunch", String(pid), bundlePath]
     }
 
     private static func loadStaticCode(at appURL: URL) throws -> SecStaticCode {
@@ -553,6 +645,7 @@ extension UpdateService: URLSessionDownloadDelegate {
 
 enum UpdateError: LocalizedError, Equatable {
     case downloadFailed(String)
+    case downloadCancelled
     case mountFailed
     case appNotFoundInDMG
     case copyFailed(String)
@@ -565,6 +658,7 @@ enum UpdateError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .downloadFailed(let msg): return "Failed to download update: \(msg)"
+        case .downloadCancelled: return "Update cancelled."
         case .mountFailed: return "Failed to mount the update disk image."
         case .appNotFoundInDMG: return "Could not find the app inside the downloaded update."
         case .copyFailed(let msg): return "Failed to install: \(msg)"

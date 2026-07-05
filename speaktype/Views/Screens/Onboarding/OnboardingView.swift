@@ -35,7 +35,6 @@ struct OnboardingView: View {
             }
         }
         .frame(minWidth: 600, minHeight: 500)  // Lower minimum size
-        .frame(minWidth: 600, minHeight: 500)  // Lower minimum size
     }
 
     func completeOnboarding() {
@@ -198,10 +197,27 @@ struct PermissionsPage: View {
 
             Spacer()
 
-            ContinueButton(
-                isEnabled: micStatus == .authorized && accessibilityStatus,
-                action: finishAction
-            )
+            VStack(spacing: 10) {
+                ContinueButton(
+                    isEnabled: micStatus == .authorized && accessibilityStatus,
+                    action: finishAction
+                )
+
+                // Accessibility is optional: without it dictation still works,
+                // the text just lands on the clipboard instead of auto-pasting.
+                // Blocking setup on it left privacy-cautious users stuck here.
+                if micStatus == .authorized && !accessibilityStatus {
+                    Button("Continue without auto-paste", action: finishAction)
+                        .buttonStyle(.plain)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.textSecondary)
+
+                    Text("Transcriptions will be copied to the clipboard — paste with ⌘V.\nEnable auto-paste anytime in Settings → Permissions.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.textMuted)
+                        .multilineTextAlignment(.center)
+                }
+            }
             .padding(.bottom, 48)
         }
         .padding(.horizontal, 60)

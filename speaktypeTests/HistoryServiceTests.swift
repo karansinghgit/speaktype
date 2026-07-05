@@ -81,6 +81,37 @@ final class HistoryServiceTests: XCTestCase {
         XCTAssertTrue(service.items.isEmpty)
     }
 
+    func testClearAllRemovesAudioFilesWhenPresent() throws {
+        let firstAudioURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("m4a")
+        let secondAudioURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("m4a")
+        try Data("first-audio".utf8).write(to: firstAudioURL)
+        try Data("second-audio".utf8).write(to: secondAudioURL)
+
+        service.addItem(
+            transcript: "First item with audio",
+            duration: 1.0,
+            audioFileURL: firstAudioURL
+        )
+        service.addItem(
+            transcript: "Second item with audio",
+            duration: 2.0,
+            audioFileURL: secondAudioURL
+        )
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: firstAudioURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: secondAudioURL.path))
+
+        service.clearAll()
+
+        XCTAssertTrue(service.items.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: firstAudioURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: secondAudioURL.path))
+    }
+
     func testClearAllPreservesStatsHistory() {
         service.addItem(transcript: "One short note", duration: 10.0)
         service.addItem(transcript: "Another slightly longer note", duration: 20.0)

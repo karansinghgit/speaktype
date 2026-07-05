@@ -31,6 +31,19 @@ final class WhisperServiceTests: XCTestCase {
         XCTAssertTrue(service.isTranscribing)
     }
 
+    func testLoadModelRejectsUnknownVariantBeforePathResolution() async {
+        guard let service = service else { return XCTFail("Service should be initialized") }
+
+        do {
+            try await service.loadModel(variant: "../../outside-model")
+            XCTFail("Expected unknown model variant to be rejected")
+        } catch WhisperService.TranscriptionError.unsupportedModelVariant {
+            // Expected.
+        } catch {
+            XCTFail("Expected unsupportedModelVariant, got \(error)")
+        }
+    }
+
     func testNormalizedTranscriptionRemovesBlankAudioPlaceholders() {
         let normalized = WhisperService.normalizedTranscription(
             from: " [BLANK_AUDIO]  hello   <|nospeech|> [SILENCE] "
@@ -53,5 +66,26 @@ final class WhisperServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(normalized, "")
+    }
+
+    func testTranscriptionServicesDoNotLogTranscriptPrefixes() throws {
+        let whisperSource = try repositorySourceFile("speaktype/Services/WhisperService.swift")
+        let miniRecorderSource = try repositorySourceFile(
+            "speaktype/Views/Overlays/MiniRecorderView.swift")
+
+        XCTAssertFalse(whisperSource.contains("text.prefix"))
+        XCTAssertFalse(whisperSource.contains("Transcription complete:"))
+        XCTAssertFalse(whisperSource.contains("Chunk done:"))
+        XCTAssertFalse(miniRecorderSource.contains("/tmp/speaktype_debug.log"))
+        XCTAssertFalse(miniRecorderSource.contains("text.prefix"))
+        XCTAssertFalse(miniRecorderSource.contains("Transcription result"))
+    }
+
+    private func repositorySourceFile(_ relativePath: String) throws -> String {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let url = repoRoot.appendingPathComponent(relativePath)
+        return try String(contentsOf: url, encoding: .utf8)
     }
 }

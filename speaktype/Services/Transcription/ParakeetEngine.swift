@@ -42,17 +42,27 @@ class ParakeetEngine: SpeechToTextEngine {
 
     /// FluidAudio's actor that owns the loaded CoreML models.
     private var manager: AsrManager?
+    /// Variant currently being loaded, so unload can cancel a warm-up too.
+    private var loadingVariant = ""
 
     private init() {}
 
     func loadModel(variant: String) async throws {
+        guard ParakeetCatalog.variants.contains(variant) else {
+            throw WhisperService.TranscriptionError.unsupportedModelVariant
+        }
+
         // Already loaded this exact model.
         if isInitialized, currentModelVariant == variant, manager != nil { return }
 
         isLoading = true
         isInitialized = false
+        loadingVariant = variant
         loadingStage = "Preparing Parakeet model…"
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            loadingVariant = ""
+        }
 
         // Release any previously loaded model before loading a new one.
         if let manager {
@@ -63,14 +73,48 @@ class ParakeetEngine: SpeechToTextEngine {
         let version = ParakeetCatalog.version(for: variant)
         loadingStage = "Loading Parakeet model…"
 
-        // Downloads from Hugging Face on first use, then loads from cache.
-        let models = try await AsrModels.downloadAndLoad(version: version)
+        // Load strictly from the local cache. downloadAndLoad used to kick off
+        // a silent multi-hundred-MB Hugging Face fetch here when files were
+        // missing — with no progress UI and contradicting the offline-first
+        // promise. Downloads belong to ModelDownloadService.
+        let cacheDir = AsrModels.defaultCacheDirectory(for: version)
+        guard AsrModels.modelsExist(at: cacheDir, version: version) else {
+            loadingStage = ""
+            throw WhisperService.TranscriptionError.modelFilesMissing
+        }
+        let models = try await AsrModels.load(from: cacheDir, version: version)
+
+        // The model may have been deleted/unloaded while loading; don't
+        // resurrect it, and don't report success to the caller.
+        guard loadingVariant == variant else { throw CancellationError() }
+
         let manager = AsrManager(config: .default)
         try await manager.loadModels(models)
 
+        guard loadingVariant == variant else {
+            await manager.cleanup()
+            throw CancellationError()
+        }
+
+        WhisperService.markFirstLoadCompletedForUI(variant: variant)
         self.manager = manager
         currentModelVariant = variant
         isInitialized = true
+        loadingStage = ""
+    }
+
+    func unloadModelIfCurrent(variant: String) async {
+        guard currentModelVariant == variant || loadingVariant == variant else { return }
+        loadingVariant = ""
+
+        if let manager {
+            await manager.cleanup()
+        }
+        manager = nil
+        currentModelVariant = ""
+        isInitialized = false
+        isLoading = false
+        isTranscribing = false
         loadingStage = ""
     }
 

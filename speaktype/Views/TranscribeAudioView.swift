@@ -4,10 +4,12 @@ import CoreMedia
 import UniformTypeIdentifiers
 
 struct TranscribeAudioView: View {
-    @StateObject private var audioRecorder = AudioRecordingService()
+    @StateObject private var audioRecorder = AudioRecordingService.shared
     private var transcription: TranscriptionManager { TranscriptionManager.shared }
+    @AppStorage(ModelSelection.defaultsKey) private var selectedModel: String = ModelSelection.none
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
     @State private var transcribedText: String = ""
+    @State private var transcriptionError: String?
     @State private var isTranscribing = false
     @State private var showFileImporter = false
     
@@ -109,6 +111,21 @@ struct TranscribeAudioView: View {
             .padding(.horizontal, 24)
             
             // Transcription Result
+            if let transcriptionError {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Color.accentError)
+                    Text(transcriptionError)
+                        .font(Typography.bodySmall)
+                        .foregroundStyle(Color.textPrimary)
+                    Spacer()
+                }
+                .padding(12)
+                .background(Color.accentError.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(.horizontal, 24)
+            }
+
             if !transcribedText.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Transcription")
@@ -167,12 +184,12 @@ struct TranscribeAudioView: View {
                     handleFileSelection(url: url)
                 }
             case .failure(let error):
-                print("File selection error: \(error.localizedDescription)")
+                transcriptionError = "File selection failed: \(error.localizedDescription)"
             }
         }
         .onAppear {
             Task {
-                if !transcription.isInitialized {
+                if !transcription.isInitialized && !transcription.currentModelVariant.isEmpty {
                     try? await transcription.initialize()
                 }
             }
@@ -190,22 +207,18 @@ struct TranscribeAudioView: View {
         // Given WhisperKit might need file access, let's copy to a temp location to be safe and avoid scope issues.
         
         do {
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
-            try? FileManager.default.removeItem(at: tempURL) // Clean up if exists
-            try FileManager.default.copyItem(at: url, to: tempURL)
+            let recordingURL = try copyToRecordingsDirectory(url)
             
             if didStartAccessing {
                 url.stopAccessingSecurityScopedResource()
             }
             
-            startTranscription(url: tempURL)
+            startTranscription(url: recordingURL)
         } catch {
-            print("Error copying file: \(error)")
+            transcriptionError = "Could not import file: \(error.localizedDescription)"
             if didStartAccessing {
                 url.stopAccessingSecurityScopedResource()
             }
-            // Fallback: try original URL if copy fails
-            startTranscription(url: url)
         }
     }
     
@@ -216,18 +229,20 @@ struct TranscribeAudioView: View {
                 
                 provider.loadFileRepresentation(forTypeIdentifier: UTType.content.identifier) { url, error in
                     if let url = url {
-                        // LoadFileRepresentation gives us a temporary URL that might not persist.
-                        // We should copy it immediately.
-                        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
                         do {
-                            try? FileManager.default.removeItem(at: tempURL)
-                            try FileManager.default.copyItem(at: url, to: tempURL)
+                            let recordingURL = try copyToRecordingsDirectory(url)
                             
                             DispatchQueue.main.async {
-                                startTranscription(url: tempURL)
+                                startTranscription(url: recordingURL)
                             }
                         } catch {
-                            print("Error copying dropped file: \(error)")
+                            DispatchQueue.main.async {
+                                transcriptionError = "Could not import dropped file: \(error.localizedDescription)"
+                            }
+                        }
+                    } else if let error {
+                        DispatchQueue.main.async {
+                            transcriptionError = "Could not read dropped file: \(error.localizedDescription)"
                         }
                     }
                 }
@@ -239,16 +254,42 @@ struct TranscribeAudioView: View {
     private func startTranscription(url: URL) {
         Task {
             isTranscribing = true
+            transcriptionError = nil
+            transcribedText = ""
             do {
+                try await ensureSelectedModelIsLoaded()
                 transcribedText = try await transcription.transcribe(audioFile: url, language: transcriptionLanguage)
                 // Save to History
                 let duration = try await getAudioDuration(url: url)
                 HistoryService.shared.addItem(transcript: transcribedText, duration: duration, audioFileURL: url)
             } catch {
-                transcribedText = "Error: \(error.localizedDescription)"
+                transcriptionError = error.localizedDescription
             }
             isTranscribing = false
         }
+    }
+
+    private func ensureSelectedModelIsLoaded() async throws {
+        guard selectedModel != ModelSelection.none else {
+            throw NSError(
+                domain: "SpeakType", code: 1,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "No AI model selected. Download and select one in Settings \u{2192} AI Models first."
+                ])
+        }
+
+        if !transcription.isInitialized || transcription.currentModelVariant != selectedModel {
+            try await transcription.loadModel(variant: selectedModel)
+        }
+    }
+
+    private func copyToRecordingsDirectory(_ sourceURL: URL) throws -> URL {
+        let filename = sourceURL.lastPathComponent.isEmpty ? "imported-audio" : sourceURL.lastPathComponent
+        let destinationURL = AudioRecordingService.recordingsDirectory()
+            .appendingPathComponent("imported-\(UUID().uuidString)-\(filename)")
+        try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+        return destinationURL
     }
     
     private func getAudioDuration(url: URL) async throws -> TimeInterval {

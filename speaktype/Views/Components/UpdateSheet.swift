@@ -4,7 +4,7 @@ import SwiftUI
 struct UpdateSheet: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var updateService = UpdateService.shared
-    @AppStorage("autoUpdate") private var autoUpdate = false
+    @AppStorage(UpdateService.autoUpdateDefaultsKey) private var autoUpdate = true
 
     let update: AppVersion
     let appName = "SpeakType"
@@ -112,7 +112,7 @@ struct UpdateSheet: View {
             if !updateService.isInstalling {
                 HStack(spacing: 8) {
                     Toggle(isOn: $autoUpdate) {
-                        Text("Automatically download and install updates in the future")
+                        Text("Automatically check for updates in the future")
                             .font(Typography.bodySmall)
                             .foregroundStyle(.secondary)
                     }
@@ -125,11 +125,19 @@ struct UpdateSheet: View {
             // Action buttons
             HStack(spacing: 12) {
                 if updateService.isInstalling {
-                    // Show only a disabled cancel-style placeholder while work is in progress
                     Text("Update in progress…")
                         .font(Typography.bodySmall)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
+
+                    // Cancellable only while downloading; after that the
+                    // installer is touching disk and should run to completion.
+                    if updateService.installPhase == "Downloading" {
+                        Button("Cancel") {
+                            updateService.cancelInstall()
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                    }
                 } else {
                     Button("Skip This Version") {
                         updateService.skipVersion(update.version)
@@ -144,7 +152,7 @@ struct UpdateSheet: View {
                     .buttonStyle(SecondaryButtonStyle())
 
                     Button("Install Update") {
-                        updateService.installUpdate(url: update.downloadURL)
+                        updateService.installUpdate(update)
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(updateService.isInstalling)

@@ -5,6 +5,8 @@ struct AIModelsView: View {
     @StateObject private var downloadService = ModelDownloadService.shared
     @AppStorage(ModelSelection.defaultsKey) private var selectedModel: String = ModelSelection.none
     @AppStorage("modelUseCase") private var useCaseRaw: String = AIModel.UseCase.dictation.rawValue
+    @State private var isLoadingRecommendedModel = false
+    @State private var recommendedLoadError: String?
 
     /// Keeps the content from stretching edge-to-edge on a wide window, so the
     /// name and its action never sit at opposite ends of a huge empty band.
@@ -144,6 +146,14 @@ struct AIModelsView: View {
 
                 heroAction(rec: rec, downloaded: downloaded, active: active)
                     .padding(.top, 20)
+
+                if let recommendedLoadError {
+                    Text(recommendedLoadError)
+                        .font(Typography.ui(11))
+                        .foregroundStyle(Color.accentError)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 8)
+                }
             }
 
             // RIGHT — the performance panel, so the hero isn't half-empty.
@@ -196,9 +206,20 @@ struct AIModelsView: View {
                 Text("This is your default model").font(Typography.uiBold(13))
             }
             .foregroundStyle(Color.brandAccent)
+        } else if downloaded && isLoadingRecommendedModel {
+            HStack(spacing: 9) {
+                Spinner(size: 13, lineWidth: 2, tint: Color.textSecondary)
+                Text(WhisperService.hasCompletedFirstLoad(variant: rec.variant)
+                    ? "Loading model…"
+                    : "Optimizing for your Mac — first load can take a few minutes…")
+                    .font(Typography.uiBold(13))
+            }
+            .foregroundStyle(Color.textSecondary)
+            .padding(.horizontal, 16).padding(.vertical, 10)
+            .background(Capsule().fill(Color.textPrimary.opacity(0.08)))
         } else if downloaded {
             Button {
-                selectedModel = rec.variant
+                loadRecommendedModel(rec)
             } label: {
                 ActionButton.label(title: "Use this model", icon: "arrow.right",
                                    style: .primary, large: true)
@@ -212,6 +233,30 @@ struct AIModelsView: View {
                                    style: .primary, large: true)
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    private func loadRecommendedModel(_ model: AIModel) {
+        isLoadingRecommendedModel = true
+        recommendedLoadError = nil
+
+        Task {
+            do {
+                try await TranscriptionManager.shared.loadModel(variant: model.variant)
+                await MainActor.run {
+                    // Re-check before selecting: the model may have been
+                    // deleted while the load was in flight.
+                    if downloadService.downloadProgress[model.variant] ?? 0 >= 1.0 {
+                        selectedModel = model.variant
+                    }
+                    isLoadingRecommendedModel = false
+                }
+            } catch {
+                await MainActor.run {
+                    recommendedLoadError = error.localizedDescription
+                    isLoadingRecommendedModel = false
+                }
+            }
         }
     }
 

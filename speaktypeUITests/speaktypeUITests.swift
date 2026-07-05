@@ -6,46 +6,67 @@ final class speaktypeUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testAppLaunchAndNavigation() throws {
+    private func launchApp() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--uitesting"]
         app.launch()
-        
-        // Wait for app to fully load
-        sleep(2)
-        
-        // Navigate to Settings - look for the link directly
-        let settingsLink = app.links["Settings"]
-        XCTAssertTrue(settingsLink.waitForExistence(timeout: 5.0), "Settings link should exist")
-        
-        settingsLink.click()
-        
-        // Verify we are on Settings View
-        let settingsContent = app.staticTexts["SpeakType Shortcuts"]
-        XCTAssertTrue(settingsContent.waitForExistence(timeout: 5.0), "Should find Settings content")
+        return app
     }
-    
+
+    /// Every sidebar destination opens and shows content unique to that screen.
+    /// Markers are texts each screen renders unconditionally, so the assertions
+    /// hold on a fresh install (no models, no history).
     func testSidebarNavigation() throws {
-        let app = XCUIApplication()
-        app.launchArguments = ["--uitesting"]
-        app.launch()
-        
-        // Wait for app to fully load
-        sleep(2)
-        
-        // Define sidebar items to test - these should appear as NavigationLinks
-        let items = ["Dashboard", "Transcribe Audio", "History", "AI Models", "Permissions", "Settings"]
-        
-        for item in items {
-            let link = app.links[item]
-            XCTAssertTrue(link.exists, "Link for '\(item)' should exist")
-            
-            if link.exists {
-                link.click()
-                // Just verify we can click without crashing
-                sleep(1)
-            }
+        let app = launchApp()
+
+        let destinations: [(button: String, marker: String)] = [
+            ("Transcribe Audio", "Drop audio or video file here"),
+            ("History", "History"),
+            ("Statistics", "Statistics"),
+            ("AI Models", "CURRENTLY USING"),
+            ("Settings", "Primary Hotkey"),
+            ("Dashboard", "Recent transcriptions"),
+        ]
+
+        for (button, marker) in destinations {
+            let sidebarButton = app.buttons[button]
+            XCTAssertTrue(
+                sidebarButton.waitForExistence(timeout: 5.0),
+                "Sidebar button '\(button)' should exist"
+            )
+            sidebarButton.click()
+
+            XCTAssertTrue(
+                app.staticTexts[marker].waitForExistence(timeout: 5.0),
+                "'\(button)' screen should show '\(marker)'"
+            )
         }
     }
-}
 
+    /// The Settings screen's tab bar switches between General, Audio, and
+    /// Permissions content.
+    func testSettingsTabs() throws {
+        let app = launchApp()
+
+        let settingsButton = app.buttons["Settings"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5.0))
+        settingsButton.click()
+
+        XCTAssertTrue(
+            app.staticTexts["Primary Hotkey"].waitForExistence(timeout: 5.0),
+            "General tab should be selected by default"
+        )
+
+        app.buttons["Audio"].click()
+        XCTAssertTrue(
+            app.buttons["Refresh Devices"].waitForExistence(timeout: 5.0),
+            "Audio tab should show the device list controls"
+        )
+
+        app.buttons["Permissions"].click()
+        XCTAssertTrue(
+            app.staticTexts["App Permissions"].waitForExistence(timeout: 5.0),
+            "Permissions tab should show the permissions list"
+        )
+    }
+}

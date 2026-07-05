@@ -5,6 +5,12 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct DashboardView: View {
+    @AppStorage("selectedHotkey") private var selectedHotkeyRaw = HotkeyOption.default.rawValue
+
+    private var hotkeyDisplayName: String {
+        HotkeyOption(rawValue: selectedHotkeyRaw)?.displayName ?? HotkeyOption.default.displayName
+    }
+
     @Binding var selection: SidebarItem?
     @StateObject private var historyService = HistoryService.shared
     @StateObject private var audioRecorder = AudioRecordingService()
@@ -136,7 +142,7 @@ struct DashboardView: View {
                                     .font(Typography.bodyMedium)
                                     .foregroundStyle(Color.textPrimary)
 
-                                Text("Press ⌘+Shift+Space to start recording")
+                                Text("Press \(hotkeyDisplayName) to start recording")
                                     .font(Typography.bodySmall)
                                     .foregroundStyle(Color.textSecondary)
                             }

@@ -7,7 +7,12 @@ struct HistoryView: View {
     @State private var itemPendingDeletion: HistoryItem? = nil
     @State private var expandedItemId: UUID? = nil
     @State private var showCopyToast = false
-    
+    @AppStorage("selectedHotkey") private var selectedHotkeyRaw = HotkeyOption.default.rawValue
+
+    private var selectedHotkeyName: String {
+        HotkeyOption(rawValue: selectedHotkeyRaw)?.displayName ?? HotkeyOption.default.displayName
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -62,7 +67,7 @@ struct HistoryView: View {
                                 .font(Typography.displaySmall)
                                 .foregroundStyle(Color.textPrimary)
                             
-                            Text("Press ⌘+Shift+Space to start recording")
+                            Text("Press \(selectedHotkeyName) to start recording")
                                 .font(Typography.bodyMedium)
                                 .foregroundStyle(Color.textSecondary)
                         }
@@ -71,7 +76,7 @@ struct HistoryView: View {
                     .padding(.top, 100)
                 } else {
                     // History items as individual cards
-                    VStack(spacing: 16) {
+                    LazyVStack(spacing: 16) {
                         ForEach(historyService.items) { item in
                             HistoryCard(
                                 item: item,

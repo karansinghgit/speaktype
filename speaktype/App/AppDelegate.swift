@@ -1,5 +1,4 @@
 import Combine
-import KeyboardShortcuts
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -14,8 +13,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastHandledHotkeyPressedState = false
     private var globalKeyDownMonitor: Any?
     private var localKeyDownMonitor: Any?
+    private var globalChordMonitor: Any?
+    private var localChordMonitor: Any?
+    private var configuredHotkey: HotkeyOption?
+    private let updateCheckScheduler = NSBackgroundActivityScheduler(
+        identifier: "com.2048labs.speaktype.update-check")
+    private var updateWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        UpdateService.registerDefaults()
+
         miniRecorderController = MiniRecorderWindowController()
         // Show the always-present resting pill so the recorder lives on screen.
         miniRecorderController?.showIdleRecorder()
@@ -27,6 +34,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup dynamic hotkey monitoring based on user selection
         setupHotkeyMonitoring()
 
+        // Chord hotkeys need a different event-tap mask than bare modifiers,
+        // so rebuild the monitoring stack when the selection changes.
+        NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.reconfigureHotkeyMonitoringIfNeeded()
+            self?.miniRecorderController?.applyIdlePillPreference()
+        }
+        // Also retry after returning from System Settings (Accessibility grant).
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.reconfigureHotkeyMonitoringIfNeeded()
+        }
+
+        schedulePeriodicUpdateChecks()
         checkForUpdatesOnLaunch()
 
         UpdateService.shared.showUpdateWindowPublisher
@@ -167,7 +190,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Hotkey Monitoring
 
+    private func reconfigureHotkeyMonitoringIfNeeded() {
+        let current = getSelectedHotkey()
+        // Rebuild when the selection changed, or when Accessibility was
+        // granted after launch — the suppressing tap could not be created
+        // without it, and previously stayed dead until an app restart
+        // (leaving global hotkeys broken outside the app).
+        let tapNowPossible = hotkeyEventTap == nil && AXIsProcessTrusted()
+        guard current != configuredHotkey || tapNowPossible else { return }
+        teardownHotkeyMonitoring()
+        setupHotkeyMonitoring()
+    }
+
+    private func teardownHotkeyMonitoring() {
+        if let globalFlagsMonitor {
+            NSEvent.removeMonitor(globalFlagsMonitor)
+            self.globalFlagsMonitor = nil
+        }
+        if let localFlagsMonitor {
+            NSEvent.removeMonitor(localFlagsMonitor)
+            self.localFlagsMonitor = nil
+        }
+        removeChordFallbackMonitors()
+        removeModifierComboMonitors()
+        if let hotkeyEventTap {
+            CGEvent.tapEnable(tap: hotkeyEventTap, enable: false)
+            if let hotkeyEventTapSource {
+                CFRunLoopRemoveSource(CFRunLoopGetMain(), hotkeyEventTapSource, .commonModes)
+            }
+            CFMachPortInvalidate(hotkeyEventTap)
+            self.hotkeyEventTap = nil
+            self.hotkeyEventTapSource = nil
+        }
+    }
+
     private func setupHotkeyMonitoring() {
+        configuredHotkey = getSelectedHotkey()
         setupSuppressingHotkeyEventTap()
 
         // Add global monitor for hotkey events
@@ -183,6 +241,64 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return event
         }
 
+        // The keyDown (modifier-combo cancel) monitors are installed on demand
+        // while the hotkey is held — see installModifierComboMonitors(). Keeping
+        // them alive for the app's lifetime woke SpeakType on every keystroke
+        // system-wide just to bail on the isHotkeyPressed guard.
+
+        // Chord hotkeys start on a keyDown the event tap normally owns; if the
+        // tap couldn't be created (no Accessibility grant), fall back to NSEvent
+        // monitors — they can't suppress the keystroke, but the chord still works.
+        if getSelectedHotkey().isChord && hotkeyEventTap == nil {
+            installChordFallbackMonitors()
+        }
+    }
+
+    private func installChordFallbackMonitors() {
+        guard globalChordMonitor == nil && localChordMonitor == nil else { return }
+
+        globalChordMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) {
+            [weak self] event in
+            self?.handleChordKeyDownEvent(event)
+        }
+        localChordMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
+            [weak self] event in
+            guard let self, self.handleChordKeyDownEvent(event) else { return event }
+            return nil
+        }
+    }
+
+    private func removeChordFallbackMonitors() {
+        if let globalChordMonitor {
+            NSEvent.removeMonitor(globalChordMonitor)
+            self.globalChordMonitor = nil
+        }
+        if let localChordMonitor {
+            NSEvent.removeMonitor(localChordMonitor)
+            self.localChordMonitor = nil
+        }
+    }
+
+    /// NSEvent fallback for chord start. Returns true when the event was the
+    /// chord (so local monitors can swallow it).
+    @discardableResult
+    private func handleChordKeyDownEvent(_ event: NSEvent) -> Bool {
+        let currentHotkey = getSelectedHotkey()
+        guard currentHotkey.isChord,
+            event.keyCode == currentHotkey.keyCode,
+            event.modifierFlags.contains(currentHotkey.modifierFlag)
+        else { return false }
+
+        if !event.isARepeat {
+            handleHotkeyStateChange(isPressed: true)
+        }
+        return true
+    }
+
+    /// Installed only for the duration of a hotkey hold; removed on release.
+    private func installModifierComboMonitors() {
+        guard globalKeyDownMonitor == nil && localKeyDownMonitor == nil else { return }
+
         globalKeyDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) {
             [weak self] event in
             self?.handleModifierComboEvent(event)
@@ -195,10 +311,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func removeModifierComboMonitors() {
+        if let globalKeyDownMonitor {
+            NSEvent.removeMonitor(globalKeyDownMonitor)
+            self.globalKeyDownMonitor = nil
+        }
+        if let localKeyDownMonitor {
+            NSEvent.removeMonitor(localKeyDownMonitor)
+            self.localKeyDownMonitor = nil
+        }
+    }
+
     private func setupSuppressingHotkeyEventTap() {
         guard hotkeyEventTap == nil else { return }
 
-        let eventMask = (1 << CGEventType.flagsChanged.rawValue)
+        // Bare-modifier hotkeys only need flagsChanged; chords also need
+        // keyDown/keyUp (to trigger on, and suppress, the chord's key). The
+        // narrow mask keeps every keystroke from waking the app for the
+        // majority who use a modifier hotkey.
+        var eventMask = (1 << CGEventType.flagsChanged.rawValue)
+        if getSelectedHotkey().isChord {
+            eventMask |= (1 << CGEventType.keyDown.rawValue)
+            eventMask |= (1 << CGEventType.keyUp.rawValue)
+        }
         let callback: CGEventTapCallBack = { _, type, event, refcon in
             guard let refcon else {
                 return Unmanaged.passUnretained(event)
@@ -238,16 +373,58 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return Unmanaged.passUnretained(event)
         }
 
+        let currentHotkey = getSelectedHotkey()
+        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+
+        if type == .keyDown || type == .keyUp {
+            // Only chords subscribe to key events. Trigger on modifier+key,
+            // and swallow the chord's key so it doesn't also type into the
+            // target app (repeats and the trailing keyUp included).
+            guard currentHotkey.isChord, keyCode == currentHotkey.keyCode else {
+                return Unmanaged.passUnretained(event)
+            }
+
+            if type == .keyDown && event.flags.contains(.maskAlternate) {
+                if !isHotkeyPressed {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.handleHotkeyStateChange(isPressed: true)
+                    }
+                }
+                return nil
+            }
+
+            if isHotkeyPressed {
+                return nil
+            }
+            return Unmanaged.passUnretained(event)
+        }
+
         guard type == .flagsChanged else {
             return Unmanaged.passUnretained(event)
         }
 
-        let currentHotkey = getSelectedHotkey()
+        // Chord stop: the chord modifier was released. Queue the release
+        // UNCONDITIONALLY — not gated on isHotkeyPressed. The press is
+        // dispatched async, so a quick tap can deliver this release event to
+        // the tap callback before the press block has run and set
+        // isHotkeyPressed; gating here would drop the stop and leave recording
+        // stuck on. Press and release both run on the main queue in FIFO order,
+        // and handleHotkeyStateChange no-ops a release with no matching press,
+        // so queuing unconditionally is safe. The flagsChanged event itself
+        // passes through — other apps still need to see the modifier go up.
+        if currentHotkey.isChord {
+            if !event.flags.contains(.maskAlternate) {
+                DispatchQueue.main.async { [weak self] in
+                    self?.handleHotkeyStateChange(isPressed: false)
+                }
+            }
+            return Unmanaged.passUnretained(event)
+        }
+
         guard currentHotkey == .fn else {
             return Unmanaged.passUnretained(event)
         }
 
-        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         guard keyCode == currentHotkey.keyCode else {
             return Unmanaged.passUnretained(event)
         }
@@ -263,6 +440,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleHotkeyEvent(_ event: NSEvent) {
         let currentHotkey = getSelectedHotkey()
+        // When the suppressing event tap is active it fully owns the Fn key
+        // (and swallows those events); an Fn event that still reaches this
+        // monitor is a late duplicate — acting on it would double-toggle.
+        if currentHotkey == .fn && hotkeyEventTap != nil { return }
+
+        // Chord release fallback when the tap is unavailable: stop once the
+        // modifier goes up. Chord *start* comes from the keyDown monitors.
+        // Call unconditionally (matching the tap path) — handleHotkeyStateChange
+        // no-ops a release with no active press — so a fast tap can't drop it.
+        if currentHotkey.isChord {
+            guard hotkeyEventTap == nil else { return }
+            if !event.modifierFlags.contains(currentHotkey.modifierFlag) {
+                handleHotkeyStateChange(isPressed: false)
+            }
+            return
+        }
+
         guard event.keyCode == currentHotkey.keyCode else { return }
 
         let isPressed = event.modifierFlags.contains(currentHotkey.modifierFlag)
@@ -275,6 +469,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let currentHotkey = getSelectedHotkey()
         if isPressed && !isHotkeyPressed {
             isHotkeyPressed = true
+            installModifierComboMonitors()
 
             // Only inject the synthetic F19 when the Globe/Fn key is actually
             // configured to show the emoji picker — otherwise there's nothing to
@@ -298,6 +493,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         } else if !isPressed && isHotkeyPressed {
             isHotkeyPressed = false
+            removeModifierComboMonitors()
 
             let recordingMode = UserDefaults.standard.integer(forKey: "recordingMode")
             if recordingMode == 0 {
@@ -316,6 +512,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard event.keyCode != Self.emojiSuppressionKeyCode else { return }
 
         isHotkeyPressed = false
+        removeModifierComboMonitors()
         miniRecorderController?.cancelRecording()
     }
 
@@ -353,20 +550,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Update Checking
 
     private func checkForUpdatesOnLaunch() {
-        let updateService = UpdateService.shared
-        let autoUpdate = UserDefaults.standard.bool(forKey: "autoUpdate")
-        guard autoUpdate && updateService.shouldCheckForUpdates() else { return }
+        Task { await performUpdateCheckIfNeeded() }
+    }
 
-        Task {
-            await updateService.checkForUpdates(silent: true)
-            if updateService.availableUpdate != nil && updateService.shouldShowReminder() {
-                await MainActor.run { self.showUpdateWindow() }
+    private func schedulePeriodicUpdateChecks() {
+        updateCheckScheduler.repeats = true
+        updateCheckScheduler.interval = 24 * 60 * 60
+        updateCheckScheduler.tolerance = 60 * 60
+        updateCheckScheduler.schedule { [weak self] completion in
+            Task {
+                await self?.performUpdateCheckIfNeeded()
+                completion(.finished)
             }
+        }
+    }
+
+    private func performUpdateCheckIfNeeded() async {
+        let updateService = UpdateService.shared
+        guard updateService.isAutoUpdateEnabled && updateService.shouldCheckForUpdates() else { return }
+
+        await updateService.checkForUpdates(silent: true)
+        if updateService.availableUpdate != nil && updateService.shouldShowReminder() {
+            await MainActor.run { self.showUpdateWindow() }
         }
     }
 
     private func showUpdateWindow() {
         guard let update = UpdateService.shared.availableUpdate else { return }
+
+        // Idempotent: a silent launch/periodic check reaches here twice for the
+        // same release — once via showUpdateWindowPublisher's sink, once via
+        // performUpdateCheckIfNeeded's reminder check. Reuse the open window
+        // instead of stacking a second identical "Software Update" window.
+        if let existing = updateWindow, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate()
+            return
+        }
 
         let updateSheetView = UpdateSheet(update: update)
         let hostingController = NSHostingController(rootView: updateSheetView)
@@ -377,6 +597,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
         window.center()
         window.isMovableByWindowBackground = true
+        updateWindow = window
         window.makeKeyAndOrderFront(nil)
         NSApp.activate()
     }

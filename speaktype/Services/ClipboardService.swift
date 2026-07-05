@@ -29,9 +29,9 @@ class ClipboardService {
 
         // Verify write
         if let check = pasteboard.string(forType: .string), check == finalText {
-            print("✅ Clipboard Write Verified: '\(check.prefix(20))...'")
+            AppLogger.success("Clipboard write verified", category: AppLogger.clipboard)
         } else {
-            print("❌ Clipboard Write FAILED!")
+            AppLogger.error("Clipboard write failed", category: AppLogger.clipboard)
         }
     }
 

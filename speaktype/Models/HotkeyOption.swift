@@ -10,6 +10,7 @@ enum HotkeyOption: String, Codable, CaseIterable, Identifiable {
     case leftControl = "leftControl"
     case rightOption = "rightOption"
     case leftOption = "leftOption"
+    case optionSpace = "optionSpace"
     
     var id: String { rawValue }
     
@@ -30,7 +31,17 @@ enum HotkeyOption: String, Codable, CaseIterable, Identifiable {
             return "Right ⌥"
         case .leftOption:
             return "Left ⌥"
+        case .optionSpace:
+            return "⌥ + Space"
         }
+    }
+
+    /// Whether this hotkey is a modifier+key chord rather than a bare
+    /// modifier. Chords start on the non-modifier key's keyDown (which is
+    /// suppressed so it doesn't also type into the target app) and stop when
+    /// the modifier is released.
+    var isChord: Bool {
+        self == .optionSpace
     }
     
     /// macOS keycode for this modifier key
@@ -50,6 +61,8 @@ enum HotkeyOption: String, Codable, CaseIterable, Identifiable {
             return 61
         case .leftOption:
             return 58
+        case .optionSpace:
+            return 49  // Space — the chord's non-modifier key
         }
     }
     
@@ -62,7 +75,7 @@ enum HotkeyOption: String, Codable, CaseIterable, Identifiable {
             return .command
         case .rightControl, .leftControl:
             return .control
-        case .rightOption, .leftOption:
+        case .rightOption, .leftOption, .optionSpace:
             return .option
         }
     }

@@ -38,7 +38,22 @@ final class ClipboardServiceTests: XCTestCase {
         ClipboardService.shared.restore(snapshot, ifCurrentStringMatches: "Dictated text")
         XCTAssertEqual(pasteboard.string(forType: .string), "User copied something else")
     }
+
+    func testClipboardVerificationDoesNotLogCopiedText() throws {
+        let source = try repositorySourceFile("speaktype/Services/ClipboardService.swift")
+
+        XCTAssertFalse(source.contains("check.prefix"))
+        XCTAssertFalse(source.contains("Clipboard Write Verified: '"))
+    }
     
     // Testing paste() is difficult in unit tests as it requires active application focus and AX permissions.
     // We primarily verify the write operation here.
+
+    private func repositorySourceFile(_ relativePath: String) throws -> String {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let url = repoRoot.appendingPathComponent(relativePath)
+        return try String(contentsOf: url, encoding: .utf8)
+    }
 }

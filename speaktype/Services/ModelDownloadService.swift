@@ -143,6 +143,14 @@ class ModelDownloadService: ObservableObject {
         downloadGeneration[variant] == generation
     }
 
+    /// True when `expectedGeneration` is set but a newer download has since
+    /// claimed the variant. Used by deleteModel so an auto-repair or post-cancel
+    /// cleanup won't remove a newer download's files. Reads on the main thread.
+    private func supersededByNewerDownload(_ variant: String, expectedGeneration: Int?) async -> Bool {
+        guard let expectedGeneration else { return false }
+        return await MainActor.run { self.downloadGeneration[variant] != expectedGeneration }
+    }
+
     private init() {
         // Move any models left in the legacy ~/Documents/huggingface location into
         // Application Support. No directory is created eagerly — a fresh install
@@ -192,9 +200,14 @@ class ModelDownloadService: ObservableObject {
         await MainActor.run {
             self.hasCompletedInitialScan = true
 
-            // Keep live download rows stable while refreshing disk state.
+            // Keep live download rows stable while refreshing disk state. Retain
+            // both in-flight rows AND completed ones (progress >= 1.0): the disk
+            // scan snapshot can be stale by the time it applies, so a download
+            // that finished mid-scan would otherwise be dropped here (isDownloading
+            // now false) and not re-added (foundModels saw it <80%), reverting a
+            // just-installed model to the "Download" button.
             self.downloadProgress = self.downloadProgress.filter {
-                self.isDownloading[$0.key] == true
+                self.isDownloading[$0.key] == true || $0.value >= 1.0
             }
 
             // Only mark models that actually exist
@@ -365,7 +378,7 @@ class ModelDownloadService: ObservableObject {
                          self.downloadStatus[variant] = "Cleaning duplicates..."
                      }
 
-                     let log = await self.deleteModel(variant: variant)
+                     let log = await self.deleteModel(variant: variant, expectedGeneration: generation)
                      print("🧹 Cleanup result: \(log)")
                      
                      // Give filesystem time to settle
@@ -480,10 +493,22 @@ class ModelDownloadService: ObservableObject {
         activeTasks[variant] = task
     }
 
-    // Aggressively deletes any potential cache for this variant
-    func deleteModel(variant: String) async -> String {
+    // Aggressively deletes any potential cache for this variant.
+    // `expectedGeneration` (non-nil for auto-repair / post-cancel cleanup) makes
+    // the deletion bail when a newer download has since claimed the variant, so
+    // it can't remove the newer download's files or reset its UI. The user's
+    // explicit trash button passes nil for an unconditional delete. The
+    // ownership check is repeated right before the terminal state writes to
+    // narrow the window in which a newer download can start mid-removal.
+    func deleteModel(variant: String, expectedGeneration: Int? = nil) async -> String {
+        if await supersededByNewerDownload(variant, expectedGeneration: expectedGeneration) {
+            return "Skipped delete for \(variant): a newer download claimed it"
+        }
+
         guard let engineKind = AIModel.engineKind(for: variant) else {
             await MainActor.run {
+                guard expectedGeneration == nil
+                    || self.downloadGeneration[variant] == expectedGeneration else { return }
                 self.downloadProgress[variant] = 0.0
                 self.isDownloading[variant] = false
                 self.downloadError[variant] = "Unknown model variant."
@@ -497,6 +522,8 @@ class ModelDownloadService: ObservableObject {
             let cacheDir = AsrModels.defaultCacheDirectory(for: version)
             try? FileManager.default.removeItem(at: cacheDir)
             await MainActor.run {
+                guard expectedGeneration == nil
+                    || self.downloadGeneration[variant] == expectedGeneration else { return }
                 self.downloadProgress[variant] = 0.0
                 self.isDownloading[variant] = false
             }
@@ -524,12 +551,16 @@ class ModelDownloadService: ObservableObject {
 
         if deletedCount > 0 {
             await MainActor.run {
+                guard expectedGeneration == nil
+                    || self.downloadGeneration[variant] == expectedGeneration else { return }
                 self.downloadProgress[variant] = 0.0
                 self.isDownloading[variant] = false
             }
             return "Deleted \(deletedCount) items"
         } else {
             await MainActor.run {
+                guard expectedGeneration == nil
+                    || self.downloadGeneration[variant] == expectedGeneration else { return }
                 self.downloadProgress[variant] = 0.0
                 self.isDownloading[variant] = false
             }
@@ -547,12 +578,15 @@ class ModelDownloadService: ObservableObject {
             return
         }
 
-        // Snapshot the generation being cancelled so cleanup can tell whether a
-        // newer download has since claimed this variant.
-        let cancelledGeneration = downloadGeneration[variant]
         task.cancel()
         activeTasks[variant] = nil
         print("Cancelled download task for \(variant)")
+
+        // Tombstone the generation: claiming a new one that no task owns means
+        // an auto-repair still running inside the cancelled task immediately
+        // loses ownership, so its deleteModel bails before removing anything.
+        // A subsequent real download claims a higher generation still.
+        let tombstone = claimDownloadGeneration(for: variant)
 
         isDownloading[variant] = false
         downloadProgress[variant] = 0.0
@@ -562,17 +596,17 @@ class ModelDownloadService: ObservableObject {
         // Delete the partial download — but only after the cancelled task has
         // actually stopped (or the deletion races WhisperKit's in-flight
         // writes), and only if no newer download has since claimed the variant
-        // (otherwise we'd delete the retry's freshly downloaded files).
+        // past the tombstone (otherwise we'd delete the retry's files).
         Task {
             _ = await task.value
-            let stillOwned = await MainActor.run {
-                self.downloadGeneration[variant] == cancelledGeneration
+            let stillTombstoned = await MainActor.run {
+                self.downloadGeneration[variant] == tombstone
             }
-            guard stillOwned else {
+            guard stillTombstoned else {
                 print("↩️ Skipping partial-download cleanup for \(variant): a newer download claimed it")
                 return
             }
-            let result = await deleteModel(variant: variant)
+            let result = await deleteModel(variant: variant, expectedGeneration: tombstone)
             print("🗑️ Cleaned up partial download: \(result)")
         }
     }

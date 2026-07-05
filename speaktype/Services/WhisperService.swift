@@ -159,7 +159,12 @@ class WhisperService {
 
     @MainActor
     func unloadModelIfCurrent(variant: String) {
-        guard currentModelVariant == variant else { return }
+        // Also match a variant that is still mid-load (not yet "current") so
+        // deleting a model during warm-up doesn't leave its load running
+        // against deleted files.
+        guard currentModelVariant == variant || activeLoadVariant == variant
+            || loadingModelVariant == variant
+        else { return }
 
         activeLoadTask?.cancel()
         activeLoadTask = nil
@@ -231,10 +236,19 @@ class WhisperService {
 
             loadingStage = "Loading model into memory..."
 
-            // Start a watchdog timer that will flag a timeout
             let loadStart = Date()
 
-            pipe = try await WhisperKit(config)
+            // Watchdog: WhisperKit(config) can hang indefinitely (corrupt model
+            // dir, low-RAM swap spiral). Race it against a bounded timeout so
+            // the UI never sits on "Warming up model..." forever. The orphaned
+            // load can't be killed, but its late result is discarded below.
+            let timeout = Self.loadTimeout(ramGB: ramGB, minimumRAMGB: model.minimumRAMGB)
+            let loadedPipe = try await Self.loadPipelineWithTimeout(config: config, timeout: timeout)
+
+            // A concurrent unload may have reset state while we were loading;
+            // don't resurrect it with a stale pipeline.
+            guard loadingModelVariant == variant else { return }
+            pipe = loadedPipe
 
             let loadDuration = Date().timeIntervalSince(loadStart)
             lastLoadDuration = loadDuration
@@ -255,6 +269,51 @@ class WhisperService {
             print(
                 "❌ Failed to initialize WhisperKit with \(variant): \(error.localizedDescription)")
             throw error
+        }
+    }
+
+    /// Generous ceiling: warm loads take seconds and documented cold loads
+    /// 30–60s, so only a genuinely wedged load hits this. Doubled when the
+    /// device is below the model's recommended RAM (swapping is slow, not stuck).
+    static func loadTimeout(ramGB: Int, minimumRAMGB: Int) -> TimeInterval {
+        ramGB < minimumRAMGB ? 360 : 180
+    }
+
+    /// Awaits WhisperKit init, but never longer than `timeout`. A task group
+    /// won't do here: it awaits all children before returning, so a hung child
+    /// would defeat the watchdog. If the timeout wins, the orphaned load keeps
+    /// running (WhisperKit init is not cancellable) and its result is dropped.
+    private static func loadPipelineWithTimeout(
+        config: WhisperKitConfig, timeout: TimeInterval
+    ) async throws -> WhisperKit {
+        final class ResumeOnce: @unchecked Sendable {
+            private let lock = NSLock()
+            private var resumed = false
+            func claim() -> Bool {
+                lock.lock()
+                defer { lock.unlock() }
+                if resumed { return false }
+                resumed = true
+                return true
+            }
+        }
+
+        let once = ResumeOnce()
+        return try await withCheckedThrowingContinuation { continuation in
+            Task {
+                do {
+                    let loaded = try await WhisperKit(config)
+                    if once.claim() { continuation.resume(returning: loaded) }
+                } catch {
+                    if once.claim() { continuation.resume(throwing: error) }
+                }
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                if once.claim() {
+                    continuation.resume(throwing: TranscriptionError.loadingTimeout)
+                }
+            }
         }
     }
 

@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		1C547F2B2F0E7DC0008120A6 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1C547F2A2F0E7DC0008120A6 /* WhisperKit */; };
-		1CE4CB3F2F0EF6AF00C01C62 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 1CE4CB3E2F0EF6AF00C01C62 /* KeyboardShortcuts */; };
 		1CE4CB412F0EF86B00C01C62 /* whisperkit-cli in Frameworks */ = {isa = PBXBuildFile; productRef = 1CE4CB402F0EF86B00C01C62 /* whisperkit-cli */; };
 		FA0000000000000000000003 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = FA0000000000000000000002 /* FluidAudio */; };
 /* End PBXBuildFile section */
@@ -73,7 +72,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				1C547F2B2F0E7DC0008120A6 /* WhisperKit in Frameworks */,
-				1CE4CB3F2F0EF6AF00C01C62 /* KeyboardShortcuts in Frameworks */,
 				1CE4CB412F0EF86B00C01C62 /* whisperkit-cli in Frameworks */,
 				FA0000000000000000000003 /* FluidAudio in Frameworks */,
 			);
@@ -145,7 +143,6 @@
 			name = speaktype;
 			packageProductDependencies = (
 				1C547F2A2F0E7DC0008120A6 /* WhisperKit */,
-				1CE4CB3E2F0EF6AF00C01C62 /* KeyboardShortcuts */,
 				1CE4CB402F0EF86B00C01C62 /* whisperkit-cli */,
 				FA0000000000000000000002 /* FluidAudio */,
 			);
@@ -233,7 +230,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				1C547F222F0E7D07008120A6 /* XCRemoteSwiftPackageReference "WhisperKit" */,
-				1CE4CB3D2F0EF6AF00C01C62 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
 				FA0000000000000000000001 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -624,14 +620,6 @@
 				version = 0.9.4;
 			};
 		};
-		1CE4CB3D2F0EF6AF00C01C62 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sindresorhus/KeyboardShortcuts";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.4.0;
-			};
-		};
 		FA0000000000000000000001 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
@@ -647,11 +635,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1C547F222F0E7D07008120A6 /* XCRemoteSwiftPackageReference "WhisperKit" */;
 			productName = WhisperKit;
-		};
-		1CE4CB3E2F0EF6AF00C01C62 /* KeyboardShortcuts */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 1CE4CB3D2F0EF6AF00C01C62 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
-			productName = KeyboardShortcuts;
 		};
 		1CE4CB402F0EF86B00C01C62 /* whisperkit-cli */ = {
 			isa = XCSwiftPackageProductDependency;

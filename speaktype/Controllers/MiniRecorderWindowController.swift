@@ -176,24 +176,38 @@ class MiniRecorderWindowController: NSObject {
                 return
             }
 
-            // 4. Re-activate the target app
-            if let app = self.lastActiveApp {
-                _ = await MainActor.run {
-                    app.activate()
+            // 4. Re-activate the target app and wait until it is actually
+            // frontmost. The panel is non-activating, so focus usually never
+            // left the target — in that common case this adds zero delay
+            // (previously every paste ate an unconditional 500ms here).
+            let target = self.lastActiveApp ?? NSWorkspace.shared.frontmostApplication
+            if let app = target,
+                NSWorkspace.shared.frontmostApplication?.processIdentifier
+                    != app.processIdentifier
+            {
+                _ = await MainActor.run { app.activate() }
+                for _ in 0..<25 {
+                    if NSWorkspace.shared.frontmostApplication?.processIdentifier
+                        == app.processIdentifier
+                    {
+                        break
+                    }
+                    try? await Task.sleep(nanoseconds: 20_000_000)
                 }
             }
 
-            // 5. Wait for focus
-            try? await Task.sleep(nanoseconds: 500_000_000)
-
-            // 6. Paste using CGEvent (Accessibility permission only)
+            // 5. Paste using CGEvent (Accessibility permission only)
             await MainActor.run {
                 ClipboardService.shared.paste()
             }
 
             guard let previousClipboard else { return }
 
-            try? await Task.sleep(nanoseconds: 350_000_000)
+            // Give slow apps (Electron, remote desktops) time to service the
+            // Cmd+V before the clipboard is restored. A longer window is safe:
+            // restore() only fires if the pasteboard still holds the transcript,
+            // so a user copy in the meantime cancels it.
+            try? await Task.sleep(nanoseconds: 800_000_000)
 
             await MainActor.run {
                 ClipboardService.shared.restore(previousClipboard, ifCurrentStringMatches: text)

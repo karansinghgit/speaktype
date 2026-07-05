@@ -14,8 +14,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastHandledHotkeyPressedState = false
     private var globalKeyDownMonitor: Any?
     private var localKeyDownMonitor: Any?
+    private let updateCheckScheduler = NSBackgroundActivityScheduler(
+        identifier: "com.2048labs.speaktype.update-check")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        UpdateService.registerDefaults()
+
         miniRecorderController = MiniRecorderWindowController()
         // Show the always-present resting pill so the recorder lives on screen.
         miniRecorderController?.showIdleRecorder()
@@ -27,6 +31,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup dynamic hotkey monitoring based on user selection
         setupHotkeyMonitoring()
 
+        schedulePeriodicUpdateChecks()
         checkForUpdatesOnLaunch()
 
         UpdateService.shared.showUpdateWindowPublisher
@@ -353,15 +358,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Update Checking
 
     private func checkForUpdatesOnLaunch() {
-        let updateService = UpdateService.shared
-        let autoUpdate = UserDefaults.standard.bool(forKey: "autoUpdate")
-        guard autoUpdate && updateService.shouldCheckForUpdates() else { return }
+        Task { await performUpdateCheckIfNeeded() }
+    }
 
-        Task {
-            await updateService.checkForUpdates(silent: true)
-            if updateService.availableUpdate != nil && updateService.shouldShowReminder() {
-                await MainActor.run { self.showUpdateWindow() }
+    private func schedulePeriodicUpdateChecks() {
+        updateCheckScheduler.repeats = true
+        updateCheckScheduler.interval = 24 * 60 * 60
+        updateCheckScheduler.tolerance = 60 * 60
+        updateCheckScheduler.schedule { [weak self] completion in
+            Task {
+                await self?.performUpdateCheckIfNeeded()
+                completion(.finished)
             }
+        }
+    }
+
+    private func performUpdateCheckIfNeeded() async {
+        let updateService = UpdateService.shared
+        guard updateService.isAutoUpdateEnabled && updateService.shouldCheckForUpdates() else { return }
+
+        await updateService.checkForUpdates(silent: true)
+        if updateService.availableUpdate != nil && updateService.shouldShowReminder() {
+            await MainActor.run { self.showUpdateWindow() }
         }
     }
 

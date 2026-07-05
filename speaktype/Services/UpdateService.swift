@@ -8,10 +8,12 @@ class UpdateService: NSObject, ObservableObject {
     static let shared = UpdateService()
     static let trustedUpdateBundleIdentifier = "com.2048labs.speaktype"
     static let trustedUpdateTeamIdentifier = "PCV4UMSRZX"
+    static let autoUpdateDefaultsKey = "autoUpdate"
 
     @Published var availableUpdate: AppVersion?
     @Published var isCheckingForUpdates = false
     @Published var lastCheckDate: Date?
+    @Published var lastCheckError: String?
 
     // Install progress state
     @Published var isInstalling = false
@@ -26,7 +28,6 @@ class UpdateService: NSObject, ObservableObject {
     // User Defaults keys
     private let lastCheckDateKey = "lastUpdateCheckDate"
     private let skippedVersionKey = "skippedVersion"
-    private let autoUpdateKey = "autoUpdate"
     private let lastReminderDateKey = "lastUpdateReminderDate"
 
     private var activeDownloadSession: URLSession?
@@ -41,11 +42,18 @@ class UpdateService: NSObject, ObservableObject {
 
     // MARK: - Update Checking
 
+    static func registerDefaults(in defaults: UserDefaults = .standard) {
+        defaults.register(defaults: [autoUpdateDefaultsKey: true])
+    }
+
     /// Check for updates from server
     func checkForUpdates(silent: Bool = false) async {
         guard !isCheckingForUpdates else { return }
 
-        await MainActor.run { isCheckingForUpdates = true }
+        await MainActor.run {
+            isCheckingForUpdates = true
+            lastCheckError = nil
+        }
 
         do {
             let url = URL(
@@ -73,7 +81,10 @@ class UpdateService: NSObject, ObservableObject {
             }
         } catch {
             print("Failed to check for updates: \(error)")
-            await MainActor.run { self.isCheckingForUpdates = false }
+            await MainActor.run {
+                self.lastCheckError = error.localizedDescription
+                self.isCheckingForUpdates = false
+            }
         }
     }
 
@@ -125,8 +136,8 @@ class UpdateService: NSObject, ObservableObject {
     // MARK: - Auto Update
 
     var isAutoUpdateEnabled: Bool {
-        get { UserDefaults.standard.bool(forKey: autoUpdateKey) }
-        set { UserDefaults.standard.set(newValue, forKey: autoUpdateKey) }
+        get { UserDefaults.standard.bool(forKey: Self.autoUpdateDefaultsKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.autoUpdateDefaultsKey) }
     }
 
     // MARK: - Update Installation
@@ -353,13 +364,22 @@ class UpdateService: NSObject, ObservableObject {
         let runningPath = Bundle.main.bundlePath
         let destURL = URL(fileURLWithPath: runningPath)
         let fm = FileManager.default
+        let tempURL = destURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(".\(destURL.lastPathComponent).updating-\(UUID().uuidString)")
 
-        // Remove old app
-        if fm.fileExists(atPath: destURL.path) {
-            try fm.removeItem(at: destURL)
+        do {
+            try fm.copyItem(at: sourceApp, to: tempURL)
+
+            if fm.fileExists(atPath: destURL.path) {
+                _ = try fm.replaceItemAt(destURL, withItemAt: tempURL)
+            } else {
+                try fm.moveItem(at: tempURL, to: destURL)
+            }
+        } catch {
+            try? fm.removeItem(at: tempURL)
+            throw error
         }
-        // Copy new app
-        try fm.copyItem(at: sourceApp, to: destURL)
     }
 
     private func verifyGatekeeperAcceptance(of appURL: URL) throws {

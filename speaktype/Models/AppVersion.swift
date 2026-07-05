@@ -28,7 +28,7 @@ struct AppVersion: Codable, Equatable {
 extension AppVersion {
     init(from release: GitHubRelease) {
         // Remove 'v' prefix if present (e.g. "v1.0.1" -> "1.0.1")
-        let cleanVersion = release.tagName.replacingOccurrences(of: "v", with: "")
+        let cleanVersion = Self.normalizedReleaseVersion(from: release.tagName)
 
         self.version = cleanVersion
         self.buildNumber = "0"
@@ -43,6 +43,13 @@ extension AppVersion {
 
         let formatter = ISO8601DateFormatter()
         self.releaseDate = formatter.date(from: release.publishedAt) ?? Date()
+    }
+
+    static func normalizedReleaseVersion(from tagName: String) -> String {
+        guard let first = tagName.first, first == "v" || first == "V" else {
+            return tagName
+        }
+        return String(tagName.dropFirst())
     }
 }
 

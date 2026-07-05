@@ -4,7 +4,7 @@ import SwiftUI
 struct UpdateSheet: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var updateService = UpdateService.shared
-    @AppStorage("autoUpdate") private var autoUpdate = false
+    @AppStorage(UpdateService.autoUpdateDefaultsKey) private var autoUpdate = true
 
     let update: AppVersion
     let appName = "SpeakType"
@@ -112,7 +112,7 @@ struct UpdateSheet: View {
             if !updateService.isInstalling {
                 HStack(spacing: 8) {
                     Toggle(isOn: $autoUpdate) {
-                        Text("Automatically download and install updates in the future")
+                        Text("Automatically check for updates in the future")
                             .font(Typography.bodySmall)
                             .foregroundStyle(.secondary)
                     }

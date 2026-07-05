@@ -639,7 +639,12 @@ struct MiniRecorderView: View {
                             // Don't leave the app switched to a model that can't
                             // load (not downloaded, load failed/timed out) — revert
                             // the selection so dictation keeps using the old model.
-                            await MainActor.run { selectedModel = previousModel }
+                            // Only revert if THIS attempt is still the active
+                            // selection; the user may have picked another model
+                            // since, and reverting would clobber that newer choice.
+                            await MainActor.run {
+                                if selectedModel == model.variant { selectedModel = previousModel }
+                            }
                         }
                         await MainActor.run { isWarmingUp = false }
                     }

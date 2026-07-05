@@ -310,15 +310,18 @@ class ModelDownloadService: ObservableObject {
         downloadError[variant] = nil
         downloadStatus[variant] = nil
         let generation = claimDownloadGeneration(for: variant)
+        // A just-cancelled task for this variant may still be unwinding its
+        // WhisperKit.download (cancellation is cooperative); the new task awaits
+        // it before writing so two downloads never write the same cache dir.
+        let previousTask = activeTasks[variant]
         // Create the storage directory now, on first download — never eagerly on launch.
         ModelStorage.ensureWhisperKitModelsDir()
         print("Starting WhisperKit download for: \(variant)")
 
         let task = Task {
-            // Debug: List what WhisperKit sees
-            // Note: WhisperKit API might differ, but let's try to see if we can get info.
-            // If fetchAvailableModels exists.
-            
+            _ = await previousTask?.value
+            if Task.isCancelled { return }
+
             do {
                 // Determine model variant enum/string
                 // Note: WhisperKit.download(variant:from:) is the likely API.
@@ -449,11 +452,15 @@ class ModelDownloadService: ObservableObject {
         downloadError[variant] = nil
         downloadStatus[variant] = nil
         let generation = claimDownloadGeneration(for: variant)
+        let previousTask = activeTasks[variant]
         print("Starting FluidAudio (Parakeet) download for: \(variant)")
 
         let version = ParakeetCatalog.version(for: variant)
 
         let task = Task {
+            _ = await previousTask?.value
+            if Task.isCancelled { return }
+
             do {
                 _ = try await AsrModels.download(
                     version: version,
@@ -579,7 +586,11 @@ class ModelDownloadService: ObservableObject {
         }
 
         task.cancel()
-        activeTasks[variant] = nil
+        // Deliberately do NOT clear activeTasks[variant] here: the next
+        // downloadModel captures it as `previousTask` and awaits it before
+        // writing, so a retry can't race this task's still-unwinding writes.
+        // A completing (non-cancelled) task clears its own entry; this cancelled
+        // task's entry is overwritten by the next download.
         print("Cancelled download task for \(variant)")
 
         // Tombstone the generation: claiming a new one that no task owns means

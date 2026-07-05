@@ -75,7 +75,7 @@ struct WaveformView: View {
         }
     }
 
-    private static func peakSamples(from url: URL, bucketCount: Int) -> [Float] {
+    static func peakSamples(from url: URL, bucketCount: Int) -> [Float] {
         guard let file = try? AVAudioFile(forReading: url) else { return [] }
 
         let frameCount = AVAudioFrameCount(file.length)

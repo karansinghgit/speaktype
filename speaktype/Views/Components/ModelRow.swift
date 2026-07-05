@@ -27,6 +27,7 @@ struct ModelRow: View {
     var isDownloaded: Bool { progress >= 1.0 }
     var isActive: Bool { selectedModel == model.variant }
     var downloadError: String? { downloadService.downloadError[model.variant] }
+    var downloadStatus: String? { downloadService.downloadStatus[model.variant] }
 
     // MARK: - Body
 
@@ -49,6 +50,9 @@ struct ModelRow: View {
                     }
                     if let downloadError {
                         note(icon: "xmark.circle.fill", text: downloadError, tint: .accentError)
+                    }
+                    if let downloadStatus {
+                        note(icon: "arrow.triangle.2.circlepath", text: downloadStatus, tint: .textMuted)
                     }
                 }
 

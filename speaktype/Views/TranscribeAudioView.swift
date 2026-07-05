@@ -271,7 +271,12 @@ struct TranscribeAudioView: View {
 
     private func ensureSelectedModelIsLoaded() async throws {
         guard selectedModel != ModelSelection.none else {
-            throw WhisperService.TranscriptionError.notInitialized
+            throw NSError(
+                domain: "SpeakType", code: 1,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "No AI model selected. Download and select one in Settings \u{2192} AI Models first."
+                ])
         }
 
         if !transcription.isInitialized || transcription.currentModelVariant != selectedModel {

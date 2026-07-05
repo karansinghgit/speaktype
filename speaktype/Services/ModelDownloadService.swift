@@ -114,6 +114,8 @@ class ModelDownloadService: ObservableObject {
     
     @Published var downloadProgress: [String: Double] = [:] // Map Model Variant (String) to progress
     @Published var downloadError: [String: String] = [:] // Debugging: track errors
+    /// Transient, non-error progress notes (e.g. auto-repair) shown neutrally in the UI.
+    @Published var downloadStatus: [String: String] = [:]
     @Published var isDownloading: [String: Bool] = [:]
     /// False until the first launch disk scan finishes; callers should treat
     /// missing progress entries as "unknown", not "not downloaded", before then.
@@ -264,6 +266,7 @@ class ModelDownloadService: ObservableObject {
         isDownloading[variant] = true
         downloadProgress[variant] = 0.0
         downloadError[variant] = nil
+        downloadStatus[variant] = nil
         // Create the storage directory now, on first download — never eagerly on launch.
         ModelStorage.ensureWhisperKitModelsDir()
         print("Starting WhisperKit download for: \(variant)")
@@ -300,6 +303,7 @@ class ModelDownloadService: ObservableObject {
                 DispatchQueue.main.async {
                     self.isDownloading[variant] = false
                     self.downloadProgress[variant] = 1.0
+                    self.downloadStatus[variant] = nil
                     self.activeTasks[variant] = nil // Cleanup task
                 }
             } catch {
@@ -315,7 +319,7 @@ class ModelDownloadService: ObservableObject {
                      print("⚠️ Multiple models detected. Cleaning cache and retrying...")
                      
                      await MainActor.run {
-                         self.downloadError[variant] = "Cleaning duplicates..."
+                         self.downloadStatus[variant] = "Cleaning duplicates..."
                      }
                      
                      let log = await self.deleteModel(variant: variant)
@@ -326,7 +330,7 @@ class ModelDownloadService: ObservableObject {
                      if Task.isCancelled { return }
                      
                      await MainActor.run {
-                         self.downloadError[variant] = "Retrying download..."
+                         self.downloadStatus[variant] = "Retrying download..."
                      }
                      
                      // Retry download once
@@ -345,6 +349,7 @@ class ModelDownloadService: ObservableObject {
                              self.isDownloading[variant] = false
                              self.downloadProgress[variant] = 1.0
                              self.downloadError[variant] = nil
+                             self.downloadStatus[variant] = nil
                              self.activeTasks[variant] = nil
                          }
                      } catch {
@@ -355,6 +360,7 @@ class ModelDownloadService: ObservableObject {
                              self.downloadProgress[variant] = 0.0
                              self.downloadError[variant] =
                                 "Download failed: \(error.localizedDescription). Try downloading again."
+                             self.downloadStatus[variant] = nil
                              self.activeTasks[variant] = nil
                          }
                      }
@@ -366,6 +372,7 @@ class ModelDownloadService: ObservableObject {
                     self.downloadProgress[variant] = 0.0
                     self.downloadError[variant] =
                         "Download failed: \(error.localizedDescription). Try downloading again."
+                    self.downloadStatus[variant] = nil
                     self.activeTasks[variant] = nil
                 }
             }
@@ -379,6 +386,7 @@ class ModelDownloadService: ObservableObject {
         isDownloading[variant] = true
         downloadProgress[variant] = 0.0
         downloadError[variant] = nil
+        downloadStatus[variant] = nil
         print("Starting FluidAudio (Parakeet) download for: \(variant)")
 
         let version = ParakeetCatalog.version(for: variant)
@@ -487,6 +495,7 @@ class ModelDownloadService: ObservableObject {
         isDownloading[variant] = false
         downloadProgress[variant] = 0.0
         downloadError[variant] = nil
+        downloadStatus[variant] = nil
         
         // Delete any partial download
         Task {

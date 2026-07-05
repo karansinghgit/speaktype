@@ -183,21 +183,24 @@ class AudioRecordingService: NSObject, ObservableObject {
         }
     }
 
-    func setupSession() {
+    /// Builds the capture session. Returns whether a usable input was installed
+    /// — false when the selected device is missing or can't be added, which
+    /// leaves an inputless session that would capture nothing.
+    @discardableResult
+    func setupSession() -> Bool {
         captureSession?.stopRunning()
         captureSession = AVCaptureSession()
 
         guard let deviceId = selectedDeviceId,
             let device = AVCaptureDevice(uniqueID: deviceId),
-            let input = try? AVCaptureDeviceInput(device: device)
+            let input = try? AVCaptureDeviceInput(device: device),
+            captureSession?.canAddInput(input) == true
         else {
             print("Failed to find or add device with ID: \(selectedDeviceId ?? "nil")")
-            return
+            return false
         }
 
-        if captureSession?.canAddInput(input) == true {
-            captureSession?.addInput(input)
-        }
+        captureSession?.addInput(input)
 
         audioOutput = AVCaptureAudioDataOutput()
         // Pin a fixed Linear PCM output format so the live level meter always sees a
@@ -221,6 +224,7 @@ class AudioRecordingService: NSObject, ObservableObject {
 
         // Don't start session here - only start when recording begins
         // This prevents continuous CPU usage when idle
+        return true
     }
 
     /// Pre-warm the capture session so first recording starts instantly
@@ -262,8 +266,7 @@ class AudioRecordingService: NSObject, ObservableObject {
 
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
-            beginAuthorizedRecording()
-            onStarted?(true)
+            beginAuthorizedRecording(onStarted: onStarted)
         case .notDetermined:
             // First run: wait for the user's answer to the system prompt.
             // Starting immediately used to record into a mic we might never
@@ -276,8 +279,7 @@ class AudioRecordingService: NSObject, ObservableObject {
                         onStarted?(false)
                         return
                     }
-                    self.beginAuthorizedRecording()
-                    onStarted?(true)
+                    self.beginAuthorizedRecording(onStarted: onStarted)
                 }
             }
         default:
@@ -286,9 +288,22 @@ class AudioRecordingService: NSObject, ObservableObject {
         }
     }
 
-    private func beginAuthorizedRecording() {
-        guard !isRecording else { return }
+    private func beginAuthorizedRecording(onStarted: ((Bool) -> Void)?) {
+        guard !isRecording else { onStarted?(false); return }
         if captureSession == nil { setupSession() }
+
+        // A missing/unpluggable device leaves an inputless session that would
+        // capture nothing. Rebuild once in case the session is merely stale, and
+        // report failure (rather than entering a false "recording" state) if we
+        // still have no usable input.
+        if captureSession?.inputs.isEmpty != false {
+            setupSession()
+        }
+        guard captureSession?.inputs.isEmpty == false else {
+            print("No usable audio input; not starting recording")
+            onStarted?(false)
+            return
+        }
 
         // 1. Reset flags and stale writer state before any new samples arrive.
         isStopping = false
@@ -353,6 +368,7 @@ class AudioRecordingService: NSObject, ObservableObject {
                 audioQueue.async {
                     self.captureSession?.stopRunning()
                 }
+                onStarted?(false)
                 return
             }
 
@@ -362,6 +378,12 @@ class AudioRecordingService: NSObject, ObservableObject {
                     self.captureSession?.startRunning()
                 }
             }
+
+            // Capture is genuinely underway now (usable input + writer created +
+            // session start scheduled) — only here do we tell the caller to
+            // enter the recording HUD, so a writer failure above can't leave a
+            // false "recording" state on screen.
+            onStarted?(true)
         }
     }
 

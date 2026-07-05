@@ -258,6 +258,14 @@ class ModelDownloadService: ObservableObject {
             return
         }
 
+        // Pre-flight free-space check: a full disk otherwise surfaces as a raw
+        // network/write error minutes into a multi-GB download.
+        if let shortfallMessage = Self.diskSpaceShortfallMessage(for: variant) {
+            downloadProgress[variant] = 0.0
+            downloadError[variant] = shortfallMessage
+            return
+        }
+
         // Route Parakeet variants to FluidAudio.
         if engineKind == .parakeet {
             downloadParakeetModel(variant: variant)
@@ -292,6 +300,9 @@ class ModelDownloadService: ObservableObject {
                 // likely: download(variant:progressCallback:) - 'from' usually has a default
                 let _ = try await WhisperKit.download(variant: variant, downloadBase: ModelStorage.whisperKitBase, progressCallback: { progress in
                     DispatchQueue.main.async {
+                        // A cancelled download's transfer can keep reporting for a
+                        // moment; don't repaint a row the user already reset.
+                        guard self.isDownloading[variant] == true else { return }
                         self.downloadProgress[variant] = progress.fractionCompleted
                     }
                 })
@@ -338,6 +349,7 @@ class ModelDownloadService: ObservableObject {
                      do {
                          let _ = try await WhisperKit.download(variant: variant, downloadBase: ModelStorage.whisperKitBase, progressCallback: { progress in
                              DispatchQueue.main.async {
+                                 guard self.isDownloading[variant] == true else { return }
                                  self.downloadProgress[variant] = progress.fractionCompleted
                              }
                          })
@@ -398,6 +410,7 @@ class ModelDownloadService: ObservableObject {
                     version: version,
                     progressHandler: { progress in
                         DispatchQueue.main.async {
+                            guard self.isDownloading[variant] == true else { return }
                             self.downloadProgress[variant] = progress.fractionCompleted
                         }
                     })
@@ -487,7 +500,8 @@ class ModelDownloadService: ObservableObject {
     }
 
     func cancelDownload(for variant: String) {
-        if let task = activeTasks[variant] {
+        let task = activeTasks[variant]
+        if let task {
             task.cancel()
             activeTasks[variant] = nil
             print("Cancelled download task for \(variant)")
@@ -498,15 +512,38 @@ class ModelDownloadService: ObservableObject {
         downloadError[variant] = nil
         downloadStatus[variant] = nil
         
-        // Delete any partial download
+        // Delete any partial download — but only after the cancelled task has
+        // actually stopped, or the deletion races WhisperKit's in-flight writes
+        // and can leave a partial tree the size scan later marks as installed.
         Task {
+            _ = await task?.value
             let result = await deleteModel(variant: variant)
             print("🗑️ Cleaned up partial download: \(result)")
         }
     }
     
     // MARK: - Helper Functions
-    
+
+    /// Returns an actionable error when the volume lacks room for the model
+    /// (expected size + 20% working margin), nil when there is space or the
+    /// check itself can't run.
+    static func diskSpaceShortfallMessage(for variant: String) -> String? {
+        guard let expectedSize = AIModel.expectedSize(for: variant) else { return nil }
+
+        let home = URL(fileURLWithPath: NSHomeDirectory())
+        guard let values = try? home.resourceValues(
+            forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
+            let available = values.volumeAvailableCapacityForImportantUsage
+        else { return nil }
+
+        let required = Int64(Double(expectedSize) * 1.2)
+        guard available < required else { return nil }
+
+        return "Not enough disk space: this model needs about "
+            + "\(formatBytes(required)) free, but only "
+            + "\(formatBytes(available)) is available."
+    }
+
     /// Calculate total size of a directory recursively
     static func calculateDirectorySize(at url: URL) -> Int64 {
         let fileManager = FileManager.default

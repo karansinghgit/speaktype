@@ -53,6 +53,13 @@ class AudioRecordingService: NSObject, ObservableObject {
     private var smoothedAudioLevel: Float = 0.0
     private var smoothedAudioFrequency: Float = 0.0
 
+    // Coalesce level/waveform publishes to ~30 Hz (audioQueue-confined).
+    // Publishing three @Published values per audio buffer re-rendered the
+    // whole observing pill 50-100x/s for no visible gain.
+    private var pendingWavePeak: Float = 0
+    private var lastLevelPublishUptime: TimeInterval = 0
+    private static let levelPublishInterval: TimeInterval = 1.0 / 30.0
+
     /// Buffers captured before the asset writer is ready (audioQueue-confined).
     /// Without this, everything the user says between pressing the hotkey and
     /// the writer being wired up — session cold start plus writer setup — was
@@ -260,6 +267,8 @@ class AudioRecordingService: NSObject, ObservableObject {
         audioQueue.async {
             self.cancelIdleSessionStop()
             self.pendingSampleBuffers.removeAll()
+            self.pendingWavePeak = 0
+            self.lastLevelPublishUptime = 0
         }
         isRecording = true
         recordingStartTime = Date()
@@ -656,10 +665,19 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
         smoothedAudioLevel += (normalizedLevel - smoothedAudioLevel) * levelSmoothing
         smoothedAudioFrequency += (normalizedFreq - smoothedAudioFrequency) * frequencySmoothing
 
+        pendingWavePeak = max(pendingWavePeak, min(1.0, peakLevel))
+
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastLevelPublishUptime >= Self.levelPublishInterval else { return }
+        lastLevelPublishUptime = now
+
+        let wavePeak = pendingWavePeak
+        pendingWavePeak = 0
+
         DispatchQueue.main.async {
             self.audioLevel = self.smoothedAudioLevel
             self.audioFrequency = self.smoothedAudioFrequency
-            self.liveWaveSamples.append(min(1.0, peakLevel))
+            self.liveWaveSamples.append(wavePeak)
             if self.liveWaveSamples.count > Self.maxLiveWaveSamples {
                 self.liveWaveSamples.removeFirst(
                     self.liveWaveSamples.count - Self.maxLiveWaveSamples)

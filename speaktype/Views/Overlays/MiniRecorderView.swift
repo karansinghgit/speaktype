@@ -275,7 +275,7 @@ struct MiniRecorderView: View {
     private var pillWidth: CGFloat {
         switch displayPhase {
         case .idle: return 58
-        case .warming: return 200
+        case .warming: return 280  // fits stage text + elapsed seconds
         case .processing: return 210
         case .recording: return expanded ? 460 : 250
         }
@@ -314,11 +314,26 @@ struct MiniRecorderView: View {
             ProgressView()
                 .controlSize(.small)
                 .colorScheme(.dark)
-            Text("Warming up model...")
-                .font(Typography.pillLabel)
-                .foregroundColor(.white.opacity(0.9))
+            // Cold loads run 30-60s; show the live stage and elapsed seconds so
+            // a long warm-up reads as progress, not a hang.
+            TimelineView(.periodic(from: .now, by: 1)) { _ in
+                Text(warmingLabel)
+                    .font(Typography.pillLabel)
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(1)
+            }
         }
         .transition(.opacity)
+    }
+
+    private var warmingLabel: String {
+        let stage = transcription.loadingStage
+        let base = stage.isEmpty ? "Warming up model..." : stage
+        if let started = transcription.loadingStartedAt {
+            let seconds = Int(Date().timeIntervalSince(started))
+            if seconds >= 5 { return "\(base) (\(seconds)s)" }
+        }
+        return base
     }
 
     private var processingContent: some View {

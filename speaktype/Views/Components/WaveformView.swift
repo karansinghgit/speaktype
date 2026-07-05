@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 
 /// Simple waveform visualization for audio playback
@@ -55,20 +56,58 @@ struct WaveformView: View {
         return path
     }
 
+    /// Downsample the actual audio into per-bucket peaks. Recordings are
+    /// 16 kHz mono WAVs, so even a minutes-long file reads in a few ms; done
+    /// off-main regardless. (This used to render random noise re-rolled on
+    /// every appearance, which implied the bars meant something they didn't.)
     private func generateSamples() {
-        // Generate simple waveform samples
-        // In production, this would analyze actual audio data
-        // For now, generate random realistic-looking waveform
-        let sampleCount = 100
-        var newSamples: [Float] = []
-
-        for i in 0..<sampleCount {
-            // Create varied amplitude for realistic look
-            let base = Float.random(in: 0.2...0.8)
-            let variation = sin(Float(i) * 0.1) * 0.2
-            newSamples.append(base + variation)
+        guard let audioURL else {
+            samples = []
+            return
         }
 
-        samples = newSamples
+        let bucketCount = 100
+        DispatchQueue.global(qos: .userInitiated).async {
+            let peaks = Self.peakSamples(from: audioURL, bucketCount: bucketCount)
+            DispatchQueue.main.async {
+                self.samples = peaks
+            }
+        }
+    }
+
+    private static func peakSamples(from url: URL, bucketCount: Int) -> [Float] {
+        guard let file = try? AVAudioFile(forReading: url) else { return [] }
+
+        let frameCount = AVAudioFrameCount(file.length)
+        guard frameCount > 0,
+            let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
+                                          frameCapacity: frameCount),
+            (try? file.read(into: buffer)) != nil,
+            let channel = buffer.floatChannelData?[0]
+        else { return [] }
+
+        let total = Int(buffer.frameLength)
+        guard total > 0 else { return [] }
+
+        let bucketSize = max(1, total / bucketCount)
+        var peaks: [Float] = []
+        peaks.reserveCapacity(bucketCount)
+
+        var index = 0
+        while index < total && peaks.count < bucketCount {
+            var peak: Float = 0
+            let end = min(index + bucketSize, total)
+            while index < end {
+                peak = max(peak, abs(channel[index]))
+                index += 1
+            }
+            peaks.append(peak)
+        }
+
+        // Normalize so quiet recordings still draw a visible shape.
+        if let maxPeak = peaks.max(), maxPeak > 0 {
+            peaks = peaks.map { min(1.0, $0 / maxPeak) }
+        }
+        return peaks
     }
 }

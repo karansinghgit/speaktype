@@ -83,14 +83,18 @@ class TranscriptionManager {
 
     /// Load a specific model variant, routing to its owning engine.
     func loadModel(variant: String) async throws {
-        let kind = AIModel.engineKind(for: variant)
+        guard let kind = AIModel.engineKind(for: variant) else {
+            throw WhisperService.TranscriptionError.unsupportedModelVariant
+        }
         try await engine(for: kind).loadModel(variant: variant)
         activeKind = kind
     }
 
     /// Transcribe an audio file with the currently active engine.
     func transcribe(audioFile: URL, language: String = "auto") async throws -> String {
-        let kind = AIModel.engineKind(for: currentModelVariant)
+        guard let kind = AIModel.engineKind(for: currentModelVariant) else {
+            throw WhisperService.TranscriptionError.unsupportedModelVariant
+        }
         return try await engine(for: kind).transcribe(audioFile: audioFile, language: language)
     }
 }

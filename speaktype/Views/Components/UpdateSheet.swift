@@ -144,7 +144,7 @@ struct UpdateSheet: View {
                     .buttonStyle(SecondaryButtonStyle())
 
                     Button("Install Update") {
-                        updateService.installUpdate(url: update.downloadURL)
+                        updateService.installUpdate(update)
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(updateService.isInstalling)

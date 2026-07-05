@@ -74,6 +74,7 @@ class WhisperService {
         case fileNotFound
         case alreadyLoading
         case loadingTimeout
+        case unsupportedModelVariant
 
         var errorDescription: String? {
             switch self {
@@ -82,6 +83,8 @@ class WhisperService {
             case .alreadyLoading: return "Model loading already in progress"
             case .loadingTimeout:
                 return "Model loading timed out — your Mac may not have enough RAM for this model"
+            case .unsupportedModelVariant:
+                return "The selected model is not supported."
             }
         }
     }
@@ -98,6 +101,10 @@ class WhisperService {
     // Dynamic model loading with optimized WhisperKitConfig
     @MainActor
     func loadModel(variant: String) async throws {
+        guard let model = AIModel.model(for: variant), model.engine == .whisper else {
+            throw TranscriptionError.unsupportedModelVariant
+        }
+
         // Already loaded this exact model
         if isInitialized && variant == currentModelVariant && pipe != nil {
             print("✅ Model \(variant) already loaded, skipping")
@@ -133,7 +140,7 @@ class WhisperService {
 
         let token = UUID()
         let task = Task { @MainActor in
-            try await self.performModelLoad(variant: variant)
+            try await self.performModelLoad(model: model)
         }
         activeLoadTask = task
         activeLoadVariant = variant
@@ -151,14 +158,13 @@ class WhisperService {
     }
 
     @MainActor
-    private func performModelLoad(variant: String) async throws {
+    private func performModelLoad(model: AIModel) async throws {
+        let variant = model.variant
         let ramGB = Self.deviceRAMGB
         print("🔄 Initializing WhisperKit with model: \(variant)...")
         print("💻 Device RAM: \(ramGB) GB")
 
-        if let model = AIModel.availableModels.first(where: { $0.variant == variant }),
-            ramGB < model.minimumRAMGB
-        {
+        if ramGB < model.minimumRAMGB {
             print(
                 "⚠️ WARNING: Model \(variant) recommends \(model.minimumRAMGB)GB+ RAM, device has \(ramGB)GB. Loading may fail or be very slow."
             )
@@ -258,7 +264,7 @@ class WhisperService {
             let text = Self.normalizedTranscription(
                 from: results.map { $0.text }.joined(separator: " "))
 
-            print("Transcription complete: \(text.prefix(50))...")
+            AppLogger.success("Transcription complete", category: AppLogger.transcription)
             return text
         } catch {
             print("Transcription failed: \(error.localizedDescription)")
@@ -286,7 +292,7 @@ class WhisperService {
         )
         let text = Self.normalizedTranscription(from: results.map { $0.text }.joined(separator: " "))
 
-        print("🔪 Chunk done: \(text.prefix(40))...")
+        AppLogger.success("Chunk transcription complete", category: AppLogger.transcription)
         // Clean up temp chunk file after transcription
         try? FileManager.default.removeItem(at: audioFile)
         return text

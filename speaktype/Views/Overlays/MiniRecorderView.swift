@@ -868,20 +868,10 @@ struct MiniRecorderView: View {
         }
     }
 
-    private func debugLog(_ message: String) {
-        let logPath = "/tmp/speaktype_debug.log"
-        let logEntry = "[\(Date())] \(message)\n"
-        if let data = logEntry.data(using: .utf8) {
-            if FileManager.default.fileExists(atPath: logPath) {
-                if let handle = FileHandle(forWritingAtPath: logPath) {
-                    handle.seekToEndOfFile()
-                    handle.write(data)
-                    handle.closeFile()
-                }
-            } else {
-                FileManager.default.createFile(atPath: logPath, contents: data)
-            }
-        }
+    private func debugLog(_ message: @autoclosure () -> String) {
+        #if DEBUG
+            AppLogger.debug(message(), category: AppLogger.ui)
+        #endif
     }
 
     private func processRecording(url: URL) async {
@@ -915,7 +905,7 @@ struct MiniRecorderView: View {
                 await MainActor.run { statusMessage = "Transcribing..." }
             }
             let text = try await transcription.transcribe(audioFile: url, language: transcriptionLanguage)
-            debugLog("Transcription result: \(text.prefix(50))...")
+            debugLog("Transcription completed")
 
             guard !text.isEmpty else {
                 debugLog("Empty text, cancelling")

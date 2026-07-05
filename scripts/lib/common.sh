@@ -67,8 +67,9 @@ resolve_version() {
   fi
 }
 
-# Ensure notarization credentials exist in the keychain, prompting once for an
-# app-specific password if the profile is missing.
+# Ensure notarization credentials exist in the keychain. When the profile is
+# missing, notarytool prompts for the app-specific password itself so the secret
+# never appears in this script's process arguments.
 ensure_notary_credentials() {
   if xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" &>/dev/null; then
     return 0
@@ -81,14 +82,12 @@ ensure_notary_credentials() {
   echo "  2. Sign in with: $APPLE_ID"
   echo "  3. Security → App-Specific Passwords → Generate"
   echo ""
-  read -rp "Enter app-specific password: " -s APP_PASSWORD
+  echo "notarytool will prompt for the app-specific password securely."
   echo ""
-  [ -z "$APP_PASSWORD" ] && { echo "❌ Password required"; exit 1; }
 
   xcrun notarytool store-credentials "$NOTARY_PROFILE" \
     --apple-id "$APPLE_ID" \
-    --team-id "$APPLE_TEAM_ID" \
-    --password "$APP_PASSWORD"
+    --team-id "$APPLE_TEAM_ID"
   echo ""
   echo "✅ Credentials stored. Continuing..."
   echo ""

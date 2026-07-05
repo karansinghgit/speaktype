@@ -132,7 +132,19 @@ class UpdateService: NSObject, ObservableObject {
     // MARK: - Update Installation
 
     /// Download the DMG, mount it, copy the .app over the running installation, and relaunch.
-    func installUpdate(url downloadURLString: String) {
+    func installUpdate(_ update: AppVersion) {
+        installUpdate(
+            url: update.downloadURL,
+            expectedVersion: update.version,
+            expectedBuild: Self.normalizedExpectedBuild(update.buildNumber)
+        )
+    }
+
+    private func installUpdate(
+        url downloadURLString: String,
+        expectedVersion: String,
+        expectedBuild: String?
+    ) {
         guard let downloadURL = URL(string: downloadURLString) else {
             setError("Invalid download URL.")
             return
@@ -181,8 +193,12 @@ class UpdateService: NSObject, ObservableObject {
                 }
                 let appInDMG = try findApp(in: mountPoint)
 
-                // 5. Verify the mounted app is signed by the expected developer
-                try verifyCandidateApp(at: appInDMG)
+                // 5. Verify the mounted app is the expected version and signed by the expected developer
+                try verifyCandidateApp(
+                    at: appInDMG,
+                    expectedVersion: expectedVersion,
+                    expectedBuild: expectedBuild
+                )
 
                 // 6. Replace the running app
                 try replaceCurrentApp(with: appInDMG)
@@ -283,7 +299,11 @@ class UpdateService: NSObject, ObservableObject {
         return appURL
     }
 
-    private func verifyCandidateApp(at appURL: URL) throws {
+    private func verifyCandidateApp(
+        at appURL: URL,
+        expectedVersion: String,
+        expectedBuild: String?
+    ) throws {
         guard
             let bundle = Bundle(url: appURL),
             let bundleIdentifier = bundle.bundleIdentifier
@@ -298,6 +318,14 @@ class UpdateService: NSObject, ObservableObject {
                 "Downloaded update has an unexpected bundle identifier."
             )
         }
+
+        try Self.validateCandidateVersion(
+            candidateVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+                as? String,
+            candidateBuild: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
+            expectedVersion: expectedVersion,
+            expectedBuild: expectedBuild
+        )
 
         let staticCode = try Self.loadStaticCode(at: appURL)
         let requirement = try Self.makeTrustedUpdateRequirement(
@@ -358,18 +386,15 @@ class UpdateService: NSObject, ObservableObject {
     }
 
     private func relaunch() {
-        // Use a shell to wait for the current process to exit, then reopen the app
+        // Use a static shell script to wait for the current process to exit, then
+        // reopen the app. Dynamic values are passed as positional parameters so
+        // bundle path metacharacters never become shell source.
         let bundlePath = Bundle.main.bundlePath
         let pid = ProcessInfo.processInfo.processIdentifier
 
-        let script = """
-            while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done
-            open "\(bundlePath)"
-            """
-
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/bin/sh")
-        proc.arguments = ["-c", script]
+        proc.arguments = Self.relaunchShellArguments(pid: pid, bundlePath: bundlePath)
         try? proc.run()
 
         DispatchQueue.main.async {
@@ -445,6 +470,41 @@ class UpdateService: NSObject, ObservableObject {
         else {
             throw UpdateError.untrustedDeveloper
         }
+    }
+
+    static func validateCandidateVersion(
+        candidateVersion: String?,
+        candidateBuild: String?,
+        expectedVersion: String,
+        expectedBuild: String?
+    ) throws {
+        guard candidateVersion == expectedVersion else {
+            throw UpdateError.invalidCandidateApp(
+                "Downloaded update version does not match the advertised release."
+            )
+        }
+
+        guard let expectedBuild else { return }
+
+        guard candidateBuild == expectedBuild else {
+            throw UpdateError.invalidCandidateApp(
+                "Downloaded update build does not match the advertised release."
+            )
+        }
+    }
+
+    static func normalizedExpectedBuild(_ buildNumber: String) -> String? {
+        let trimmed = buildNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || trimmed == "0" ? nil : trimmed
+    }
+
+    static func relaunchShellArguments(pid: Int32, bundlePath: String) -> [String] {
+        let script = """
+            while kill -0 "$1" 2>/dev/null; do sleep 0.2; done
+            exec /usr/bin/open "$2"
+            """
+
+        return ["-c", script, "speaktype-relaunch", String(pid), bundlePath]
     }
 
     private static func loadStaticCode(at appURL: URL) throws -> SecStaticCode {

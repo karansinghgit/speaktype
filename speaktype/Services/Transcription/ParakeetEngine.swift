@@ -46,6 +46,10 @@ class ParakeetEngine: SpeechToTextEngine {
     private init() {}
 
     func loadModel(variant: String) async throws {
+        guard ParakeetCatalog.variants.contains(variant) else {
+            throw WhisperService.TranscriptionError.unsupportedModelVariant
+        }
+
         // Already loaded this exact model.
         if isInitialized, currentModelVariant == variant, manager != nil { return }
 

@@ -222,7 +222,10 @@ class ModelDownloadService: ObservableObject {
 
             // Calculate total directory size
             let directorySize = Self.calculateDirectorySize(at: item)
-            let expectedSize = AIModel.expectedSize(for: modelName)
+            guard let expectedSize = AIModel.expectedSize(for: modelName) else {
+                print("⚠️ Ignoring unknown model directory: \(modelName)")
+                continue
+            }
 
             // Model is complete if it's at least 80% of expected size
             let minAcceptableSize = Int64(Double(expectedSize) * 0.8)
@@ -239,9 +242,14 @@ class ModelDownloadService: ObservableObject {
     // Asynchronous download using WhisperKit
     func downloadModel(variant: String) {
         guard isDownloading[variant] != true else { return }
+        guard let engineKind = AIModel.engineKind(for: variant) else {
+            downloadProgress[variant] = 0.0
+            downloadError[variant] = "Unknown model variant."
+            return
+        }
 
         // Route Parakeet variants to FluidAudio.
-        if AIModel.engineKind(for: variant) == .parakeet {
+        if engineKind == .parakeet {
             downloadParakeetModel(variant: variant)
             return
         }
@@ -404,8 +412,17 @@ class ModelDownloadService: ObservableObject {
 
     // Aggressively deletes any potential cache for this variant
     func deleteModel(variant: String) async -> String {
+        guard let engineKind = AIModel.engineKind(for: variant) else {
+            await MainActor.run {
+                self.downloadProgress[variant] = 0.0
+                self.isDownloading[variant] = false
+                self.downloadError[variant] = "Unknown model variant."
+            }
+            return "Unknown model variant"
+        }
+
         // Parakeet models are managed by FluidAudio in its own cache directory.
-        if AIModel.engineKind(for: variant) == .parakeet {
+        if engineKind == .parakeet {
             let version = ParakeetCatalog.version(for: variant)
             let cacheDir = AsrModels.defaultCacheDirectory(for: version)
             try? FileManager.default.removeItem(at: cacheDir)

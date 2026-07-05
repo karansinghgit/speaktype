@@ -27,6 +27,12 @@ final class ModelDownloadServiceTests: XCTestCase {
         XCTAssertNotNil(service.isDownloading)
     }
 
+    func testUnknownModelVariantsAreNotRoutedToAnEngine() {
+        XCTAssertNil(AIModel.model(for: "../../outside-model"))
+        XCTAssertNil(AIModel.engineKind(for: "../../outside-model"))
+        XCTAssertNil(AIModel.expectedSize(for: "../../outside-model"))
+    }
+
     func testCandidatePathsStayWithinRepoOwnedRoots() throws {
         // Simulate the two repo-owned WhisperKit model roots (current App Support +
         // legacy Documents), matching ModelStorage's `.../models/argmaxinc/whisperkit-coreml`.

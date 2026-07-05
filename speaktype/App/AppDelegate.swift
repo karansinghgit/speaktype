@@ -18,6 +18,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var configuredHotkey: HotkeyOption?
     private let updateCheckScheduler = NSBackgroundActivityScheduler(
         identifier: "com.2048labs.speaktype.update-check")
+    private var updateWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UpdateService.registerDefaults()
@@ -577,6 +578,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func showUpdateWindow() {
         guard let update = UpdateService.shared.availableUpdate else { return }
 
+        // Idempotent: a silent launch/periodic check reaches here twice for the
+        // same release — once via showUpdateWindowPublisher's sink, once via
+        // performUpdateCheckIfNeeded's reminder check. Reuse the open window
+        // instead of stacking a second identical "Software Update" window.
+        if let existing = updateWindow, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate()
+            return
+        }
+
         let updateSheetView = UpdateSheet(update: update)
         let hostingController = NSHostingController(rootView: updateSheetView)
 
@@ -586,6 +597,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
         window.center()
         window.isMovableByWindowBackground = true
+        updateWindow = window
         window.makeKeyAndOrderFront(nil)
         NSApp.activate()
     }

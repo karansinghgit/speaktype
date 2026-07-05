@@ -245,7 +245,12 @@ struct ModelRow: View {
             do {
                 try await transcription.loadModel(variant: model.variant)
                 await MainActor.run {
-                    stopLoadingTimer(); isLoadingModel = false; selectedModel = model.variant
+                    stopLoadingTimer(); isLoadingModel = false
+                    // Re-check before selecting: the model may have been
+                    // deleted while the load was in flight.
+                    if downloadService.downloadProgress[model.variant] ?? 0 >= 1.0 {
+                        selectedModel = model.variant
+                    }
                 }
             } catch {
                 await MainActor.run {

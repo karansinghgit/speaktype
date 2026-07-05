@@ -241,7 +241,11 @@ struct AIModelsView: View {
             do {
                 try await TranscriptionManager.shared.loadModel(variant: model.variant)
                 await MainActor.run {
-                    selectedModel = model.variant
+                    // Re-check before selecting: the model may have been
+                    // deleted while the load was in flight.
+                    if downloadService.downloadProgress[model.variant] ?? 0 >= 1.0 {
+                        selectedModel = model.variant
+                    }
                     isLoadingRecommendedModel = false
                 }
             } catch {

@@ -83,7 +83,8 @@ class WhisperService {
             case .fileNotFound: return "Audio file not found"
             case .alreadyLoading: return "Model loading already in progress"
             case .loadingTimeout:
-                return "Model loading timed out — your Mac may not have enough RAM for this model"
+                return "Model loading stalled and was stopped. Try again — if it keeps happening, "
+                    + "re-download the model or pick a smaller one."
             case .unsupportedModelVariant:
                 return "The selected model is not supported."
             case .modelFilesMissing:
@@ -248,9 +249,10 @@ class WhisperService {
             let timeout = Self.loadTimeout(ramGB: ramGB, minimumRAMGB: model.minimumRAMGB)
             let loadedPipe = try await Self.loadPipelineWithTimeout(config: config, timeout: timeout)
 
-            // A concurrent unload may have reset state while we were loading;
-            // don't resurrect it with a stale pipeline.
-            guard loadingModelVariant == variant else { return }
+            // A concurrent unload reset state while we were loading; surface
+            // that as cancellation — returning normally made callers treat a
+            // deleted model as successfully loaded and re-select it.
+            guard loadingModelVariant == variant else { throw CancellationError() }
             pipe = loadedPipe
 
             let loadDuration = Date().timeIntervalSince(loadStart)
@@ -275,11 +277,13 @@ class WhisperService {
         }
     }
 
-    /// Generous ceiling: warm loads take seconds and documented cold loads
-    /// 30–60s, so only a genuinely wedged load hits this. Doubled when the
-    /// device is below the model's recommended RAM (swapping is slow, not stuck).
+    /// Ceiling for a wedged load, NOT a performance bound: the first load of a
+    /// large model includes CoreML/ANE specialization, which legitimately runs
+    /// several minutes (a 180s value here fired mid-load on a 16GB machine and
+    /// reported a healthy load as failed). Longer still below recommended RAM,
+    /// where swapping is slow but not stuck.
     static func loadTimeout(ramGB: Int, minimumRAMGB: Int) -> TimeInterval {
-        ramGB < minimumRAMGB ? 360 : 180
+        ramGB < minimumRAMGB ? 1200 : 600
     }
 
     /// Awaits WhisperKit init, but never longer than `timeout`. A task group

@@ -42,6 +42,8 @@ class ParakeetEngine: SpeechToTextEngine {
 
     /// FluidAudio's actor that owns the loaded CoreML models.
     private var manager: AsrManager?
+    /// Variant currently being loaded, so unload can cancel a warm-up too.
+    private var loadingVariant = ""
 
     private init() {}
 
@@ -55,8 +57,12 @@ class ParakeetEngine: SpeechToTextEngine {
 
         isLoading = true
         isInitialized = false
+        loadingVariant = variant
         loadingStage = "Preparing Parakeet model…"
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            loadingVariant = ""
+        }
 
         // Release any previously loaded model before loading a new one.
         if let manager {
@@ -77,8 +83,18 @@ class ParakeetEngine: SpeechToTextEngine {
             throw WhisperService.TranscriptionError.modelFilesMissing
         }
         let models = try await AsrModels.load(from: cacheDir, version: version)
+
+        // The model may have been deleted/unloaded while loading; don't
+        // resurrect it, and don't report success to the caller.
+        guard loadingVariant == variant else { throw CancellationError() }
+
         let manager = AsrManager(config: .default)
         try await manager.loadModels(models)
+
+        guard loadingVariant == variant else {
+            await manager.cleanup()
+            throw CancellationError()
+        }
 
         self.manager = manager
         currentModelVariant = variant
@@ -87,7 +103,8 @@ class ParakeetEngine: SpeechToTextEngine {
     }
 
     func unloadModelIfCurrent(variant: String) async {
-        guard currentModelVariant == variant else { return }
+        guard currentModelVariant == variant || loadingVariant == variant else { return }
+        loadingVariant = ""
 
         if let manager {
             await manager.cleanup()

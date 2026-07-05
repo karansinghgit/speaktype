@@ -115,7 +115,10 @@ class ModelDownloadService: ObservableObject {
     @Published var downloadProgress: [String: Double] = [:] // Map Model Variant (String) to progress
     @Published var downloadError: [String: String] = [:] // Debugging: track errors
     @Published var isDownloading: [String: Bool] = [:]
-    
+    /// False until the first launch disk scan finishes; callers should treat
+    /// missing progress entries as "unknown", not "not downloaded", before then.
+    @Published private(set) var hasCompletedInitialScan = false
+
     private var activeTasks: [String: Task<Void, Never>] = [:] // Track running download tasks
     
     private init() {
@@ -164,6 +167,8 @@ class ModelDownloadService: ObservableObject {
         }
 
         await MainActor.run {
+            self.hasCompletedInitialScan = true
+
             // Keep live download rows stable while refreshing disk state.
             self.downloadProgress = self.downloadProgress.filter {
                 self.isDownloading[$0.key] == true

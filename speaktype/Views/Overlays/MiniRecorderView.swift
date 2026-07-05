@@ -719,6 +719,22 @@ struct MiniRecorderView: View {
             }
         #endif
 
+        // Denied mic access previously produced a silent zero-byte recording;
+        // tell the user what is wrong instead.
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        guard micStatus == .authorized || micStatus == .notDetermined else {
+            debugLog("Microphone access denied - showing error")
+            isProcessing = true
+            statusMessage = "Mic access off — System Settings → Privacy & Security"
+
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                isProcessing = false
+                onCancel?()
+            }
+            return
+        }
+
         // Check if model is selected BEFORE starting recording
         guard !selectedModel.isEmpty else {
             debugLog("No model selected - showing error")
@@ -733,9 +749,12 @@ struct MiniRecorderView: View {
             return
         }
 
-        // Check if model is downloaded
+        // Check if model is downloaded. Until the launch disk scan finishes,
+        // treat the model as present — a hotkey press seconds after login used
+        // to flash a false "Model not downloaded" (transcription still fails
+        // with a real error in the rare case the model is genuinely missing).
         let progress = ModelDownloadService.shared.downloadProgress[selectedModel] ?? 0
-        guard progress >= 1.0 else {
+        guard progress >= 1.0 || !ModelDownloadService.shared.hasCompletedInitialScan else {
             debugLog("Model not downloaded - showing error")
             isProcessing = true
             statusMessage = "Model not downloaded"

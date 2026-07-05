@@ -17,6 +17,18 @@ class AudioRecordingService: NSObject, ObservableObject {
     @Published var selectedDeviceId: String? {
         didSet {
             setupSession()
+            // If a dictation is in flight (device unplugged mid-recording, or a
+            // switch from settings), restart the rebuilt session so capture
+            // continues — setupSession alone leaves the new session stopped and
+            // the recording would silently go dead until the user stops.
+            if isRecording {
+                audioQueue.async {
+                    if self.captureSession?.isRunning != true {
+                        print("🎤 Restarting capture session after device change mid-recording")
+                        self.captureSession?.startRunning()
+                    }
+                }
+            }
             // Persist so the selection survives app restarts.
             if let selectedDeviceId {
                 UserDefaults.standard.set(selectedDeviceId, forKey: Self.selectedDeviceDefaultsKey)

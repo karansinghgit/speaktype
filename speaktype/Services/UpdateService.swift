@@ -226,14 +226,26 @@ class UpdateService: NSObject, ObservableObject {
                 relaunch()
 
             } catch {
+                let userCancelled: Bool
+                if case UpdateError.downloadCancelled = error { userCancelled = true } else { userCancelled = false }
                 await MainActor.run {
                     self.isInstalling = false
-                    self.installError = error.localizedDescription
+                    self.installError = userCancelled ? nil : error.localizedDescription
                     self.installPhase = ""
                     self.installStatus = ""
                 }
             }
         }
+    }
+
+    /// Abort an in-flight update download. Only the download phase is
+    /// cancellable; once installation starts touching disk, finishing is
+    /// safer than stopping halfway. Without this, a stalled download left
+    /// the update sheet stuck on "Update in progress" with no way out.
+    func cancelInstall() {
+        guard isInstalling, activeDownloadContinuation != nil else { return }
+        activeDownloadSession?.invalidateAndCancel()
+        finishDownload(.failure(UpdateError.downloadCancelled))
     }
 
     // MARK: - Private Helpers
@@ -633,6 +645,7 @@ extension UpdateService: URLSessionDownloadDelegate {
 
 enum UpdateError: LocalizedError, Equatable {
     case downloadFailed(String)
+    case downloadCancelled
     case mountFailed
     case appNotFoundInDMG
     case copyFailed(String)
@@ -645,6 +658,7 @@ enum UpdateError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .downloadFailed(let msg): return "Failed to download update: \(msg)"
+        case .downloadCancelled: return "Update cancelled."
         case .mountFailed: return "Failed to mount the update disk image."
         case .appNotFoundInDMG: return "Could not find the app inside the downloaded update."
         case .copyFailed(let msg): return "Failed to install: \(msg)"

@@ -125,11 +125,19 @@ struct UpdateSheet: View {
             // Action buttons
             HStack(spacing: 12) {
                 if updateService.isInstalling {
-                    // Show only a disabled cancel-style placeholder while work is in progress
                     Text("Update in progress…")
                         .font(Typography.bodySmall)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
+
+                    // Cancellable only while downloading; after that the
+                    // installer is touching disk and should run to completion.
+                    if updateService.installPhase == "Downloading" {
+                        Button("Cancel") {
+                            updateService.cancelInstall()
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                    }
                 } else {
                     Button("Skip This Version") {
                         updateService.skipVersion(update.version)

@@ -158,6 +158,24 @@ class WhisperService {
     }
 
     @MainActor
+    func unloadModelIfCurrent(variant: String) {
+        guard currentModelVariant == variant else { return }
+
+        activeLoadTask?.cancel()
+        activeLoadTask = nil
+        activeLoadVariant = ""
+        activeLoadToken = nil
+        pipe = nil
+        currentModelVariant = ""
+        isInitialized = false
+        isLoading = false
+        isTranscribing = false
+        loadingStage = ""
+        loadingModelVariant = ""
+        loadingStartedAt = nil
+    }
+
+    @MainActor
     private func performModelLoad(model: AIModel) async throws {
         let variant = model.variant
         let ramGB = Self.deviceRAMGB

@@ -18,6 +18,7 @@ struct ModelRow: View {
     @State private var loadingTimer: Timer?
     @State private var isHovered = false
     @State private var appeared = false
+    @State private var showDeleteConfirmation = false
 
     // MARK: - Derived state
 
@@ -25,6 +26,7 @@ struct ModelRow: View {
     var isDownloading: Bool { downloadService.isDownloading[model.variant] ?? false }
     var isDownloaded: Bool { progress >= 1.0 }
     var isActive: Bool { selectedModel == model.variant }
+    var downloadError: String? { downloadService.downloadError[model.variant] }
 
     // MARK: - Body
 
@@ -44,6 +46,9 @@ struct ModelRow: View {
                     }
                     if let loadError {
                         note(icon: "xmark.circle.fill", text: loadError, tint: .accentError)
+                    }
+                    if let downloadError {
+                        note(icon: "xmark.circle.fill", text: downloadError, tint: .accentError)
                     }
                 }
 
@@ -73,6 +78,12 @@ struct ModelRow: View {
         .animation(.easeOut(duration: 0.16), value: isActive)
         .onHover { isHovered = $0 }
         .onAppear { withAnimation(.easeOut(duration: 0.5).delay(0.05)) { appeared = true } }
+        .alert("Delete \(model.name)?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) { deleteModel() }
+        } message: {
+            Text("This removes the downloaded model files. You can download the model again later.")
+        }
     }
 
     // MARK: - Header
@@ -123,7 +134,7 @@ struct ModelRow: View {
     private func note(icon: String, text: String, tint: Color) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon).font(.system(size: 10))
-            Text(text).font(Typography.ui(11)).lineLimit(2)
+            Text(text).font(Typography.ui(11)).lineLimit(3)
         }
         .foregroundStyle(tint)
     }
@@ -145,7 +156,7 @@ struct ModelRow: View {
                     }
                     .buttonStyle(.plain).help("Set as default model")
                 }
-                Button(action: deleteModel) {
+                Button(action: { showDeleteConfirmation = true }) {
                     Image(systemName: "trash").font(.system(size: 13))
                         .foregroundStyle(Color.textMuted).padding(8)
                         .background(Circle().fill(Color.textPrimary.opacity(isHovered ? 0.06 : 0)))
@@ -211,7 +222,10 @@ struct ModelRow: View {
     private func deleteModel() {
         Task {
             _ = await downloadService.deleteModel(variant: model.variant)
-            if selectedModel == model.variant { selectedModel = ModelSelection.none }
+            await transcription.unloadModelIfCurrent(variant: model.variant)
+            await MainActor.run {
+                if selectedModel == model.variant { selectedModel = ModelSelection.none }
+            }
         }
     }
 

@@ -78,6 +78,20 @@ class ParakeetEngine: SpeechToTextEngine {
         loadingStage = ""
     }
 
+    func unloadModelIfCurrent(variant: String) async {
+        guard currentModelVariant == variant else { return }
+
+        if let manager {
+            await manager.cleanup()
+        }
+        manager = nil
+        currentModelVariant = ""
+        isInitialized = false
+        isLoading = false
+        isTranscribing = false
+        loadingStage = ""
+    }
+
     func transcribe(audioFile: URL, language: String) async throws -> String {
         guard let manager else { throw ASRError.notInitialized }
 

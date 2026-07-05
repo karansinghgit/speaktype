@@ -90,6 +90,18 @@ class TranscriptionManager {
         activeKind = kind
     }
 
+    /// Release the active in-memory model if its downloaded files were removed.
+    func unloadModelIfCurrent(variant: String) async {
+        let wasActive = currentModelVariant == variant
+
+        await whisper.unloadModelIfCurrent(variant: variant)
+        await parakeet.unloadModelIfCurrent(variant: variant)
+
+        if wasActive {
+            activeKind = .whisper
+        }
+    }
+
     /// Transcribe an audio file with the currently active engine.
     func transcribe(audioFile: URL, language: String = "auto") async throws -> String {
         guard let kind = AIModel.engineKind(for: currentModelVariant) else {

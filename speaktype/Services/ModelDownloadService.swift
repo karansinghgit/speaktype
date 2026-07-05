@@ -164,8 +164,10 @@ class ModelDownloadService: ObservableObject {
         }
 
         await MainActor.run {
-            // Clear all previous progress
-            self.downloadProgress.removeAll()
+            // Keep live download rows stable while refreshing disk state.
+            self.downloadProgress = self.downloadProgress.filter {
+                self.isDownloading[$0.key] == true
+            }
 
             // Only mark models that actually exist
             for variant in foundModels {
@@ -346,7 +348,8 @@ class ModelDownloadService: ObservableObject {
                          DispatchQueue.main.async {
                              self.isDownloading[variant] = false
                              self.downloadProgress[variant] = 0.0
-                             self.downloadError[variant] = "Error: \(error.localizedDescription)\n\nTry clicking the trash icon to manually clean cache."
+                             self.downloadError[variant] =
+                                "Download failed: \(error.localizedDescription). Try downloading again."
                              self.activeTasks[variant] = nil
                          }
                      }
@@ -356,7 +359,8 @@ class ModelDownloadService: ObservableObject {
                 DispatchQueue.main.async {
                     self.isDownloading[variant] = false
                     self.downloadProgress[variant] = 0.0
-                    self.downloadError[variant] = error.localizedDescription + "\n\n(Try Trash icon to clean cache)"
+                    self.downloadError[variant] =
+                        "Download failed: \(error.localizedDescription). Try downloading again."
                     self.activeTasks[variant] = nil
                 }
             }

@@ -636,6 +636,10 @@ struct MiniRecorderView: View {
                             debugLog("Model pre-loaded after switch: \(model.variant)")
                         } catch {
                             debugLog("Model pre-load failed: \(error.localizedDescription)")
+                            // Don't leave the app switched to a model that can't
+                            // load (not downloaded, load failed/timed out) — revert
+                            // the selection so dictation keeps using the old model.
+                            await MainActor.run { selectedModel = previousModel }
                         }
                         await MainActor.run { isWarmingUp = false }
                     }
@@ -816,11 +820,20 @@ struct MiniRecorderView: View {
 
             guard shouldResumeRecording else { return }
 
-            audioRecorder.startRecording()
-
+            // Resume on the new device, but only re-enter the recording HUD if
+            // capture actually restarts — a device that can't be added (unplugged
+            // in the same instant, grabbed exclusively by another app) must not
+            // leave the pill showing a live HUD over nothing. Mic is already
+            // authorized here (we were recording), so onStarted fires synchronously.
             await MainActor.run {
-                isProcessing = false
-                isListening = true
+                audioRecorder.startRecording { started in
+                    isProcessing = false
+                    isListening = started
+                    if !started {
+                        statusMessage = "Couldn't switch input"
+                        onCancel?()
+                    }
+                }
             }
         }
     }

@@ -13,6 +13,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastHandledHotkeyPressedState = false
     private var globalKeyDownMonitor: Any?
     private var localKeyDownMonitor: Any?
+    private var globalChordMonitor: Any?
+    private var localChordMonitor: Any?
+    private var configuredHotkey: HotkeyOption?
     private let updateCheckScheduler = NSBackgroundActivityScheduler(
         identifier: "com.2048labs.speaktype.update-check")
 
@@ -29,6 +32,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Setup dynamic hotkey monitoring based on user selection
         setupHotkeyMonitoring()
+
+        // Chord hotkeys need a different event-tap mask than bare modifiers,
+        // so rebuild the monitoring stack when the selection changes.
+        NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.reconfigureHotkeyMonitoringIfNeeded()
+        }
 
         schedulePeriodicUpdateChecks()
         checkForUpdatesOnLaunch()
@@ -171,7 +182,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Hotkey Monitoring
 
+    private func reconfigureHotkeyMonitoringIfNeeded() {
+        let current = getSelectedHotkey()
+        guard current != configuredHotkey else { return }
+        teardownHotkeyMonitoring()
+        setupHotkeyMonitoring()
+    }
+
+    private func teardownHotkeyMonitoring() {
+        if let globalFlagsMonitor {
+            NSEvent.removeMonitor(globalFlagsMonitor)
+            self.globalFlagsMonitor = nil
+        }
+        if let localFlagsMonitor {
+            NSEvent.removeMonitor(localFlagsMonitor)
+            self.localFlagsMonitor = nil
+        }
+        removeChordFallbackMonitors()
+        removeModifierComboMonitors()
+        if let hotkeyEventTap {
+            CGEvent.tapEnable(tap: hotkeyEventTap, enable: false)
+            if let hotkeyEventTapSource {
+                CFRunLoopRemoveSource(CFRunLoopGetMain(), hotkeyEventTapSource, .commonModes)
+            }
+            CFMachPortInvalidate(hotkeyEventTap)
+            self.hotkeyEventTap = nil
+            self.hotkeyEventTapSource = nil
+        }
+    }
+
     private func setupHotkeyMonitoring() {
+        configuredHotkey = getSelectedHotkey()
         setupSuppressingHotkeyEventTap()
 
         // Add global monitor for hotkey events
@@ -191,6 +232,54 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // while the hotkey is held — see installModifierComboMonitors(). Keeping
         // them alive for the app's lifetime woke SpeakType on every keystroke
         // system-wide just to bail on the isHotkeyPressed guard.
+
+        // Chord hotkeys start on a keyDown the event tap normally owns; if the
+        // tap couldn't be created (no Accessibility grant), fall back to NSEvent
+        // monitors — they can't suppress the keystroke, but the chord still works.
+        if getSelectedHotkey().isChord && hotkeyEventTap == nil {
+            installChordFallbackMonitors()
+        }
+    }
+
+    private func installChordFallbackMonitors() {
+        guard globalChordMonitor == nil && localChordMonitor == nil else { return }
+
+        globalChordMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) {
+            [weak self] event in
+            self?.handleChordKeyDownEvent(event)
+        }
+        localChordMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
+            [weak self] event in
+            guard let self, self.handleChordKeyDownEvent(event) else { return event }
+            return nil
+        }
+    }
+
+    private func removeChordFallbackMonitors() {
+        if let globalChordMonitor {
+            NSEvent.removeMonitor(globalChordMonitor)
+            self.globalChordMonitor = nil
+        }
+        if let localChordMonitor {
+            NSEvent.removeMonitor(localChordMonitor)
+            self.localChordMonitor = nil
+        }
+    }
+
+    /// NSEvent fallback for chord start. Returns true when the event was the
+    /// chord (so local monitors can swallow it).
+    @discardableResult
+    private func handleChordKeyDownEvent(_ event: NSEvent) -> Bool {
+        let currentHotkey = getSelectedHotkey()
+        guard currentHotkey.isChord,
+            event.keyCode == currentHotkey.keyCode,
+            event.modifierFlags.contains(currentHotkey.modifierFlag)
+        else { return false }
+
+        if !event.isARepeat {
+            handleHotkeyStateChange(isPressed: true)
+        }
+        return true
     }
 
     /// Installed only for the duration of a hotkey hold; removed on release.
@@ -223,7 +312,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupSuppressingHotkeyEventTap() {
         guard hotkeyEventTap == nil else { return }
 
-        let eventMask = (1 << CGEventType.flagsChanged.rawValue)
+        // Bare-modifier hotkeys only need flagsChanged; chords also need
+        // keyDown/keyUp (to trigger on, and suppress, the chord's key). The
+        // narrow mask keeps every keystroke from waking the app for the
+        // majority who use a modifier hotkey.
+        var eventMask = (1 << CGEventType.flagsChanged.rawValue)
+        if getSelectedHotkey().isChord {
+            eventMask |= (1 << CGEventType.keyDown.rawValue)
+            eventMask |= (1 << CGEventType.keyUp.rawValue)
+        }
         let callback: CGEventTapCallBack = { _, type, event, refcon in
             guard let refcon else {
                 return Unmanaged.passUnretained(event)
@@ -263,16 +360,52 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return Unmanaged.passUnretained(event)
         }
 
+        let currentHotkey = getSelectedHotkey()
+        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+
+        if type == .keyDown || type == .keyUp {
+            // Only chords subscribe to key events. Trigger on modifier+key,
+            // and swallow the chord's key so it doesn't also type into the
+            // target app (repeats and the trailing keyUp included).
+            guard currentHotkey.isChord, keyCode == currentHotkey.keyCode else {
+                return Unmanaged.passUnretained(event)
+            }
+
+            if type == .keyDown && event.flags.contains(.maskAlternate) {
+                if !isHotkeyPressed {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.handleHotkeyStateChange(isPressed: true)
+                    }
+                }
+                return nil
+            }
+
+            if isHotkeyPressed {
+                return nil
+            }
+            return Unmanaged.passUnretained(event)
+        }
+
         guard type == .flagsChanged else {
             return Unmanaged.passUnretained(event)
         }
 
-        let currentHotkey = getSelectedHotkey()
+        // Chord stop: the modifier was released while the chord was active.
+        // The flagsChanged event itself passes through — other apps still need
+        // to see the modifier go up.
+        if currentHotkey.isChord {
+            if isHotkeyPressed && !event.flags.contains(.maskAlternate) {
+                DispatchQueue.main.async { [weak self] in
+                    self?.handleHotkeyStateChange(isPressed: false)
+                }
+            }
+            return Unmanaged.passUnretained(event)
+        }
+
         guard currentHotkey == .fn else {
             return Unmanaged.passUnretained(event)
         }
 
-        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         guard keyCode == currentHotkey.keyCode else {
             return Unmanaged.passUnretained(event)
         }
@@ -292,6 +425,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // (and swallows those events); an Fn event that still reaches this
         // monitor is a late duplicate — acting on it would double-toggle.
         if currentHotkey == .fn && hotkeyEventTap != nil { return }
+
+        // Chord release fallback when the tap is unavailable: stop once the
+        // modifier goes up. Chord *start* comes from the keyDown monitors.
+        if currentHotkey.isChord {
+            guard hotkeyEventTap == nil else { return }
+            if isHotkeyPressed && !event.modifierFlags.contains(currentHotkey.modifierFlag) {
+                handleHotkeyStateChange(isPressed: false)
+            }
+            return
+        }
+
         guard event.keyCode == currentHotkey.keyCode else { return }
 
         let isPressed = event.modifierFlags.contains(currentHotkey.modifierFlag)

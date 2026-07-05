@@ -41,6 +41,13 @@ class AudioRecordingService: NSObject, ObservableObject {
     private var smoothedAudioLevel: Float = 0.0
     private var smoothedAudioFrequency: Float = 0.0
 
+    /// Buffers captured before the asset writer is ready (audioQueue-confined).
+    /// Without this, everything the user says between pressing the hotkey and
+    /// the writer being wired up — session cold start plus writer setup — was
+    /// silently dropped, cutting off the first word(s) of every dictation.
+    private var pendingSampleBuffers: [CMSampleBuffer] = []
+    private static let maxPendingSampleBuffers = 600
+
     private let audioQueue = DispatchQueue(label: "com.speaktype.audioQueue")
 
     private func validatedAudioFileURL(
@@ -235,39 +242,21 @@ class AudioRecordingService: NSObject, ObservableObject {
         shouldDiscardCurrentRecordingOutput = false
         liveWaveSamples = []
         resetMainWriterState()
+        // Clear stale pending buffers on the audio queue before new samples can
+        // accumulate (the delegate only buffers while isRecording is true, and
+        // audioQueue is serial, so this runs first).
+        audioQueue.async {
+            self.cancelIdleSessionStop()
+            self.pendingSampleBuffers.removeAll()
+        }
         isRecording = true
         recordingStartTime = Date()
-        // Hop onto audioQueue: idleSessionStopWorkItem is only ever touched there,
-        // and startRecording runs on the main thread.
-        audioQueue.async { self.cancelIdleSessionStop() }
 
-        // 2. Wrap setup in a Task so stopRecording can wait for it
+        // 2. Wrap setup in a Task so stopRecording can wait for it.
+        // The writer is wired up BEFORE the capture session starts, and any
+        // buffers that beat it (prewarmed session already running) are retained
+        // in pendingSampleBuffers — so no audio is lost on either path.
         setupTask = Task { @MainActor in
-            // Ensure the capture session is running before setting up the writer.
-            let didColdStart = await withCheckedContinuation {
-                (continuation: CheckedContinuation<Bool, Never>) in
-                audioQueue.async {
-                    if self.captureSession?.isRunning != true {
-                        print("🎤 Starting capture session...")
-                        self.captureSession?.startRunning()
-                        continuation.resume(returning: true)
-                    } else {
-                        continuation.resume(returning: false)
-                    }
-                }
-            }
-            // Let the session settle before wiring the writer — but do NOT block the
-            // audio queue to do it. The capture delegate is delivered on `audioQueue`;
-            // the old code slept 0.3s ON that queue, so no buffers could arrive while
-            // it slept and the live waveform stayed empty for the first ~0.3s of every
-            // recording (text still worked — the writer just starts on the first
-            // buffer). Awaiting off-queue lets buffers, and the meter, flow while we
-            // wait, so the waveform is alive from the first frame.
-            if didColdStart {
-                try? await Task.sleep(nanoseconds: 300_000_000)
-                print("🎤 Capture session started")
-            }
-
             let url = getRecordingsDirectory().appendingPathComponent(
                 "recording-\(Date().timeIntervalSince1970).wav")
             currentFileURL = url
@@ -309,6 +298,14 @@ class AudioRecordingService: NSObject, ObservableObject {
                 audioQueue.async {
                     self.captureSession?.stopRunning()
                 }
+                return
+            }
+
+            audioQueue.async {
+                if self.captureSession?.isRunning != true {
+                    print("🎤 Starting capture session...")
+                    self.captureSession?.startRunning()
+                }
             }
         }
     }
@@ -321,11 +318,8 @@ class AudioRecordingService: NSObject, ObservableObject {
         shouldDiscardCurrentRecordingOutput = discardOutput
 
         // Ensure minimum recording duration to prevent empty/corrupted WAV files
-        if let startTime = currentFileURL?.path.components(separatedBy: "-").last?
-            .replacingOccurrences(of: ".wav", with: ""),
-            let startTimestamp = Double(startTime)
-        {
-            let duration = Date().timeIntervalSince1970 - startTimestamp
+        if let startTime = recordingStartTime {
+            let duration = Date().timeIntervalSince(startTime)
             if duration < 0.5 {
                 try? await Task.sleep(nanoseconds: UInt64((0.5 - duration) * 1_000_000_000))
             }
@@ -348,6 +342,23 @@ class AudioRecordingService: NSObject, ObservableObject {
 
                 let writer = self.assetWriter
                 let writerInput = self.assetWriterInput
+
+                // Flush any buffers the writer never got to see (e.g. a very
+                // short recording stopped before the first delegate callback
+                // after the writer became ready).
+                if let writer, let writerInput, writer.status == .writing,
+                    !self.pendingSampleBuffers.isEmpty, !discardOutput
+                {
+                    if !self.isSessionStarted, let first = self.pendingSampleBuffers.first {
+                        writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(first))
+                        self.isSessionStarted = true
+                    }
+                    for buffered in self.pendingSampleBuffers
+                    where writerInput.isReadyForMoreMediaData {
+                        writerInput.append(buffered)
+                    }
+                }
+                self.pendingSampleBuffers.removeAll()
                 self.resetMainWriterState()
 
                 if let writer {
@@ -455,23 +466,37 @@ extension AudioRecordingService: AVCaptureAudioDataOutputSampleBufferDelegate {
 
         // Don't append if we're stopping - prevents race condition crash
         guard !isStopping else { return }
-        guard let writer = assetWriter, let input = assetWriterInput else { return }
-
-        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-
-        // --- Main writer (full recording) ---
-        if writer.status == .writing {
-            if !isSessionStarted {
-                writer.startSession(atSourceTime: pts)
-                isSessionStarted = true
+        guard let writer = assetWriter, let input = assetWriterInput,
+            writer.status == .writing
+        else {
+            // Writer not wired up yet — retain the audio so the start of the
+            // dictation isn't lost; flushed below once the writer is ready.
+            pendingSampleBuffers.append(sampleBuffer)
+            if pendingSampleBuffers.count > Self.maxPendingSampleBuffers {
+                pendingSampleBuffers.removeFirst(
+                    pendingSampleBuffers.count - Self.maxPendingSampleBuffers)
             }
-
-            if input.isReadyForMoreMediaData {
-                guard !isStopping else { return }
-                input.append(sampleBuffer)
-            }
+            return
         }
 
+        // --- Main writer (full recording) ---
+        if !isSessionStarted {
+            let firstBuffer = pendingSampleBuffers.first ?? sampleBuffer
+            writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(firstBuffer))
+            isSessionStarted = true
+        }
+
+        if !pendingSampleBuffers.isEmpty {
+            for buffered in pendingSampleBuffers where input.isReadyForMoreMediaData {
+                input.append(buffered)
+            }
+            pendingSampleBuffers.removeAll()
+        }
+
+        if input.isReadyForMoreMediaData {
+            guard !isStopping else { return }
+            input.append(sampleBuffer)
+        }
     }
 
     private func processAudioLevel(from sampleBuffer: CMSampleBuffer) {

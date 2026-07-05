@@ -250,27 +250,39 @@ class AudioRecordingService: NSObject, ObservableObject {
         }
     }
 
-    func startRecording() {
-        guard !isRecording else { return }
+    /// Start recording. `onStarted` fires with `true` once capture actually
+    /// begins and `false` if permission is denied — so callers can flip their
+    /// "recording" UI only when a take is really underway, instead of guessing
+    /// before the (possibly asynchronous) permission answer.
+    func startRecording(onStarted: ((Bool) -> Void)? = nil) {
+        guard !isRecording else {
+            onStarted?(false)
+            return
+        }
 
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
             beginAuthorizedRecording()
+            onStarted?(true)
         case .notDetermined:
             // First run: wait for the user's answer to the system prompt.
             // Starting immediately used to record into a mic we might never
-            // get, producing an empty take even when the user granted access.
+            // get, producing an empty take even when the user granted access —
+            // and callers must not enter "recording" state until this resolves.
             AVCaptureDevice.requestAccess(for: .audio) { granted in
                 DispatchQueue.main.async {
                     guard granted else {
                         print("Microphone access denied")
+                        onStarted?(false)
                         return
                     }
                     self.beginAuthorizedRecording()
+                    onStarted?(true)
                 }
             }
         default:
             print("Microphone access denied")
+            onStarted?(false)
         }
     }
 

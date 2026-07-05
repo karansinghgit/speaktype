@@ -774,8 +774,24 @@ struct MiniRecorderView: View {
         cancelCommit = false
 
         debugLog("Starting recording...")
-        audioRecorder.startRecording()
-        isListening = true
+        // Enter the "listening" HUD only once capture actually begins. On first
+        // run the mic prompt resolves asynchronously; flipping isListening
+        // eagerly left the pill stuck showing "recording" if the user denied.
+        audioRecorder.startRecording { started in
+            guard started else {
+                debugLog("Recording did not start (microphone permission)")
+                isListening = false
+                isProcessing = true
+                statusMessage = "Mic access off — System Settings → Privacy & Security"
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    isProcessing = false
+                    onCancel?()
+                }
+                return
+            }
+            isListening = true
+        }
     }
 
     private func selectAudioDevice(_ deviceId: String) {

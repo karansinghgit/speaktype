@@ -188,6 +188,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return event
         }
 
+        // The keyDown (modifier-combo cancel) monitors are installed on demand
+        // while the hotkey is held — see installModifierComboMonitors(). Keeping
+        // them alive for the app's lifetime woke SpeakType on every keystroke
+        // system-wide just to bail on the isHotkeyPressed guard.
+    }
+
+    /// Installed only for the duration of a hotkey hold; removed on release.
+    private func installModifierComboMonitors() {
+        guard globalKeyDownMonitor == nil && localKeyDownMonitor == nil else { return }
+
         globalKeyDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) {
             [weak self] event in
             self?.handleModifierComboEvent(event)
@@ -197,6 +207,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             [weak self] event in
             self?.handleModifierComboEvent(event)
             return event
+        }
+    }
+
+    private func removeModifierComboMonitors() {
+        if let globalKeyDownMonitor {
+            NSEvent.removeMonitor(globalKeyDownMonitor)
+            self.globalKeyDownMonitor = nil
+        }
+        if let localKeyDownMonitor {
+            NSEvent.removeMonitor(localKeyDownMonitor)
+            self.localKeyDownMonitor = nil
         }
     }
 
@@ -268,6 +289,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleHotkeyEvent(_ event: NSEvent) {
         let currentHotkey = getSelectedHotkey()
+        // When the suppressing event tap is active it fully owns the Fn key
+        // (and swallows those events); an Fn event that still reaches this
+        // monitor is a late duplicate — acting on it would double-toggle.
+        if currentHotkey == .fn && hotkeyEventTap != nil { return }
         guard event.keyCode == currentHotkey.keyCode else { return }
 
         let isPressed = event.modifierFlags.contains(currentHotkey.modifierFlag)
@@ -280,6 +305,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let currentHotkey = getSelectedHotkey()
         if isPressed && !isHotkeyPressed {
             isHotkeyPressed = true
+            installModifierComboMonitors()
 
             // Only inject the synthetic F19 when the Globe/Fn key is actually
             // configured to show the emoji picker — otherwise there's nothing to
@@ -303,6 +329,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         } else if !isPressed && isHotkeyPressed {
             isHotkeyPressed = false
+            removeModifierComboMonitors()
 
             let recordingMode = UserDefaults.standard.integer(forKey: "recordingMode")
             if recordingMode == 0 {
@@ -321,6 +348,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard event.keyCode != Self.emojiSuppressionKeyCode else { return }
 
         isHotkeyPressed = false
+        removeModifierComboMonitors()
         miniRecorderController?.cancelRecording()
     }
 

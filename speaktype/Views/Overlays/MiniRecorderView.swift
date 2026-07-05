@@ -450,30 +450,13 @@ struct MiniRecorderView: View {
         .onAppear {
             initializedService()
             audioRecorder.fetchAvailableDevices()
-
-            // Set up Escape key monitors
-            globalEscapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
-                if event.keyCode == 53 {
-                    Task { @MainActor in self.handleEscape() }
-                }
-            }
-            localEscapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                if event.keyCode == 53 {
-                    Task { @MainActor in self.handleEscape() }
-                    return nil  // swallow Escape
-                }
-                return event
-            }
         }
         .onDisappear {
-            if let globalEscapeMonitor = globalEscapeMonitor {
-                NSEvent.removeMonitor(globalEscapeMonitor)
-            }
-            if let localEscapeMonitor = localEscapeMonitor {
-                NSEvent.removeMonitor(localEscapeMonitor)
-            }
+            removeEscapeMonitors()
             audioRecorder.stopSessionIfIdle()
         }
+        .onChange(of: isListening) { updateEscapeMonitors() }
+        .onChange(of: isProcessing) { updateEscapeMonitors() }
         .onChange(of: isListening) {
             // Only animate when actually recording to save CPU
             if isListening {
@@ -850,6 +833,45 @@ struct MiniRecorderView: View {
             // Always use the final full-recording transcription for committed output.
             // Chunk stitching caused repeated phrases at boundaries across languages.
             await processRecording(url: url)
+        }
+    }
+
+    /// Escape monitors live only while a recording or processing pass is
+    /// active. A permanent global keyDown monitor woke the app on every
+    /// keystroke system-wide just to check for Escape.
+    private func updateEscapeMonitors() {
+        if isListening || isProcessing {
+            installEscapeMonitors()
+        } else {
+            removeEscapeMonitors()
+        }
+    }
+
+    private func installEscapeMonitors() {
+        guard globalEscapeMonitor == nil && localEscapeMonitor == nil else { return }
+
+        globalEscapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == 53 {
+                Task { @MainActor in self.handleEscape() }
+            }
+        }
+        localEscapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == 53 {
+                Task { @MainActor in self.handleEscape() }
+                return nil  // swallow Escape
+            }
+            return event
+        }
+    }
+
+    private func removeEscapeMonitors() {
+        if let globalEscapeMonitor {
+            NSEvent.removeMonitor(globalEscapeMonitor)
+            self.globalEscapeMonitor = nil
+        }
+        if let localEscapeMonitor {
+            NSEvent.removeMonitor(localEscapeMonitor)
+            self.localEscapeMonitor = nil
         }
     }
 

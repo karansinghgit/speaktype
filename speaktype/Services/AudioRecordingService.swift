@@ -1,5 +1,6 @@
 import AVFoundation
 import Combine
+import CoreAudio
 import CoreMedia
 import Foundation
 
@@ -40,6 +41,9 @@ class AudioRecordingService: NSObject, ObservableObject {
     private var setupTask: Task<Void, Never>?
     private var isStopping = false  // Flag to prevent appending during stop
     private var idleSessionStopWorkItem: DispatchWorkItem?
+    /// Tracks the last macOS system default input UID so we can follow default changes
+    /// when the user has not explicitly picked a different device in SpeakType settings.
+    private var lastKnownSystemDefaultInputUID: String?
 
     // MARK: - Chunking state
     private var chunkAssetWriter: AVAssetWriter?
@@ -143,14 +147,64 @@ class AudioRecordingService: NSObject, ObservableObject {
             name: AVCaptureDevice.wasDisconnectedNotification,
             object: nil
         )
+
+        lastKnownSystemDefaultInputUID = Self.defaultInputDeviceUID()
+        startObservingDefaultInputDevice()
     }
 
     @objc private func handleDeviceChange(_ notification: Notification) {
         print("Audio device change detected")
-        fetchAvailableDevices()
+        fetchAvailableDevices { [weak self] in
+            // Rebuild even when selectedDeviceId is unchanged — display reconnects and
+            // route changes can leave the old AVCaptureSession alive but silent.
+            self?.recoverCaptureSessionIfNeeded(forceReconfigure: true)
+        }
     }
 
-    func fetchAvailableDevices() {
+    private func handleSystemDefaultInputChanged() {
+        let previousDefault = lastKnownSystemDefaultInputUID
+        guard let newDefaultUID = Self.defaultInputDeviceUID() else { return }
+        lastKnownSystemDefaultInputUID = newDefaultUID
+
+        fetchAvailableDevices { [weak self] in
+            guard let self else { return }
+
+            // If the app was effectively using the previous system default, follow the
+            // new default when the user changes input in System Settings.
+            if let previousDefault,
+                self.selectedDeviceId == previousDefault,
+                newDefaultUID != previousDefault,
+                self.availableDevices.contains(where: { $0.uniqueID == newDefaultUID })
+            {
+                print("🎤 Following system default input change to UID: \(newDefaultUID)")
+                self.selectedDeviceId = newDefaultUID
+            } else {
+                self.recoverCaptureSessionIfNeeded(forceReconfigure: true)
+            }
+        }
+    }
+
+    private func startObservingDefaultInputDevice() {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let status = AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            DispatchQueue.main
+        ) { [weak self] _, _ in
+            self?.handleSystemDefaultInputChanged()
+        }
+
+        if status != noErr {
+            print("Failed to observe system default input device: \(status)")
+        }
+    }
+
+    func fetchAvailableDevices(completion: (() -> Void)? = nil) {
         let discoverySession = AVCaptureDevice.DiscoverySession(
             deviceTypes: [.microphone],
             mediaType: .audio,
@@ -174,10 +228,12 @@ class AudioRecordingService: NSObject, ObservableObject {
                     self.selectedDeviceId = nil
                 }
             }
+            completion?()
         }
     }
 
     func setupSession() {
+        let shouldRestart = isRecording || (captureSession?.isRunning ?? false)
         captureSession?.stopRunning()
         captureSession = AVCaptureSession()
 
@@ -215,6 +271,62 @@ class AudioRecordingService: NSObject, ObservableObject {
 
         // Don't start session here - only start when recording begins
         // This prevents continuous CPU usage when idle
+        if shouldRestart {
+            restartCaptureSession()
+        }
+    }
+
+    /// Rebuild and restart the capture session after hardware/route changes.
+    private func recoverCaptureSessionIfNeeded(forceReconfigure: Bool = false) {
+        let shouldRecover =
+            forceReconfigure || isRecording || (captureSession?.isRunning ?? false)
+        guard shouldRecover else { return }
+        setupSession()
+    }
+
+    private func restartCaptureSession() {
+        audioQueue.async {
+            self.cancelIdleSessionStop()
+            guard let session = self.captureSession, !session.isRunning else { return }
+            print("🎤 Restarting capture session after reconfiguration...")
+            session.startRunning()
+        }
+    }
+
+    private static func defaultInputDeviceUID() -> String? {
+        var deviceID = AudioDeviceID(0)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard
+            AudioObjectGetPropertyData(
+                AudioObjectID(kAudioObjectSystemObject),
+                &address,
+                0,
+                nil,
+                &size,
+                &deviceID
+            ) == noErr
+        else { return nil }
+        return deviceUID(for: deviceID)
+    }
+
+    private static func deviceUID(for deviceID: AudioDeviceID) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceUID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var uid = "" as CFString
+        var size = UInt32(MemoryLayout<CFString>.size)
+        let status = withUnsafeMutablePointer(to: &uid) { uidPointer in
+            AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, uidPointer)
+        }
+        guard status == noErr else { return nil }
+        return uid as String
     }
 
     /// Pre-warm the capture session so first recording starts instantly

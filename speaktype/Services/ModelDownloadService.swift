@@ -513,10 +513,17 @@ class ModelDownloadService: ObservableObject {
         downloadStatus[variant] = nil
         
         // Delete any partial download — but only after the cancelled task has
-        // actually stopped, or the deletion races WhisperKit's in-flight writes
-        // and can leave a partial tree the size scan later marks as installed.
+        // actually stopped (or the deletion races WhisperKit's in-flight
+        // writes), and only if the user hasn't started a fresh download for
+        // this variant in the meantime (or the cleanup would delete the
+        // retry's files out from under it).
         Task {
             _ = await task?.value
+            let restarted = await MainActor.run { self.isDownloading[variant] == true }
+            guard !restarted else {
+                print("↩️ Skipping partial-download cleanup for \(variant): a new download is in flight")
+                return
+            }
             let result = await deleteModel(variant: variant)
             print("🗑️ Cleaned up partial download: \(result)")
         }

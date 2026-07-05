@@ -6,19 +6,19 @@ struct DeviceRow: View {
     let name: String
     let isActive: Bool
     let isSelected: Bool
-    
+
     var body: some View {
         HStack {
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(isSelected ? Color.accentPrimary : Color.textMuted)
                 .font(.title3)
-            
+
             Text(name)
                 .font(Typography.bodyMedium)
                 .foregroundStyle(Color.textPrimary)
-            
+
             Spacer()
-            
+
             if isActive {
                 HStack(spacing: 4) {
                     Image(systemName: "waveform")

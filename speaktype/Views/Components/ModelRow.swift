@@ -28,6 +28,7 @@ struct ModelRow: View {
     var isActive: Bool { selectedModel == model.variant }
     var downloadError: String? { downloadService.downloadError[model.variant] }
     var downloadStatus: String? { downloadService.downloadStatus[model.variant] }
+    var isFirstLoad: Bool { !WhisperService.hasCompletedFirstLoad(variant: model.variant) }
 
     // MARK: - Body
 
@@ -192,13 +193,19 @@ struct ModelRow: View {
             .background(Capsule().fill(Color.textPrimary.opacity(0.08)))
             .foregroundStyle(Color.textSecondary)
 
-            if loadingElapsed > 15 {
+            if isFirstLoad {
+                Text("Optimizing for your Mac — first load can take a few minutes")
+                    .font(Typography.ui(10))
+                    .foregroundStyle(Color.textMuted)
+            } else if loadingElapsed > 15 {
                 Text(loadingElapsed > 30 ? "Taking longer than expected…" : "\(Int(loadingElapsed))s")
                     .font(Typography.ui(10))
                     .foregroundStyle(loadingElapsed > 30 ? Color.accentWarning : Color.textMuted)
             }
         }
-        .help("First load may take 10-30 seconds")
+        .help(isFirstLoad
+            ? "The first load compiles the model for the Neural Engine (one-time, a few minutes for large models)"
+            : "Loading usually takes a few seconds")
     }
 
     private var downloadProgressSection: some View {

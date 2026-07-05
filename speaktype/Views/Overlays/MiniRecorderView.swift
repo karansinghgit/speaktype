@@ -327,8 +327,14 @@ struct MiniRecorderView: View {
     }
 
     private var warmingLabel: String {
+        // The first load after download includes a one-time CoreML/ANE
+        // compile that can run minutes for large models; say so, or the
+        // pill reads as hung.
+        let firstLoad = !WhisperService.hasCompletedFirstLoad(variant: selectedModel)
         let stage = transcription.loadingStage
-        let base = stage.isEmpty ? "Warming up model..." : stage
+        let base = firstLoad
+            ? "First-time setup — optimizing model for your Mac…"
+            : (stage.isEmpty ? "Warming up model..." : stage)
         if let started = transcription.loadingStartedAt {
             let seconds = Int(Date().timeIntervalSince(started))
             if seconds >= 5 { return "\(base) (\(seconds)s)" }

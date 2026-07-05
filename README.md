@@ -84,9 +84,10 @@ make dmg            # Create DMG installer
 
 ### Current Issues
 
-⚠️ When loading a model for the first time / switching to another model, there is a startup delay of 30-60 seconds. 
-
-So the first transcription will appear ultra slow, but it will go back to instantaneous dictation right after it's warmed up. 
+⚠️ The first load of a freshly downloaded model runs a one-time CoreML/Neural Engine
+optimization pass — around 30-60 seconds for small models and up to a few minutes for
+large ones. The app shows a "First-time setup — optimizing model for your Mac" status
+while this runs; macOS caches the result, so every later load takes seconds.
 
 ### Project Structure
 

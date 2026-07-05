@@ -96,6 +96,7 @@ class ParakeetEngine: SpeechToTextEngine {
             throw CancellationError()
         }
 
+        WhisperService.markFirstLoadCompletedForUI(variant: variant)
         self.manager = manager
         currentModelVariant = variant
         isInitialized = true

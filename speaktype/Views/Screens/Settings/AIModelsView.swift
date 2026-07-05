@@ -209,7 +209,10 @@ struct AIModelsView: View {
         } else if downloaded && isLoadingRecommendedModel {
             HStack(spacing: 9) {
                 Spinner(size: 13, lineWidth: 2, tint: Color.textSecondary)
-                Text("Loading model…").font(Typography.uiBold(13))
+                Text(WhisperService.hasCompletedFirstLoad(variant: rec.variant)
+                    ? "Loading model…"
+                    : "Optimizing for your Mac — first load can take a few minutes…")
+                    .font(Typography.uiBold(13))
             }
             .foregroundStyle(Color.textSecondary)
             .padding(.horizontal, 16).padding(.vertical, 10)

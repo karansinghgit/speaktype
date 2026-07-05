@@ -6,6 +6,7 @@ class WhisperService {
     // Shared singleton instance - use this everywhere
     static let shared = WhisperService()
     private static let autoEditEnabledKey = "enableAutoEdit"
+    private static let warmedUpVariantsKey = "modelWarmupCompletedVariants"
     private static let customReplacementRulesKey = "customReplacementRules"
     private static let placeholderPatterns = [
         #"\[(?:BLANK_AUDIO|SILENCE)\]"#,
@@ -63,6 +64,27 @@ class WhisperService {
     @MainActor private var activeLoadTask: Task<Void, Error>?
     @MainActor private var activeLoadVariant: String = ""
     @MainActor private var activeLoadToken: UUID?
+
+    /// Whether this variant has ever completed a load on this machine. The
+    /// first load after download includes CoreML/ANE specialization (minutes
+    /// for large models, one-time, OS-cached); the UI uses this to set
+    /// expectations instead of looking hung.
+    static func hasCompletedFirstLoad(variant: String) -> Bool {
+        let done = UserDefaults.standard.stringArray(forKey: warmedUpVariantsKey) ?? []
+        return done.contains(variant)
+    }
+
+    /// Same as the private marker, callable from other engines (Parakeet).
+    static func markFirstLoadCompletedForUI(variant: String) {
+        markFirstLoadCompleted(variant: variant)
+    }
+
+    private static func markFirstLoadCompleted(variant: String) {
+        var done = UserDefaults.standard.stringArray(forKey: warmedUpVariantsKey) ?? []
+        guard !done.contains(variant) else { return }
+        done.append(variant)
+        UserDefaults.standard.set(done, forKey: warmedUpVariantsKey)
+    }
 
     /// Device RAM in GB (cached on init)
     static let deviceRAMGB: Int = {
@@ -259,6 +281,7 @@ class WhisperService {
             lastLoadDuration = loadDuration
             print("⏱️ Model loaded in \(String(format: "%.1f", loadDuration))s")
 
+            Self.markFirstLoadCompleted(variant: variant)
             currentModelVariant = variant
             isInitialized = true
             isLoading = false

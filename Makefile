@@ -106,7 +106,11 @@ test-ui:
 # Run SwiftLint
 lint:
 	@echo "Running SwiftLint..."
-	@which swiftlint > /dev/null && swiftlint || echo "⚠️  SwiftLint not installed"
+	@if ! command -v swiftlint > /dev/null; then \
+		echo "⚠️  SwiftLint not installed. Install with: brew install swiftlint"; \
+		exit 1; \
+	fi
+	swiftlint
 
 # Reproduce the GitHub Actions CI checks locally (build + unit tests + lint)
 ci:
@@ -114,12 +118,20 @@ ci:
 	xcodebuild -scheme speaktype -configuration Debug build CODE_SIGNING_ALLOWED=NO
 	xcodebuild test -scheme speaktype -destination 'platform=macOS' -only-testing:speaktypeTests CODE_SIGNING_ALLOWED=NO
 	@echo "--- SwiftLint (advisory) ---"
-	@which swiftlint > /dev/null && swiftlint || echo "⚠️  SwiftLint not installed"
+	@if command -v swiftlint > /dev/null; then \
+		swiftlint || echo "⚠️  SwiftLint reported violations"; \
+	else \
+		echo "⚠️  SwiftLint not installed. Install with: brew install swiftlint"; \
+	fi
 
 # Auto-fix SwiftLint issues
 format:
 	@echo "Formatting code with SwiftLint..."
-	@which swiftlint > /dev/null && swiftlint --fix || echo "⚠️  SwiftLint not installed"
+	@if ! command -v swiftlint > /dev/null; then \
+		echo "⚠️  SwiftLint not installed. Install with: brew install swiftlint"; \
+		exit 1; \
+	fi
+	swiftlint --fix
 
 # Clean build artifacts
 clean:

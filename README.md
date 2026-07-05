@@ -104,7 +104,6 @@ speaktype/
 
 - **Swift 5.9+** / SwiftUI + AppKit
 - **[WhisperKit](https://github.com/argmaxinc/WhisperKit)** - Local Whisper inference
-- **[KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts)** - Global hotkeys
 - **AVFoundation** - Audio capture
 
 ---

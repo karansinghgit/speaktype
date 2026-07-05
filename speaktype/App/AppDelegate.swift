@@ -1,5 +1,4 @@
 import Combine
-import KeyboardShortcuts
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {

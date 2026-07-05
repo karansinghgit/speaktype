@@ -5,7 +5,6 @@
 //  Created by Karan Singh on 7/1/26.
 //
 
-import KeyboardShortcuts
 import SwiftData
 import SwiftUI
 

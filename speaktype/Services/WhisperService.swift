@@ -352,32 +352,6 @@ class WhisperService {
         }
     }
 
-    /// Transcribe a background audio chunk without affecting the global `isTranscribing` flag.
-    /// Chunk files are automatically deleted after transcription.
-    func transcribeChunk(audioFile: URL, language: String = "auto") async throws -> String {
-        guard let pipe = pipe, isInitialized else {
-            throw TranscriptionError.notInitialized
-        }
-
-        guard FileManager.default.fileExists(atPath: audioFile.path) else {
-            // Chunk file may have been cleaned up already - return empty gracefully
-            return ""
-        }
-
-        print("🔪 Chunk transcription started: \(audioFile.lastPathComponent)")
-
-        let results = try await pipe.transcribe(
-            audioPath: audioFile.path,
-            decodeOptions: decodingOptions(for: language)
-        )
-        let text = Self.normalizedTranscription(from: results.map { $0.text }.joined(separator: " "))
-
-        AppLogger.success("Chunk transcription complete", category: AppLogger.transcription)
-        // Clean up temp chunk file after transcription
-        try? FileManager.default.removeItem(at: audioFile)
-        return text
-    }
-
     private func decodingOptions(for language: String) -> DecodingOptions {
         var options = DecodingOptions()
         options.task = .transcribe

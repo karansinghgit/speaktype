@@ -35,10 +35,17 @@ class HistoryService: ObservableObject {
     
     private let saveKey = "history_items"
     private let statsSaveKey = "history_stats_entries"
-    
+
+    /// Bump when the normalization rules change in a way stored transcripts
+    /// should be re-run through. While it matches, launch skips re-normalizing
+    /// the whole history (~30 regex passes per item, growing with usage).
+    private static let normalizationVersionKey = "history_normalization_version"
+    private static let normalizationVersion = 1
+
     private init() {
         loadStats()
         loadHistory()
+        sweepOrphanedRecordings()
     }
     
     func addItem(transcript: String, duration: TimeInterval, audioFileURL: URL? = nil, modelUsed: String? = nil, transcriptionTime: TimeInterval? = nil) {
@@ -134,6 +141,14 @@ class HistoryService: ObservableObject {
     private func loadHistory() {
         if let data = UserDefaults.standard.data(forKey: saveKey),
            let decoded = try? JSONDecoder().decode([HistoryItem].self, from: data) {
+            let storedVersion = UserDefaults.standard.integer(
+                forKey: Self.normalizationVersionKey)
+            if storedVersion == Self.normalizationVersion {
+                items = decoded
+                migrateStatsIfNeeded(from: decoded)
+                return
+            }
+
             let normalizedItems = decoded.compactMap { item -> HistoryItem? in
                 let normalizedTranscript = WhisperService.normalizedTranscription(
                     from: item.transcript)
@@ -161,6 +176,36 @@ class HistoryService: ObservableObject {
             }
 
             migrateStatsIfNeeded(from: normalizedItems)
+        }
+        UserDefaults.standard.set(
+            Self.normalizationVersion, forKey: Self.normalizationVersionKey)
+    }
+
+    /// Delete recordings in the app-managed Recordings directory that no
+    /// history item references. Recordings whose history rows were pruned
+    /// (decode failures, failed imports) otherwise accumulate forever at
+    /// ~1.9 MB/min of dictation. Only touches our own file patterns, and only
+    /// files older than a day, so an in-flight recording is never swept.
+    private func sweepOrphanedRecordings() {
+        let referenced = Set(items.compactMap { $0.audioFileURL?.standardizedFileURL.path })
+        DispatchQueue.global(qos: .utility).async {
+            let dir = AudioRecordingService.recordingsDirectory()
+            guard let files = try? FileManager.default.contentsOfDirectory(
+                at: dir, includingPropertiesForKeys: [.contentModificationDateKey])
+            else { return }
+
+            let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
+            for file in files {
+                let name = file.lastPathComponent
+                guard name.hasPrefix("recording-") || name.hasPrefix("imported-") else {
+                    continue
+                }
+                guard !referenced.contains(file.standardizedFileURL.path) else { continue }
+                let modified = (try? file.resourceValues(
+                    forKeys: [.contentModificationDateKey]))?.contentModificationDate
+                guard let modified, modified < cutoff else { continue }
+                try? FileManager.default.removeItem(at: file)
+            }
         }
     }
 

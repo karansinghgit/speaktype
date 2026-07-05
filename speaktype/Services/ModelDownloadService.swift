@@ -122,7 +122,27 @@ class ModelDownloadService: ObservableObject {
     @Published private(set) var hasCompletedInitialScan = false
 
     private var activeTasks: [String: Task<Void, Never>] = [:] // Track running download tasks
-    
+
+    /// Monotonic per-variant download id. Every download claims a new
+    /// generation; progress callbacks, completion handlers, and post-cancel
+    /// cleanup only act while their generation is still current for the variant.
+    /// A boolean `isDownloading` can't tell "my download" apart from "a newer
+    /// retry that already finished", which let a cancelled task's cleanup delete
+    /// the retry's freshly downloaded files. All access is on the main thread
+    /// (downloadModel/cancelDownload run on main; callbacks hop via
+    /// DispatchQueue.main / MainActor.run).
+    private var downloadGeneration: [String: Int] = [:]
+
+    private func claimDownloadGeneration(for variant: String) -> Int {
+        let next = (downloadGeneration[variant] ?? 0) + 1
+        downloadGeneration[variant] = next
+        return next
+    }
+
+    private func ownsDownload(_ variant: String, generation: Int) -> Bool {
+        downloadGeneration[variant] == generation
+    }
+
     private init() {
         // Move any models left in the legacy ~/Documents/huggingface location into
         // Application Support. No directory is created eagerly — a fresh install
@@ -276,10 +296,11 @@ class ModelDownloadService: ObservableObject {
         downloadProgress[variant] = 0.0
         downloadError[variant] = nil
         downloadStatus[variant] = nil
+        let generation = claimDownloadGeneration(for: variant)
         // Create the storage directory now, on first download — never eagerly on launch.
         ModelStorage.ensureWhisperKitModelsDir()
         print("Starting WhisperKit download for: \(variant)")
-        
+
         let task = Task {
             // Debug: List what WhisperKit sees
             // Note: WhisperKit API might differ, but let's try to see if we can get info.
@@ -300,19 +321,22 @@ class ModelDownloadService: ObservableObject {
                 // likely: download(variant:progressCallback:) - 'from' usually has a default
                 let _ = try await WhisperKit.download(variant: variant, downloadBase: ModelStorage.whisperKitBase, progressCallback: { progress in
                     DispatchQueue.main.async {
-                        // A cancelled download's transfer can keep reporting for a
-                        // moment; don't repaint a row the user already reset.
-                        guard self.isDownloading[variant] == true else { return }
+                        // Ignore a cancelled/superseded download's stray progress:
+                        // it must still be actively downloading AND the current
+                        // generation to repaint the row.
+                        guard self.isDownloading[variant] == true,
+                            self.ownsDownload(variant, generation: generation) else { return }
                         self.downloadProgress[variant] = progress.fractionCompleted
                     }
                 })
-                
+
                 // Check if task was cancelled before declaring success
                 if Task.isCancelled { return }
-                
+
                 print("Model downloaded successfully")
-                
+
                 DispatchQueue.main.async {
+                    guard self.ownsDownload(variant, generation: generation) else { return }
                     self.isDownloading[variant] = false
                     self.downloadProgress[variant] = 1.0
                     self.downloadStatus[variant] = nil
@@ -329,11 +353,18 @@ class ModelDownloadService: ObservableObject {
                 // Auto-Repair: If duplicate models found, delete and retry ONCE
                 if error.localizedDescription.contains("Multiple models found") {
                      print("⚠️ Multiple models detected. Cleaning cache and retrying...")
-                     
+
+                     // Bail if a newer download has claimed this variant — the
+                     // deleteModel below would otherwise remove its files.
+                     let stillOwned = await MainActor.run {
+                         self.ownsDownload(variant, generation: generation)
+                     }
+                     guard stillOwned else { return }
+
                      await MainActor.run {
                          self.downloadStatus[variant] = "Cleaning duplicates..."
                      }
-                     
+
                      let log = await self.deleteModel(variant: variant)
                      print("🧹 Cleanup result: \(log)")
                      
@@ -349,16 +380,18 @@ class ModelDownloadService: ObservableObject {
                      do {
                          let _ = try await WhisperKit.download(variant: variant, downloadBase: ModelStorage.whisperKitBase, progressCallback: { progress in
                              DispatchQueue.main.async {
-                                 guard self.isDownloading[variant] == true else { return }
+                                 guard self.isDownloading[variant] == true,
+                                     self.ownsDownload(variant, generation: generation) else { return }
                                  self.downloadProgress[variant] = progress.fractionCompleted
                              }
                          })
-                         
+
                          if Task.isCancelled { return }
-                         
+
                          print("✅ Model downloaded successfully after cleanup")
-                         
+
                          DispatchQueue.main.async {
+                             guard self.ownsDownload(variant, generation: generation) else { return }
                              self.isDownloading[variant] = false
                              self.downloadProgress[variant] = 1.0
                              self.downloadError[variant] = nil
@@ -369,6 +402,7 @@ class ModelDownloadService: ObservableObject {
                          if Task.isCancelled { return }
                          print("❌ Retry failed: \(error)")
                          DispatchQueue.main.async {
+                             guard self.ownsDownload(variant, generation: generation) else { return }
                              self.isDownloading[variant] = false
                              self.downloadProgress[variant] = 0.0
                              self.downloadError[variant] =
@@ -381,6 +415,7 @@ class ModelDownloadService: ObservableObject {
                 }
 
                 DispatchQueue.main.async {
+                    guard self.ownsDownload(variant, generation: generation) else { return }
                     self.isDownloading[variant] = false
                     self.downloadProgress[variant] = 0.0
                     self.downloadError[variant] =
@@ -400,6 +435,7 @@ class ModelDownloadService: ObservableObject {
         downloadProgress[variant] = 0.0
         downloadError[variant] = nil
         downloadStatus[variant] = nil
+        let generation = claimDownloadGeneration(for: variant)
         print("Starting FluidAudio (Parakeet) download for: \(variant)")
 
         let version = ParakeetCatalog.version(for: variant)
@@ -410,7 +446,8 @@ class ModelDownloadService: ObservableObject {
                     version: version,
                     progressHandler: { progress in
                         DispatchQueue.main.async {
-                            guard self.isDownloading[variant] == true else { return }
+                            guard self.isDownloading[variant] == true,
+                                self.ownsDownload(variant, generation: generation) else { return }
                             self.downloadProgress[variant] = progress.fractionCompleted
                         }
                     })
@@ -419,6 +456,7 @@ class ModelDownloadService: ObservableObject {
                 print("Parakeet model downloaded successfully")
 
                 DispatchQueue.main.async {
+                    guard self.ownsDownload(variant, generation: generation) else { return }
                     self.isDownloading[variant] = false
                     self.downloadProgress[variant] = 1.0
                     self.activeTasks[variant] = nil
@@ -430,6 +468,7 @@ class ModelDownloadService: ObservableObject {
                 }
                 print("FluidAudio download error: \(error)")
                 DispatchQueue.main.async {
+                    guard self.ownsDownload(variant, generation: generation) else { return }
                     self.isDownloading[variant] = false
                     self.downloadProgress[variant] = 0.0
                     self.downloadError[variant] = error.localizedDescription
@@ -500,28 +539,37 @@ class ModelDownloadService: ObservableObject {
     }
 
     func cancelDownload(for variant: String) {
-        let task = activeTasks[variant]
-        if let task {
-            task.cancel()
-            activeTasks[variant] = nil
-            print("Cancelled download task for \(variant)")
+        guard let task = activeTasks[variant] else {
+            // Nothing running (e.g. cancel arrived after completion); just clear
+            // any transient UI state without touching downloaded files.
+            isDownloading[variant] = false
+            downloadStatus[variant] = nil
+            return
         }
-        
+
+        // Snapshot the generation being cancelled so cleanup can tell whether a
+        // newer download has since claimed this variant.
+        let cancelledGeneration = downloadGeneration[variant]
+        task.cancel()
+        activeTasks[variant] = nil
+        print("Cancelled download task for \(variant)")
+
         isDownloading[variant] = false
         downloadProgress[variant] = 0.0
         downloadError[variant] = nil
         downloadStatus[variant] = nil
-        
-        // Delete any partial download — but only after the cancelled task has
+
+        // Delete the partial download — but only after the cancelled task has
         // actually stopped (or the deletion races WhisperKit's in-flight
-        // writes), and only if the user hasn't started a fresh download for
-        // this variant in the meantime (or the cleanup would delete the
-        // retry's files out from under it).
+        // writes), and only if no newer download has since claimed the variant
+        // (otherwise we'd delete the retry's freshly downloaded files).
         Task {
-            _ = await task?.value
-            let restarted = await MainActor.run { self.isDownloading[variant] == true }
-            guard !restarted else {
-                print("↩️ Skipping partial-download cleanup for \(variant): a new download is in flight")
+            _ = await task.value
+            let stillOwned = await MainActor.run {
+                self.downloadGeneration[variant] == cancelledGeneration
+            }
+            guard stillOwned else {
+                print("↩️ Skipping partial-download cleanup for \(variant): a newer download claimed it")
                 return
             }
             let result = await deleteModel(variant: variant)

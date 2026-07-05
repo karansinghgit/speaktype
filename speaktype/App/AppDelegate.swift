@@ -402,11 +402,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return Unmanaged.passUnretained(event)
         }
 
-        // Chord stop: the modifier was released while the chord was active.
-        // The flagsChanged event itself passes through — other apps still need
-        // to see the modifier go up.
+        // Chord stop: the chord modifier was released. Queue the release
+        // UNCONDITIONALLY — not gated on isHotkeyPressed. The press is
+        // dispatched async, so a quick tap can deliver this release event to
+        // the tap callback before the press block has run and set
+        // isHotkeyPressed; gating here would drop the stop and leave recording
+        // stuck on. Press and release both run on the main queue in FIFO order,
+        // and handleHotkeyStateChange no-ops a release with no matching press,
+        // so queuing unconditionally is safe. The flagsChanged event itself
+        // passes through — other apps still need to see the modifier go up.
         if currentHotkey.isChord {
-            if isHotkeyPressed && !event.flags.contains(.maskAlternate) {
+            if !event.flags.contains(.maskAlternate) {
                 DispatchQueue.main.async { [weak self] in
                     self?.handleHotkeyStateChange(isPressed: false)
                 }
@@ -440,9 +446,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Chord release fallback when the tap is unavailable: stop once the
         // modifier goes up. Chord *start* comes from the keyDown monitors.
+        // Call unconditionally (matching the tap path) — handleHotkeyStateChange
+        // no-ops a release with no active press — so a fast tap can't drop it.
         if currentHotkey.isChord {
             guard hotkeyEventTap == nil else { return }
-            if isHotkeyPressed && !event.modifierFlags.contains(currentHotkey.modifierFlag) {
+            if !event.modifierFlags.contains(currentHotkey.modifierFlag) {
                 handleHotkeyStateChange(isPressed: false)
             }
             return

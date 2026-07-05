@@ -251,8 +251,30 @@ class AudioRecordingService: NSObject, ObservableObject {
     }
 
     func startRecording() {
-        requestPermission()
+        guard !isRecording else { return }
 
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            beginAuthorizedRecording()
+        case .notDetermined:
+            // First run: wait for the user's answer to the system prompt.
+            // Starting immediately used to record into a mic we might never
+            // get, producing an empty take even when the user granted access.
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                DispatchQueue.main.async {
+                    guard granted else {
+                        print("Microphone access denied")
+                        return
+                    }
+                    self.beginAuthorizedRecording()
+                }
+            }
+        default:
+            print("Microphone access denied")
+        }
+    }
+
+    private func beginAuthorizedRecording() {
         guard !isRecording else { return }
         if captureSession == nil { setupSession() }
 
@@ -415,16 +437,6 @@ class AudioRecordingService: NSObject, ObservableObject {
                     continuation.resume(returning: finalizedRecordingURL)
                 }
             }
-        }
-    }
-
-    func requestPermission() {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized: break
-        case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .audio) { _ in }
-        default:
-            print("Microphone access denied")
         }
     }
 

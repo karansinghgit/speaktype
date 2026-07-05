@@ -828,8 +828,9 @@ struct MiniRecorderView: View {
             // Resume on the new device, but only re-enter the recording HUD if
             // capture actually restarts — a device that can't be added (unplugged
             // in the same instant, grabbed exclusively by another app) must not
-            // leave the pill showing a live HUD over nothing. Mic is already
-            // authorized here (we were recording), so onStarted fires synchronously.
+            // leave the pill showing a live HUD over nothing. onStarted resolves
+            // once the writer setup task confirms capture, keeping "Switching
+            // input…" up until then.
             await MainActor.run {
                 audioRecorder.startRecording { started in
                     isProcessing = false

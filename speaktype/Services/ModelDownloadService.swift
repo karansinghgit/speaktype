@@ -586,11 +586,6 @@ class ModelDownloadService: ObservableObject {
         }
 
         task.cancel()
-        // Deliberately do NOT clear activeTasks[variant] here: the next
-        // downloadModel captures it as `previousTask` and awaits it before
-        // writing, so a retry can't race this task's still-unwinding writes.
-        // A completing (non-cancelled) task clears its own entry; this cancelled
-        // task's entry is overwritten by the next download.
         print("Cancelled download task for \(variant)")
 
         // Tombstone the generation: claiming a new one that no task owns means
@@ -608,7 +603,7 @@ class ModelDownloadService: ObservableObject {
         // actually stopped (or the deletion races WhisperKit's in-flight
         // writes), and only if no newer download has since claimed the variant
         // past the tombstone (otherwise we'd delete the retry's files).
-        Task {
+        let cleanupTask = Task {
             _ = await task.value
             let stillTombstoned = await MainActor.run {
                 self.downloadGeneration[variant] == tombstone
@@ -620,6 +615,15 @@ class ModelDownloadService: ObservableObject {
             let result = await deleteModel(variant: variant, expectedGeneration: tombstone)
             print("🗑️ Cleaned up partial download: \(result)")
         }
+
+        // Point activeTasks at the cleanup task (not the cancelled download): the
+        // next downloadModel captures it as `previousTask` and awaits it before
+        // writing, so a retry chains behind BOTH the cancelled task unwinding
+        // AND this cleanup's file removal — the retry's writes can't race the
+        // delete. The cleanup task holds no generation ownership, so it's never
+        // a valid cancel target (the UI shows "Download", not "Cancel", once
+        // isDownloading is false); the next download overwrites this entry.
+        activeTasks[variant] = cleanupTask
     }
     
     // MARK: - Helper Functions

@@ -44,6 +44,9 @@ class AudioRecordingService: NSObject, ObservableObject {
     /// Tracks the last macOS system default input UID so we can follow default changes
     /// when the user has not explicitly picked a different device in SpeakType settings.
     private var lastKnownSystemDefaultInputUID: String?
+    /// Retained so the Core Audio default-input listener can be removed on deinit.
+    /// AudioObjectRemovePropertyListenerBlock requires the *same* block instance.
+    private var defaultInputListenerBlock: AudioObjectPropertyListenerBlock?
 
     // MARK: - Chunking state
     private var chunkAssetWriter: AVAssetWriter?
@@ -191,17 +194,43 @@ class AudioRecordingService: NSObject, ObservableObject {
             mElement: kAudioObjectPropertyElementMain
         )
 
-        let status = AudioObjectAddPropertyListenerBlock(
-            AudioObjectID(kAudioObjectSystemObject),
-            &address,
-            DispatchQueue.main
-        ) { [weak self] _, _ in
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             self?.handleSystemDefaultInputChanged()
         }
 
-        if status != noErr {
+        let status = AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            DispatchQueue.main,
+            block
+        )
+
+        if status == noErr {
+            defaultInputListenerBlock = block
+        } else {
             print("Failed to observe system default input device: \(status)")
         }
+    }
+
+    private func stopObservingDefaultInputDevice() {
+        guard let block = defaultInputListenerBlock else { return }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        AudioObjectRemovePropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            DispatchQueue.main,
+            block
+        )
+        defaultInputListenerBlock = nil
+    }
+
+    deinit {
+        stopObservingDefaultInputDevice()
+        NotificationCenter.default.removeObserver(self)
     }
 
     func fetchAvailableDevices(completion: (() -> Void)? = nil) {
@@ -287,9 +316,17 @@ class AudioRecordingService: NSObject, ObservableObject {
     private func restartCaptureSession() {
         audioQueue.async {
             self.cancelIdleSessionStop()
-            guard let session = self.captureSession, !session.isRunning else { return }
-            print("🎤 Restarting capture session after reconfiguration...")
-            session.startRunning()
+            if let session = self.captureSession, !session.isRunning {
+                print("🎤 Restarting capture session after reconfiguration...")
+                session.startRunning()
+            }
+            // If this restart was for a pre-warmed (idle) session rather than an
+            // active recording, re-arm the idle auto-stop. Otherwise the mic would
+            // stay hot indefinitely after a device/route change, regressing the
+            // "no continuous mic indicator while idle" behavior.
+            if !self.isRecording {
+                self.scheduleIdleSessionStop()
+            }
         }
     }
 

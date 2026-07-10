@@ -90,6 +90,10 @@ class HistoryService: ObservableObject {
     }
     
     func clearAll() {
+        // Delete the audio files backing every transcript so they don't leak on
+        // disk (matches `deleteItem`'s `deleteAudioFile: true` default). Stats are
+        // intentionally preserved — the Clear All dialog promises to keep them.
+        items.forEach(removeAudioFileIfNeeded(for:))
         items.removeAll()
         saveHistory()
     }

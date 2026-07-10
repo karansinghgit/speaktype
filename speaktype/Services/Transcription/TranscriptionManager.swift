@@ -89,9 +89,14 @@ class TranscriptionManager {
     }
 
     /// Transcribe an audio file with the currently active engine.
+    ///
+    /// The raw engine output is passed through the user's dictionary rules so
+    /// custom replacements and spoken snippets apply uniformly regardless of
+    /// which backend produced the text.
     func transcribe(audioFile: URL, language: String = "auto") async throws -> String {
         let kind = AIModel.engineKind(for: currentModelVariant)
-        return try await engine(for: kind).transcribe(audioFile: audioFile, language: language)
+        let text = try await engine(for: kind).transcribe(audioFile: audioFile, language: language)
+        return DictionaryService.apply(to: text)
     }
 }
 

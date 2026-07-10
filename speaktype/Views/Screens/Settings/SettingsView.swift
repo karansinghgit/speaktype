@@ -95,7 +95,6 @@ struct GeneralSettingsTab: View {
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
     @AppStorage("recentTranscriptionLanguages") private var recentLanguagesString: String = ""
     @AppStorage("enableAutoEdit") private var enableAutoEdit: Bool = false
-    @AppStorage("customReplacementRules") private var customReplacementRules: String = ""
 
     private var recentLanguageCodes: [String] {
         recentLanguagesString.split(separator: ",").map(String.init).filter { !$0.isEmpty }
@@ -257,38 +256,28 @@ struct GeneralSettingsTab: View {
                         .font(Typography.captionSmall)
                         .foregroundStyle(Color.textMuted)
 
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Custom replacements")
-                                .font(Typography.bodyMedium)
-                                .foregroundStyle(Color.textPrimary)
+                        Divider()
 
-                            ZStack(alignment: .topLeading) {
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color.bgHover)
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "character.book.closed")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color.textMuted)
+                                .padding(.top, 2)
 
-                                if customReplacementRules.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    Text("teh => the\nspeak type => SpeakType\nuh huh =>")
-                                        .font(.system(size: 12, design: .monospaced))
-                                        .foregroundStyle(Color.textMuted)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 10)
-                                        .allowsHitTesting(false)
-                                }
-
-                                TextEditor(text: $customReplacementRules)
-                                    .font(.system(size: 12, design: .monospaced))
-                                    .scrollContentBackground(.hidden)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 6)
-                            }
-                            .frame(minHeight: 110)
-                            .opacity(enableAutoEdit ? 1.0 : 0.65)
-
-                            Text("One rule per line using `from => to`. Leave the right side blank to delete a phrase.")
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Custom replacements & snippets")
+                                    .font(Typography.bodyMedium)
+                                    .foregroundStyle(Color.textPrimary)
+                                Text(
+                                    "Word replacements and spoken snippets (say “my email” → your address) now live in the Dictionary tab in the sidebar. They apply on every model, always on."
+                                )
                                 .font(Typography.captionSmall)
                                 .foregroundStyle(Color.textMuted)
+                                .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            Spacer(minLength: 0)
                         }
-                        .disabled(!enableAutoEdit)
                     }
                 }
 

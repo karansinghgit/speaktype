@@ -93,6 +93,7 @@ struct GeneralSettingsTab: View {
         true
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon: Bool = true
     @AppStorage("alwaysShowRecorderPill") private var alwaysShowRecorderPill: Bool = false
+    @AppStorage(PillPosition.defaultsKey) private var recorderPillPosition: PillPosition = .defaultPosition
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
     @AppStorage("recentTranscriptionLanguages") private var recentLanguagesString: String = ""
     @AppStorage("enableAutoEdit") private var enableAutoEdit: Bool = false
@@ -249,6 +250,44 @@ struct GeneralSettingsTab: View {
                                 alwaysShowRecorderPill
                                     ? "The small floating recorder stays on screen even when you're not dictating."
                                     : "The floating recorder appears only while you're dictating and hides when idle."
+                            )
+                            .font(Typography.captionSmall)
+                            .foregroundStyle(Color.textMuted)
+                        }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Recorder pill position")
+                                    .font(Typography.bodyMedium)
+                                    .foregroundStyle(Color.textPrimary)
+                                Spacer()
+                                Menu {
+                                    ForEach(PillPosition.allCases) { pos in
+                                        Button(pos.displayName) {
+                                            recorderPillPosition = pos
+                                            NotificationCenter.default.post(
+                                                name: .recorderPillPositionChanged, object: nil)
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Text(recorderPillPosition.displayName)
+                                            .font(Typography.bodySmall)
+                                            .foregroundStyle(Color.textPrimary)
+                                        Image(systemName: "chevron.up.chevron.down")
+                                            .font(.system(size: 9))
+                                            .foregroundStyle(Color.textPrimary)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(Color.bgHover)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                }
+                                .menuStyle(.borderlessButton)
+                            }
+
+                            Text(
+                                "Where the floating recorder appears on screen. Visible while dictating, or always if “Always show recorder pill” is on."
                             )
                             .font(Typography.captionSmall)
                             .foregroundStyle(Color.textMuted)

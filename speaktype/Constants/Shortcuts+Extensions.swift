@@ -14,4 +14,7 @@ extension Notification.Name {
     /// Posted when the "always show recorder pill" preference changes so the
     /// window controller can show/hide the idle pill immediately.
     static let recorderIdleVisibilityChanged = Notification.Name("recorderIdleVisibilityChanged")
+    /// Posted when the user picks a new "recorder pill position" in Settings so
+    /// the window controller can move the pill without touching visibility.
+    static let recorderPillPositionChanged = Notification.Name("recorderPillPositionChanged")
 }

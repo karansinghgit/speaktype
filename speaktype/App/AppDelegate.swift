@@ -30,6 +30,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.miniRecorderController?.applyIdleVisibilityPreference()
         }
 
+        // React to the "recorder pill position" change at runtime. The
+        // controller defers the actual move while a recording is in progress
+        // so the HUD doesn't jump under the user's cursor.
+        NotificationCenter.default.addObserver(
+            forName: .recorderPillPositionChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.miniRecorderController?.applyPillPosition()
+        }
+
+        // Reposition the pill when displays change (external monitor
+        // connected/disconnected, dock resized, etc.) so it doesn't end up
+        // off-screen relative to the new layout.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.miniRecorderController?.handleScreenParametersChanged()
+        }
+
         // Only show the Dock icon while the dashboard is actually open; otherwise
         // live quietly in the menu bar.
         observeWindowsForDockIcon()

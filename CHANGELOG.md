@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
 ## [Unreleased]
-- 
+- Recorder pill position: new setting under General lets the user pin the floating recorder to any of the 9 on-screen positions (4 corners, 3 mid-edges, top/bottom center). Default is bottom center.
 
 ## [1.3.0] - 2026-07-10
 - 

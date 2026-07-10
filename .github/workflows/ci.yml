@@ -25,15 +25,34 @@ jobs:
           xcodebuild -version
           swift --version
 
-      - name: Build (Debug)
-        run: xcodebuild -scheme speaktype -configuration Debug build CODE_SIGNING_ALLOWED=NO
+      # Cache resolved Swift packages so WhisperKit / FluidAudio / swift-transformers
+      # aren't re-fetched and recompiled every run. Keyed on the resolved graph.
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('speaktype.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      # Compile once with build-for-testing, then run the tests without rebuilding,
+      # instead of a full `build` followed by a `test` that recompiles the app.
+      - name: Build for testing
+        run: |
+          xcodebuild build-for-testing \
+            -scheme speaktype \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -clonedSourcePackagesDirPath SourcePackages \
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Unit tests
         run: |
-          xcodebuild test \
+          xcodebuild test-without-building \
             -scheme speaktype \
             -destination 'platform=macOS' \
             -only-testing:speaktypeTests \
+            -clonedSourcePackagesDirPath SourcePackages \
             CODE_SIGNING_ALLOWED=NO
 
   lint:
@@ -42,8 +61,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install SwiftLint
-        run: brew install swiftlint
+      # SwiftLint is preinstalled on the macOS runner image; only fall back to
+      # brew (slow) if it's ever missing.
+      - name: Ensure SwiftLint
+        run: command -v swiftlint >/dev/null || brew install swiftlint
 
       # Advisory only: the codebase has a large pre-existing violation
       # backlog, so the step is allowed to fail without failing the job.

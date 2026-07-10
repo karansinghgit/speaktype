@@ -92,6 +92,7 @@ struct GeneralSettingsTab: View {
     @AppStorage("restoreClipboardAfterAutoPaste") private var restoreClipboardAfterAutoPaste =
         true
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon: Bool = true
+    @AppStorage("alwaysShowRecorderPill") private var alwaysShowRecorderPill: Bool = false
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
     @AppStorage("recentTranscriptionLanguages") private var recentLanguagesString: String = ""
     @AppStorage("enableAutoEdit") private var enableAutoEdit: Bool = false
@@ -226,6 +227,29 @@ struct GeneralSettingsTab: View {
                                 restoreClipboardAfterAutoPaste
                                     ? "After SpeakType pastes into the active app, it restores whatever was already on your clipboard."
                                     : "After SpeakType pastes into the active app, the transcript stays on your clipboard for manual pasting."
+                            )
+                            .font(Typography.captionSmall)
+                            .foregroundStyle(Color.textMuted)
+                        }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Always show recorder pill")
+                                    .font(Typography.bodyMedium)
+                                    .foregroundStyle(Color.textPrimary)
+                                Spacer()
+                                Toggle("", isOn: $alwaysShowRecorderPill)
+                                    .labelsHidden()
+                                    .onChange(of: alwaysShowRecorderPill) {
+                                        NotificationCenter.default.post(
+                                            name: .recorderIdleVisibilityChanged, object: nil)
+                                    }
+                            }
+
+                            Text(
+                                alwaysShowRecorderPill
+                                    ? "The small floating recorder stays on screen even when you're not dictating."
+                                    : "The floating recorder appears only while you're dictating and hides when idle."
                             )
                             .font(Typography.captionSmall)
                             .foregroundStyle(Color.textMuted)

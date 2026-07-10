@@ -9,8 +9,15 @@ class MiniRecorderWindowController: NSObject {
         UserDefaults.standard.object(forKey: "restoreClipboardAfterAutoPaste") as? Bool ?? true
     }
 
-    /// Show the always-present resting pill. Called once at launch; the pill then
-    /// lives on screen and morphs into the recording HUD on demand.
+    /// When on, the resting pill stays on screen even when idle. Default off:
+    /// the recorder appears only while dictating and hides afterward (issue #100).
+    private var alwaysShowIdlePill: Bool {
+        UserDefaults.standard.bool(forKey: "alwaysShowRecorderPill")
+    }
+
+    /// Prepare the resting pill. Called once at launch. When "always show" is on
+    /// the pill lives on screen and morphs into the recording HUD; when off it
+    /// stays hidden until recording starts.
     func showIdleRecorder() {
         if panel == nil {
             setupPanel()
@@ -22,8 +29,28 @@ class MiniRecorderWindowController: NSObject {
         // behind it so the transparent window never blocks the desktop or dock.
         panel.ignoresMouseEvents = true
 
-        if !panel.isVisible {
+        if alwaysShowIdlePill, !panel.isVisible {
             panel.orderFrontRegardless()
+        }
+    }
+
+    /// React to the "always show recorder pill" preference changing at runtime.
+    func applyIdleVisibilityPreference() {
+        if panel == nil {
+            setupPanel()
+        }
+        guard let panel = panel else { return }
+
+        if alwaysShowIdlePill {
+            centerPanel()
+            panel.ignoresMouseEvents = true
+            if !panel.isVisible {
+                panel.orderFrontRegardless()
+            }
+        } else if panel.ignoresMouseEvents {
+            // Only hide when idle — during an active session the panel is
+            // interactive (ignoresMouseEvents == false), so leave it alone.
+            panel.orderOut(nil)
         }
     }
 
@@ -68,9 +95,14 @@ class MiniRecorderWindowController: NSObject {
         }
     }
 
-    /// Return the pill to its passive resting state without hiding it.
+    /// Return the pill to its passive resting state. When "always show" is off
+    /// (the default) this hides the recorder so it only appears while dictating.
     private func returnToIdle() {
-        panel?.ignoresMouseEvents = true
+        guard let panel = panel else { return }
+        panel.ignoresMouseEvents = true
+        if !alwaysShowIdlePill {
+            panel.orderOut(nil)
+        }
     }
 
     // Stop recording - trigger transcription and paste

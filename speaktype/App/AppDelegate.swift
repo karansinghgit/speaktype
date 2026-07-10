@@ -17,8 +17,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         miniRecorderController = MiniRecorderWindowController()
-        // Show the always-present resting pill so the recorder lives on screen.
+        // Prepare the resting pill. It stays hidden until recording unless the
+        // user opts into always showing it (issue #100).
         miniRecorderController?.showIdleRecorder()
+
+        // React to the "always show recorder pill" toggle at runtime.
+        NotificationCenter.default.addObserver(
+            forName: .recorderIdleVisibilityChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.miniRecorderController?.applyIdleVisibilityPreference()
+        }
 
         // Only show the Dock icon while the dashboard is actually open; otherwise
         // live quietly in the menu bar.

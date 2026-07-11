@@ -96,6 +96,8 @@ struct GeneralSettingsTab: View {
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage: String = "auto"
     @AppStorage("recentTranscriptionLanguages") private var recentLanguagesString: String = ""
     @AppStorage("enableAutoEdit") private var enableAutoEdit: Bool = false
+    @AppStorage(SmartTrailingPunctuation.defaultsKey)
+    private var smartTrailingPunctuation: Bool = true
 
     private var recentLanguageCodes: [String] {
         recentLanguagesString.split(separator: ",").map(String.init).filter { !$0.isEmpty }
@@ -276,6 +278,23 @@ struct GeneralSettingsTab: View {
 
                         Text(
                             "Auto Edit removes common filler words like \"um\" and \"uh\" after transcription. It stays fully offline and does not rewrite the meaning of what you said."
+                        )
+                        .font(Typography.captionSmall)
+                        .foregroundStyle(Color.textMuted)
+
+                        Divider()
+
+                        HStack {
+                            Text("Smart trailing punctuation")
+                                .font(Typography.bodyMedium)
+                                .foregroundStyle(Color.textPrimary)
+                            Spacer()
+                            Toggle("", isOn: $smartTrailingPunctuation)
+                                .labelsHidden()
+                        }
+
+                        Text(
+                            "When a dictation is just an email address, URL, number, or single word, the sentence-final period the model adds is removed so the text pastes clean. Full sentences are never touched."
                         )
                         .font(Typography.captionSmall)
                         .foregroundStyle(Color.textMuted)

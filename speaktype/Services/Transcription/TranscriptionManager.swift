@@ -92,11 +92,13 @@ class TranscriptionManager {
     ///
     /// The raw engine output is passed through the user's dictionary rules so
     /// custom replacements and spoken snippets apply uniformly regardless of
-    /// which backend produced the text.
+    /// which backend produced the text. Smart trailing punctuation runs last,
+    /// after snippets have expanded, so a dictation that resolves to an email,
+    /// URL, number, or single token loses the model's sentence-final period.
     func transcribe(audioFile: URL, language: String = "auto") async throws -> String {
         let kind = AIModel.engineKind(for: currentModelVariant)
         let text = try await engine(for: kind).transcribe(audioFile: audioFile, language: language)
-        return DictionaryService.apply(to: text)
+        return SmartTrailingPunctuation.apply(to: DictionaryService.apply(to: text))
     }
 }
 

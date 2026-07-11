@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
 ## [Unreleased]
-- 
+- Smart trailing punctuation: when a dictation is just an email address, URL, number, or single word, the sentence-final period the model adds is stripped so the text pastes clean. Default-on toggle in Settings → General → Transcript Cleanup.
 
 ## [1.3.0] - 2026-07-10
 - 

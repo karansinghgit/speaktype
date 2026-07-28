@@ -15,6 +15,17 @@ class MiniRecorderWindowController: NSObject {
         UserDefaults.standard.bool(forKey: "alwaysShowRecorderPill")
     }
 
+    /// Where the pill sits on screen. Read from UserDefaults each time it is
+    /// repositioned, so the latest value is always used.
+    private var pillPosition: PillPosition {
+        if let raw = UserDefaults.standard.string(forKey: PillPosition.defaultsKey),
+            let pos = PillPosition(rawValue: raw)
+        {
+            return pos
+        }
+        return .defaultPosition
+    }
+
     /// Prepare the resting pill. Called once at launch. When "always show" is on
     /// the pill lives on screen and morphs into the recording HUD; when off it
     /// stays hidden until recording starts.
@@ -24,7 +35,7 @@ class MiniRecorderWindowController: NSObject {
         }
         guard let panel = panel else { return }
 
-        centerPanel()
+        positionPanel()
         // Idle pill is a passive indicator — let clicks pass through to whatever is
         // behind it so the transparent window never blocks the desktop or dock.
         panel.ignoresMouseEvents = true
@@ -42,7 +53,7 @@ class MiniRecorderWindowController: NSObject {
         guard let panel = panel else { return }
 
         if alwaysShowIdlePill {
-            centerPanel()
+            positionPanel()
             panel.ignoresMouseEvents = true
             if !panel.isVisible {
                 panel.orderFrontRegardless()
@@ -52,6 +63,30 @@ class MiniRecorderWindowController: NSObject {
             // interactive (ignoresMouseEvents == false), so leave it alone.
             panel.orderOut(nil)
         }
+    }
+
+    /// React to the "recorder pill position" preference changing at runtime.
+    /// Defer the move while a recording is in progress so the HUD doesn't
+    /// teleport under the user's cursor; the next `startRecording()` /
+    /// `showIdleRecorder()` will place it in the new spot.
+    func applyPillPosition() {
+        if panel == nil {
+            setupPanel()
+        }
+        guard let panel = panel else { return }
+        guard !AudioRecordingService.shared.isRecording else { return }
+        guard panel.isVisible else { return }
+        positionPanel()
+    }
+
+    /// Reposition the pill when the display configuration changes (external
+    /// monitor connected/disconnected, dock resized, etc.) so it doesn't end
+    /// up off-screen relative to the new layout. Deferred mid-recording so the
+    /// HUD doesn't jump under the user's cursor; the next `startRecording()`
+    /// / `showIdleRecorder()` will place it in the new spot.
+    func handleScreenParametersChanged() {
+        guard !AudioRecordingService.shared.isRecording else { return }
+        positionPanel()
     }
 
     // Start recording - show panel and begin recording
@@ -65,7 +100,7 @@ class MiniRecorderWindowController: NSObject {
 
         guard let panel = panel else { return }
 
-        centerPanel()
+        positionPanel()
         // Become interactive so the recording HUD (stop dot, hover controls) works.
         panel.ignoresMouseEvents = false
 
@@ -78,20 +113,24 @@ class MiniRecorderWindowController: NSObject {
         NotificationCenter.default.post(name: .recordingStartRequested, object: nil)
     }
 
-    /// Center the panel horizontally on its current screen, floating just above
-    /// the dock. Safe to call repeatedly (on show and on every resize).
-    private func centerPanel() {
+    /// Position the panel on its current screen according to the user's chosen
+    /// `PillPosition`. Safe to call repeatedly (on show and on every resize).
+    private func positionPanel() {
         guard let panel = panel else { return }
         let screen = panel.screen ?? NSScreen.main
         guard let visibleFrame = screen?.visibleFrame else {
             panel.center()
             return
         }
-        let x = visibleFrame.midX - (panel.frame.width / 2)
-        let y = visibleFrame.minY + 4  // sit low & discreet, just above the dock
-        let origin = NSPoint(x: (x).rounded(), y: (y).rounded())
-        if panel.frame.origin != origin {
-            panel.setFrameOrigin(origin)
+
+        let origin = PillPosition.origin(
+            for: pillPosition,
+            panelSize: panel.frame.size,
+            visibleFrame: visibleFrame
+        )
+        let rounded = NSPoint(x: origin.x.rounded(), y: origin.y.rounded())
+        if panel.frame.origin != rounded {
+            panel.setFrameOrigin(rounded)
         }
     }
 
@@ -102,6 +141,9 @@ class MiniRecorderWindowController: NSObject {
         panel.ignoresMouseEvents = true
         if !alwaysShowIdlePill {
             panel.orderOut(nil)
+        } else {
+            // Pick up any position change that was deferred mid-recording.
+            positionPanel()
         }
     }
 
@@ -165,7 +207,7 @@ class MiniRecorderWindowController: NSObject {
         p.maxSize = fixedSize
         p.titleVisibility = .hidden
         p.titlebarAppearsTransparent = true
-        p.isMovableByWindowBackground = false  // stay put — always screen-centered
+        p.isMovableByWindowBackground = false  // stay put — positioned by positionPanel() per user preference
         p.hasShadow = false  // Disable system shadow to avoid transparency artifacts (View has its own shadow)
 
         // Window Behavior

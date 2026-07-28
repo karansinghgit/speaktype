@@ -5,8 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
 ## [Unreleased]
-- Smart trailing punctuation: when a dictation is just an email address, URL, number, or single word, the sentence-final period the model adds is stripped so the text pastes clean. Default-on toggle in Settings → General → Transcript Cleanup.
-- Recorder pill position: new setting under General lets the user pin the floating recorder to any of the 9 on-screen positions (4 corners, 3 mid-edges, top/bottom center). Default is bottom center.
+- 
 
 ## [1.3.0] - 2026-07-10
 - 

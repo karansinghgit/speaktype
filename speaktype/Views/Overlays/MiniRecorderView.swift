@@ -914,8 +914,20 @@ struct MiniRecorderView: View {
             if !cancelCommit {
                 await MainActor.run { statusMessage = "Transcribing..." }
             }
-            let text = try await transcription.transcribe(audioFile: url, language: transcriptionLanguage)
+            var text = try await transcription.transcribe(audioFile: url, language: transcriptionLanguage)
             debugLog("Transcription result: \(text.prefix(50))...")
+
+            if PostProcessingService.shared.isEnabled {
+                if !cancelCommit {
+                    await MainActor.run { statusMessage = "Post-processing..." }
+                }
+                do {
+                    text = try await PostProcessingService.shared.process(text)
+                    debugLog("Post-processing result: \(text.prefix(50))...")
+                } catch {
+                    debugLog("Post-processing failed, using original: \(error.localizedDescription)")
+                }
+            }
 
             guard !text.isEmpty else {
                 debugLog("Empty text, cancelling")

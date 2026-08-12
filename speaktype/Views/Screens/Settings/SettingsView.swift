@@ -363,6 +363,9 @@ struct GeneralSettingsTab: View {
                     }
                 }
 
+                // LLM Post-Processing
+                PostProcessingSettingsSection()
+
                 // Spoken Language
                 SettingsSection {
                     SettingsSectionHeader(
@@ -554,6 +557,149 @@ struct GeneralSettingsTab: View {
         ("tk", "Turkmen"), ("uk", "Ukrainian"), ("ur", "Urdu"), ("uz", "Uzbek"),
         ("vi", "Vietnamese"), ("cy", "Welsh"), ("yi", "Yiddish"), ("yo", "Yoruba"),
     ]
+}
+
+// MARK: - Post-Processing Settings Section
+
+struct PostProcessingSettingsSection: View {
+    private var service: PostProcessingService { PostProcessingService.shared }
+    @State private var isEnabled: Bool = PostProcessingService.shared.isEnabled
+    @State private var prompt: String = PostProcessingService.shared.prompt
+    @State private var baseURL: String = PostProcessingService.shared.baseURL
+    @State private var model: String = PostProcessingService.shared.model
+    @State private var apiKey: String = PostProcessingService.shared.apiKey
+    @State private var showAPIKey = false
+
+    var body: some View {
+        SettingsSection {
+            SettingsSectionHeader(
+                icon: "brain",
+                title: "LLM Post-Processing",
+                subtitle: "Run an LLM on transcriptions to fix and reformat"
+            )
+
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text("Enable post-processing")
+                        .font(Typography.bodyMedium)
+                        .foregroundStyle(Color.textPrimary)
+                    Spacer()
+                    Toggle("", isOn: $isEnabled)
+                        .labelsHidden()
+                        .onChange(of: isEnabled) { service.isEnabled = isEnabled }
+                }
+
+                Text(
+                    "After transcription, sends the text to an LLM to fix typos, remove filler words, and clean up formatting. Defaults to Ollama (local) — install it from ollama.com and run: ollama pull qwen2.5:0.5b"
+                )
+                .font(Typography.captionSmall)
+                .foregroundStyle(Color.textMuted)
+
+                if isEnabled {
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("API Base URL")
+                            .font(Typography.bodyMedium)
+                            .foregroundStyle(Color.textPrimary)
+                        TextField("http://localhost:11434/v1", text: $baseURL)
+                            .textFieldStyle(.roundedBorder)
+                            .font(Typography.bodySmall)
+                            .onChange(of: baseURL) { service.baseURL = baseURL }
+                        Text(
+                            "OpenAI-compatible endpoint. Ollama runs locally at localhost:11434. Also works with OpenAI, LM Studio, or any compatible provider."
+                        )
+                        .font(Typography.captionSmall)
+                        .foregroundStyle(Color.textMuted)
+                    }
+
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Model")
+                            .font(Typography.bodyMedium)
+                            .foregroundStyle(Color.textPrimary)
+                        TextField("qwen2.5:0.5b", text: $model)
+                            .textFieldStyle(.roundedBorder)
+                            .font(Typography.bodySmall)
+                            .onChange(of: model) { service.model = model }
+                        Text(
+                            "For Ollama: qwen2.5:0.5b (fast, 290 MB) or gemma3:1b (better quality, 600 MB). For OpenAI: gpt-4o-mini."
+                        )
+                        .font(Typography.captionSmall)
+                        .foregroundStyle(Color.textMuted)
+                    }
+
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("API Key (optional)")
+                            .font(Typography.bodyMedium)
+                            .foregroundStyle(Color.textPrimary)
+                        HStack(spacing: 8) {
+                            if showAPIKey {
+                                TextField("Not needed for Ollama", text: $apiKey)
+                                    .textFieldStyle(.roundedBorder)
+                                    .font(Typography.bodySmall)
+                                    .onChange(of: apiKey) { service.apiKey = apiKey }
+                            } else {
+                                SecureField("Not needed for Ollama", text: $apiKey)
+                                    .textFieldStyle(.roundedBorder)
+                                    .font(Typography.bodySmall)
+                                    .onChange(of: apiKey) { service.apiKey = apiKey }
+                            }
+                            Button {
+                                showAPIKey.toggle()
+                            } label: {
+                                Image(systemName: showAPIKey ? "eye.slash" : "eye")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color.textMuted)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Text("Only needed for cloud providers like OpenAI. Leave empty for local Ollama.")
+                            .font(Typography.captionSmall)
+                            .foregroundStyle(Color.textMuted)
+                    }
+
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("System Prompt")
+                                .font(Typography.bodyMedium)
+                                .foregroundStyle(Color.textPrimary)
+                            Spacer()
+                            Button("Reset to Default") {
+                                prompt = PostProcessingService.defaultPrompt
+                                service.prompt = prompt
+                            }
+                            .font(Typography.captionSmall)
+                            .foregroundStyle(Color.textMuted)
+                            .buttonStyle(.plain)
+                        }
+                        TextEditor(text: $prompt)
+                            .font(Typography.bodySmall)
+                            .frame(minHeight: 80, maxHeight: 160)
+                            .scrollContentBackground(.hidden)
+                            .padding(8)
+                            .background(Color.bgHover)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color.border.opacity(0.5), lineWidth: 1)
+                            )
+                            .onChange(of: prompt) { service.prompt = prompt }
+                        Text(
+                            "The transcribed text is sent as the user message. Your prompt is the system instruction that tells the LLM how to reformat it."
+                        )
+                        .font(Typography.captionSmall)
+                        .foregroundStyle(Color.textMuted)
+                    }
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Audio Settings Tab

@@ -105,6 +105,91 @@ final class ModelDownloadServiceTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: unrelatedPath.path))
     }
 
+    // MARK: - Refresh vs. in-flight downloads
+
+    func testMergedProgressMarksModelsFoundOnDiskAsInstalled() {
+        let merged = ModelDownloadService.mergedProgress(
+            foundOnDisk: ["parakeet-tdt-0.6b-v2"],
+            inFlight: [:],
+            currentProgress: [:]
+        )
+
+        XCTAssertEqual(merged["parakeet-tdt-0.6b-v2"], 1.0)
+    }
+
+    func testMergedProgressKeepsInFlightDownloadFraction() {
+        // The AI Models screen refreshes on every appearance; that must not reset a
+        // running download's progress bar to 0%.
+        let merged = ModelDownloadService.mergedProgress(
+            foundOnDisk: [],
+            inFlight: ["parakeet-tdt-0.6b-v2": true],
+            currentProgress: ["parakeet-tdt-0.6b-v2": 0.42]
+        )
+
+        XCTAssertEqual(merged["parakeet-tdt-0.6b-v2"], 0.42)
+    }
+
+    func testMergedProgressNeverMarksAnInFlightDownloadAsInstalled() {
+        // A half-written cache directory must not flip the UI to "Installed" —
+        // that hides the download and leaves the user with a model that can't load.
+        let merged = ModelDownloadService.mergedProgress(
+            foundOnDisk: ["parakeet-tdt-0.6b-v2"],
+            inFlight: ["parakeet-tdt-0.6b-v2": true],
+            currentProgress: ["parakeet-tdt-0.6b-v2": 0.9]
+        )
+
+        XCTAssertEqual(merged["parakeet-tdt-0.6b-v2"], 0.9)
+        XCTAssertLessThan(merged["parakeet-tdt-0.6b-v2"] ?? 1.0, 1.0)
+    }
+
+    func testMergedProgressDropsModelsThatAreNoLongerOnDisk() {
+        let merged = ModelDownloadService.mergedProgress(
+            foundOnDisk: [],
+            inFlight: ["openai_whisper-tiny": false],
+            currentProgress: ["openai_whisper-tiny": 1.0]
+        )
+
+        XCTAssertNil(merged["openai_whisper-tiny"])
+    }
+
+    // MARK: - Failure messages
+
+    func testUserFacingMessageExplainsOfflineFailures() {
+        let error = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
+
+        let message = ModelDownloadService.userFacingMessage(for: error)
+
+        XCTAssertTrue(message.contains("internet connection"), message)
+    }
+
+    func testUserFacingMessageExplainsRateLimiting() {
+        let error = NSError(
+            domain: "HuggingFace", code: 429,
+            userInfo: [NSLocalizedDescriptionKey: "Hugging Face rate limit encountered: slow down"])
+
+        let message = ModelDownloadService.userFacingMessage(for: error)
+
+        XCTAssertTrue(message.localizedCaseInsensitiveContains("rate-limiting"), message)
+    }
+
+    func testUserFacingMessageExplainsOutOfDiskSpace() {
+        let error = NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError)
+
+        let message = ModelDownloadService.userFacingMessage(for: error)
+
+        XCTAssertTrue(message.localizedCaseInsensitiveContains("disk space"), message)
+    }
+
+    func testUserFacingMessageFallsBackToTheUnderlyingDescription() {
+        let error = NSError(
+            domain: "Test", code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Something specific broke"])
+
+        let message = ModelDownloadService.userFacingMessage(for: error)
+
+        XCTAssertTrue(message.contains("Something specific broke"), message)
+    }
+
     @discardableResult
     private func createDirectory(at url: URL) throws -> URL {
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)

@@ -24,6 +24,7 @@ struct ModelRow: View {
     var progress: Double { downloadService.downloadProgress[model.variant] ?? 0.0 }
     var isDownloading: Bool { downloadService.isDownloading[model.variant] ?? false }
     var isDownloaded: Bool { progress >= 1.0 }
+    var downloadError: String? { downloadService.downloadError[model.variant] }
     var isActive: Bool { selectedModel == model.variant }
 
     // MARK: - Body
@@ -41,6 +42,11 @@ struct ModelRow: View {
 
                     if let warning = model.ramWarning(deviceRAMGB: WhisperService.deviceRAMGB) {
                         note(icon: "exclamationmark.triangle.fill", text: warning, tint: .accentWarning)
+                    }
+                    // A failed download used to leave no trace at all — the button
+                    // just flipped back to "Download" with no explanation.
+                    if let downloadError, !isDownloading {
+                        note(icon: "exclamationmark.triangle.fill", text: downloadError, tint: .accentError)
                     }
                     if let loadError {
                         note(icon: "xmark.circle.fill", text: loadError, tint: .accentError)
@@ -123,7 +129,8 @@ struct ModelRow: View {
     private func note(icon: String, text: String, tint: Color) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon).font(.system(size: 10))
-            Text(text).font(Typography.ui(11)).lineLimit(2)
+            Text(text).font(Typography.ui(11)).lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(tint)
     }
@@ -158,7 +165,10 @@ struct ModelRow: View {
                 .buttonStyle(.plain)
             } else {
                 Button(action: { downloadService.downloadModel(variant: model.variant) }) {
-                    ActionButton.label(title: "Download", icon: "arrow.down", style: .primary)
+                    ActionButton.label(
+                        title: downloadError == nil ? "Download" : "Try again",
+                        icon: downloadError == nil ? "arrow.down" : "arrow.clockwise",
+                        style: .primary)
                 }
                 .buttonStyle(.plain)
             }

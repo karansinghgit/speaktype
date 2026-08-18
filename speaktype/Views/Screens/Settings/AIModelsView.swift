@@ -188,30 +188,94 @@ struct AIModelsView: View {
         .shadow(color: Color.brandAccent.opacity(0.10), radius: 20, x: 0, y: 8)
     }
 
-    @ViewBuilder
+    /// The hero is the *only* place the recommended model can be downloaded from
+    /// — it is deliberately filtered out of the list below — so it has to carry
+    /// the full download state machine (progress, cancel, failure, retry). It
+    /// previously showed a bare "Download" button in every state, so a download
+    /// that was running (or had failed) looked like a button that did nothing.
     private func heroAction(rec: AIModel, downloaded: Bool, active: Bool) -> some View {
-        if active && downloaded {
-            HStack(spacing: 7) {
-                Image(systemName: "checkmark.circle.fill")
-                Text("This is your default model").font(Typography.uiBold(13))
+        let downloading = downloadService.isDownloading[rec.variant] ?? false
+        let error = downloadService.downloadError[rec.variant]
+
+        return VStack(alignment: .leading, spacing: 12) {
+            if downloading {
+                heroDownloadProgress(variant: rec.variant)
+            } else if active && downloaded {
+                HStack(spacing: 7) {
+                    Image(systemName: "checkmark.circle.fill")
+                    Text("This is your default model").font(Typography.uiBold(13))
+                }
+                .foregroundStyle(Color.brandAccent)
+            } else if downloaded {
+                Button {
+                    selectedModel = rec.variant
+                } label: {
+                    ActionButton.label(title: "Use this model", icon: "arrow.right",
+                                       style: .primary, large: true)
+                }
+                .buttonStyle(.plain)
+            } else {
+                if let error {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 11))
+                        Text(error)
+                            .font(Typography.ui(12))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .foregroundStyle(Color.accentError)
+                    .frame(maxWidth: 420, alignment: .leading)
+                }
+
+                Button {
+                    downloadService.downloadModel(variant: rec.variant)
+                } label: {
+                    ActionButton.label(title: error == nil ? "Download" : "Try again",
+                                       icon: error == nil ? "arrow.down" : "arrow.clockwise",
+                                       style: .primary, large: true)
+                }
+                .buttonStyle(.plain)
             }
-            .foregroundStyle(Color.brandAccent)
-        } else if downloaded {
-            Button {
-                selectedModel = rec.variant
-            } label: {
-                ActionButton.label(title: "Use this model", icon: "arrow.right",
-                                   style: .primary, large: true)
+        }
+    }
+
+    /// Live progress for the hero's download, with a way out of it.
+    private func heroDownloadProgress(variant: String) -> some View {
+        let progress = downloadService.downloadProgress[variant] ?? 0.0
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 9) {
+                Spinner(size: 13, lineWidth: 2, tint: Color.brandAccent)
+                Text("Downloading…")
+                    .font(Typography.uiMedium(13))
+                    .foregroundStyle(Color.textSecondary)
+                Text("\(Int(progress * 100))%")
+                    .font(Typography.uiBold(13))
+                    .foregroundStyle(Color.brandAccent)
+                    .monospacedDigit()
             }
-            .buttonStyle(.plain)
-        } else {
-            Button {
-                downloadService.downloadModel(variant: rec.variant)
-            } label: {
-                ActionButton.label(title: "Download", icon: "arrow.down",
-                                   style: .primary, large: true)
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.textPrimary.opacity(0.08)).frame(height: 6)
+                    Capsule().fill(Color.brandAccent)
+                        .frame(width: max(6, geo.size.width * progress), height: 6)
+                        .animation(.easeOut(duration: 0.2), value: progress)
+                }
             }
-            .buttonStyle(.plain)
+            .frame(width: 320, height: 6)
+
+            HStack(spacing: 12) {
+                Button {
+                    downloadService.cancelDownload(for: variant)
+                } label: {
+                    ActionButton.label(title: "Cancel", icon: "xmark", style: .secondary)
+                }
+                .buttonStyle(.plain)
+
+                Text("Large models take a few minutes on a first download.")
+                    .font(Typography.ui(11))
+                    .foregroundStyle(Color.textMuted)
+            }
         }
     }
 

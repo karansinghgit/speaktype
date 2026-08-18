@@ -5,7 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
 ## [Unreleased]
-- 
+- Fix: the recommended model on the AI Models screen now shows download progress, a cancel button, and the actual reason a download failed (with a retry) instead of a Download button that appeared to do nothing.
+- Fix: a half-finished Parakeet download is no longer reported as installed.
 
 ## [1.3.0] - 2026-07-10
 - 

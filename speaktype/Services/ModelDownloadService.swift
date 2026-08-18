@@ -131,6 +131,63 @@ class ModelDownloadService: ObservableObject {
         }
     }
     
+    /// Merges a fresh disk scan with the downloads that are still running.
+    ///
+    /// The AI Models screen refreshes on every appearance, so a refresh must not
+    /// clobber an in-flight download's fraction (which would reset the progress
+    /// bar to 0% and make a running download look stalled), and must not mark a
+    /// model still being fetched as installed. Pure, so it can be tested.
+    static func mergedProgress(
+        foundOnDisk: Set<String>,
+        inFlight: [String: Bool],
+        currentProgress: [String: Double]
+    ) -> [String: Double] {
+        var merged: [String: Double] = [:]
+        for variant in foundOnDisk {
+            merged[variant] = 1.0
+        }
+        for (variant, downloading) in inFlight where downloading {
+            // A download in flight is never "installed" yet — the task itself
+            // writes 1.0 when it finishes.
+            merged[variant] = min(currentProgress[variant] ?? 0.0, 0.99)
+        }
+        return merged
+    }
+
+    /// Turns a download failure into something a user can act on.
+    ///
+    /// The raw `localizedDescription` of a URLSession/Hugging Face failure is
+    /// often opaque ("The request timed out"), and the UI previously swallowed it
+    /// entirely — a failed download just silently returned to a "Download"
+    /// button with no explanation.
+    static func userFacingMessage(for error: Error) -> String {
+        let nsError = error as NSError
+
+        if nsError.domain == NSURLErrorDomain {
+            switch nsError.code {
+            case NSURLErrorNotConnectedToInternet, NSURLErrorCannotFindHost,
+                 NSURLErrorCannotConnectToHost, NSURLErrorNetworkConnectionLost,
+                 NSURLErrorDNSLookupFailed:
+                return "Couldn't reach Hugging Face. Check your internet connection and try again."
+            case NSURLErrorTimedOut:
+                return "The download timed out. Check your connection and try again — finished parts are kept."
+            default:
+                break
+            }
+        }
+
+        if nsError.domain == NSCocoaErrorDomain, nsError.code == NSFileWriteOutOfSpaceError {
+            return "Not enough free disk space to finish this download."
+        }
+
+        let description = error.localizedDescription
+        if description.localizedCaseInsensitiveContains("rate limit") || description.contains("429") {
+            return "Hugging Face is rate-limiting downloads right now. Wait a minute, then try again."
+        }
+
+        return "Download failed: \(description)"
+    }
+
     // Check which models are already downloaded and update progress dictionary
     func refreshDownloadedModels() async {
         print("🔍 Checking for already-downloaded models...")
@@ -140,8 +197,6 @@ class ModelDownloadService: ObservableObject {
         // NOTE: WhisperKit.fetchAvailableModels() returns ALL remote models, not local ones
         // We ONLY rely on disk-based verification to check what's actually downloaded
         
-        let fileManager = FileManager.default
-
         // Verify models actually exist on disk with proper size validation.
         // Scan the current Application Support location plus the legacy Documents
         // location (in case a migration move failed or hasn't run yet).
@@ -155,21 +210,28 @@ class ModelDownloadService: ObservableObject {
         for variant in ParakeetCatalog.variants {
             let version = ParakeetCatalog.version(for: variant)
             let cacheDir = AsrModels.defaultCacheDirectory(for: version)
-            if fileManager.fileExists(atPath: cacheDir.path),
-               let contents = try? fileManager.contentsOfDirectory(atPath: cacheDir.path),
-               !contents.isEmpty {
+            // A non-empty cache directory is NOT proof of a usable model: an
+            // interrupted or failed download leaves some of the .mlmodelc bundles
+            // behind, and treating that as "installed" hides the Download button
+            // for a model that can never load. Ask FluidAudio whether every file
+            // this version requires is actually present.
+            if AsrModels.modelsExist(at: cacheDir, version: version) {
                 foundModels.insert(variant)
                 print("✅ Parakeet model \(variant) found in cache")
+            } else if FileManager.default.fileExists(atPath: cacheDir.path) {
+                print("⚠️ Parakeet model \(variant) is incomplete at \(cacheDir.path)")
             }
         }
 
         await MainActor.run {
-            // Clear all previous progress
-            self.downloadProgress.removeAll()
-
-            // Only mark models that actually exist
+            // Rebuild in one assignment so the UI never flickers through an empty
+            // state, and never drop a download that is still running.
+            self.downloadProgress = Self.mergedProgress(
+                foundOnDisk: foundModels,
+                inFlight: self.isDownloading,
+                currentProgress: self.downloadProgress
+            )
             for variant in foundModels {
-                self.downloadProgress[variant] = 1.0
                 print("✅ Marked as downloaded: \(variant)")
             }
             
@@ -338,7 +400,7 @@ class ModelDownloadService: ObservableObject {
                          DispatchQueue.main.async {
                              self.isDownloading[variant] = false
                              self.downloadProgress[variant] = 0.0
-                             self.downloadError[variant] = "Error: \(error.localizedDescription)\n\nTry clicking the trash icon to manually clean cache."
+                             self.downloadError[variant] = Self.userFacingMessage(for: error)
                              self.activeTasks[variant] = nil
                          }
                      }
@@ -348,7 +410,7 @@ class ModelDownloadService: ObservableObject {
                 DispatchQueue.main.async {
                     self.isDownloading[variant] = false
                     self.downloadProgress[variant] = 0.0
-                    self.downloadError[variant] = error.localizedDescription + "\n\n(Try Trash icon to clean cache)"
+                    self.downloadError[variant] = Self.userFacingMessage(for: error)
                     self.activeTasks[variant] = nil
                 }
             }
@@ -393,7 +455,7 @@ class ModelDownloadService: ObservableObject {
                 DispatchQueue.main.async {
                     self.isDownloading[variant] = false
                     self.downloadProgress[variant] = 0.0
-                    self.downloadError[variant] = error.localizedDescription
+                    self.downloadError[variant] = Self.userFacingMessage(for: error)
                     self.activeTasks[variant] = nil
                 }
             }

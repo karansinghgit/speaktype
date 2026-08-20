@@ -82,10 +82,64 @@ class TranscriptionManager {
     }
 
     /// Load a specific model variant, routing to its owning engine.
+    ///
+    /// `activeKind` switches *before* the load, not after: the display-state
+    /// accessors above read whichever engine `activeKind` names, so setting it
+    /// afterwards meant `isLoading` / `loadingStage` reported the idle Whisper
+    /// engine for the whole time a Parakeet model was warming up. The recorder
+    /// never saw a load in progress and fell back to its truncated status text.
     func loadModel(variant: String) async throws {
         let kind = AIModel.engineKind(for: variant)
-        try await engine(for: kind).loadModel(variant: variant)
         activeKind = kind
+        try await engine(for: kind).loadModel(variant: variant)
+    }
+
+    // MARK: - Warm-up
+
+    /// Variant whose warm-up is currently in flight, if any. Readable so UI can
+    /// show readiness for the specific model it is displaying.
+    private(set) var warmingVariant: String?
+
+    /// True while a *background* warm-up is loading a model. Distinct from
+    /// `isLoading`, which is true for any load including one the user is
+    /// actively waiting on: UI that belongs to a dictation must not react to a
+    /// preload the user never asked for.
+    private(set) var isWarmingUp = false
+
+    /// Loads `variant` in the background so the first dictation doesn't pay the
+    /// model-load cost — the "warming up" wait users hit mid-sentence.
+    ///
+    /// Fire-and-forget and deduped: warming a model that is already loaded, or
+    /// re-warming one already in flight, is a no-op. Only downloaded models are
+    /// warmed, because `loadModel` otherwise falls through to FluidAudio's
+    /// download path and would silently pull gigabytes with no progress UI.
+    ///
+    /// - Returns: whether a warm-up was actually started.
+    @discardableResult
+    func warmUp(variant: String) -> Bool {
+        guard !variant.isEmpty else { return false }
+        guard warmingVariant != variant else { return false }
+        guard !(isInitialized && currentModelVariant == variant) else { return false }
+        guard ModelDownloadService.shared.isDownloaded(variant) else { return false }
+
+        warmingVariant = variant
+        isWarmingUp = true
+
+        Task { @MainActor in
+            do {
+                try await self.loadModel(variant: variant)
+                print("✅ Warmed up \(variant)")
+            } catch {
+                // A warm-up is best-effort: the model still loads on demand at
+                // the next dictation, which is where errors get surfaced.
+                print("⚠️ Warm-up failed for \(variant): \(error.localizedDescription)")
+            }
+            if self.warmingVariant == variant {
+                self.warmingVariant = nil
+                self.isWarmingUp = false
+            }
+        }
+        return true
     }
 
     /// Transcribe an audio file with the currently active engine.

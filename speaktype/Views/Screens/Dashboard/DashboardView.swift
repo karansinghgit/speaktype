@@ -175,22 +175,13 @@ struct DashboardView: View {
                 print("File selection error: \(error.localizedDescription)")
             }
         }
-        .onAppear {
-            Task {
-                guard !selectedModel.isEmpty else { return }
-                if !transcription.isInitialized
-                    || transcription.currentModelVariant != selectedModel
-                {
-                    try? await transcription.loadModel(variant: selectedModel)
-                }
-            }
-        }
-        .onChange(of: selectedModel) {
-            Task {
-                guard !selectedModel.isEmpty else { return }
-                try? await transcription.loadModel(variant: selectedModel)
-            }
-        }
+        // Route both preloads through `warmUp`, which dedupes: two screens (or a
+        // post-download warm-up) asking for the same model used to start two
+        // concurrent loads of the same weights. It also refuses to load a model
+        // that isn't downloaded, instead of silently falling through to the
+        // engine's download path.
+        .onAppear { transcription.warmUp(variant: selectedModel) }
+        .onChange(of: selectedModel) { transcription.warmUp(variant: selectedModel) }
     }
 
     // MARK: - Helpers

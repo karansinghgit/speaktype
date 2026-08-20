@@ -11,6 +11,11 @@ struct MiniRecorderView: View {
     @State private var isProcessing = false
     @State private var statusMessage = "Transcribing..."
     @State private var isWarmingUp = false
+    /// When the current warm-up began, so the pill can show elapsed seconds
+    /// instead of an open-ended spinner.
+    @State private var warmUpStart: Date?
+    @State private var warmUpElapsed: TimeInterval = 0
+    @State private var warmUpTimer: Timer?
     @State private var showAccessibilityWarning = false
     var onCommit: ((String) -> Void)?
     var onCancel: (() -> Void)?
@@ -264,7 +269,11 @@ struct MiniRecorderView: View {
     private enum RecorderPhase { case idle, warming, processing, recording }
 
     private var displayPhase: RecorderPhase {
-        if isWarmingUp || transcription.isLoading { return .warming }
+        // Deliberately *not* `transcription.isLoading`: that is also true for a
+        // background warm-up (after a download, or at launch), and the HUD must
+        // never expand for work the user didn't ask for. `isWarmingUp` is set
+        // only by this recorder's own load paths.
+        if isWarmingUp { return .warming }
         if isProcessing { return .processing }
         if isListening { return .recording }
         return .idle
@@ -275,7 +284,7 @@ struct MiniRecorderView: View {
     private var pillWidth: CGFloat {
         switch displayPhase {
         case .idle: return 58
-        case .warming: return 200
+        case .warming: return 320
         case .processing: return 210
         case .recording: return expanded ? 460 : 250
         }
@@ -309,15 +318,50 @@ struct MiniRecorderView: View {
         .transition(.opacity.combined(with: .scale(scale: 0.6)))
     }
 
+    /// What the pill says while a model loads.
+    ///
+    /// The engine publishes a real stage ("Loading Parakeet model…"); fall back
+    /// to a generic line only before the first stage arrives. Kept short on
+    /// purpose — this sits in a fixed-width capsule, and the previous copy
+    /// ("Warming up model — first use is slower…") was simply clipped mid-word.
+    private var warmUpLabel: String {
+        let stage = transcription.loadingStage
+        return stage.isEmpty ? "Getting model ready…" : stage
+    }
+
     private var warmingContent: some View {
         HStack(spacing: 8) {
             ProgressView()
                 .controlSize(.small)
                 .colorScheme(.dark)
-            Text("Warming up model...")
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(warmUpLabel)
+                    .font(Typography.pillLabel)
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                // A silent spinner gives no sense of how long this will take, so
+                // once it stops feeling instant, say how long it has been and
+                // that it only happens once.
+                if warmUpElapsed >= 3 {
+                    Text(warmUpElapsed >= 25
+                         ? "\(Int(warmUpElapsed))s · almost there, first load only"
+                         : "\(Int(warmUpElapsed))s · first load only")
+                        .font(Typography.pillLabel)
+                        .foregroundColor(.white.opacity(0.55))
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            Text("esc")
                 .font(Typography.pillLabel)
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(.white.opacity(0.4))
         }
+        .padding(.horizontal, 4)
         .transition(.opacity)
     }
 
@@ -626,14 +670,14 @@ struct MiniRecorderView: View {
                 // Pre-load the new model immediately so the first transcription isn't slow
                 if model.variant != previousModel {
                     Task {
-                        await MainActor.run { isWarmingUp = true }
+                        await MainActor.run { beginWarmUp() }
                         do {
                             try await transcription.loadModel(variant: model.variant)
                             debugLog("Model pre-loaded after switch: \(model.variant)")
                         } catch {
                             debugLog("Model pre-load failed: \(error.localizedDescription)")
                         }
-                        await MainActor.run { isWarmingUp = false }
+                        await MainActor.run { endWarmUp() }
                     }
                 }
             } label: {
@@ -834,8 +878,28 @@ struct MiniRecorderView: View {
         }
     }
 
+    /// Enter the warming phase and start counting seconds.
+    private func beginWarmUp() {
+        isWarmingUp = true
+        warmUpStart = Date()
+        warmUpElapsed = 0
+        warmUpTimer?.invalidate()
+        warmUpTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            if let start = warmUpStart { warmUpElapsed = Date().timeIntervalSince(start) }
+        }
+    }
+
+    /// Leave the warming phase. Safe to call when not warming.
+    private func endWarmUp() {
+        warmUpTimer?.invalidate()
+        warmUpTimer = nil
+        warmUpStart = nil
+        warmUpElapsed = 0
+        isWarmingUp = false
+    }
+
     private func handleEscape() {
-        guard isListening || isProcessing || isWarmingUp || transcription.isLoading else { return }
+        guard isListening || isProcessing || isWarmingUp else { return }
 
         debugLog("Escape pressed - cancelling immediate commit")
         cancelCommit = true
@@ -860,10 +924,17 @@ struct MiniRecorderView: View {
                 }
             }
         } else {
-            // Already processing, just show stopping and quickly dismiss
-            statusMessage = "Stopping transcription..."
+            // Already warming up or processing. Clearing both flags is what
+            // actually returns the pill to idle: `onCancel` only tells the
+            // window to settle, so leaving `isProcessing` set left the HUD
+            // wedged open — the status text stayed on screen with no way to
+            // dismiss it. The load itself keeps running in the background and
+            // will simply be ready for the next dictation.
+            statusMessage = isWarmingUp ? "Continuing in background..." : "Stopping transcription..."
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                onCancel?()
+                self.endWarmUp()
+                self.isProcessing = false
+                self.onCancel?()
             }
         }
     }
@@ -891,13 +962,18 @@ struct MiniRecorderView: View {
             if !transcription.isInitialized || transcription.currentModelVariant != selectedModel
             {
                 debugLog("Loading model: \(selectedModel)")
-                await MainActor.run { statusMessage = "Warming up model — first use is slower..." }
+                // Show the dedicated warming phase (spinner + live stage +
+                // elapsed) rather than a long sentence stuffed into the
+                // fixed-width processing pill, where it was clipped mid-word.
+                await MainActor.run { beginWarmUp() }
                 do {
                     try await transcription.loadModel(variant: selectedModel)
                     debugLog("Model loaded successfully")
+                    await MainActor.run { endWarmUp() }
                 } catch {
                     debugLog("Model load failed: \(error.localizedDescription)")
                     await MainActor.run {
+                        endWarmUp()
                         statusMessage = "Model load failed"
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                             self.isProcessing = false

@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
 ## [Unreleased]
+- Models are now warmed up as soon as they finish downloading (and when you pick one), so the first dictation no longer stalls on "warming up".
+- Fix: the recorder's warming-up message was clipped mid-word, and pressing esc left it wedged on screen. It now shows the real loading stage, elapsed time, and settles back to idle.
 - Fix: the recommended model on the AI Models screen now shows download progress, a cancel button, and the actual reason a download failed (with a retry) instead of a Download button that appeared to do nothing.
 - Fix: a half-finished Parakeet download is no longer reported as installed.
 

@@ -131,6 +131,31 @@ class ModelDownloadService: ObservableObject {
         }
     }
     
+    /// True when this variant is fully downloaded and ready to load.
+    func isDownloaded(_ variant: String) -> Bool {
+        (downloadProgress[variant] ?? 0) >= 1.0
+    }
+
+    /// Gets a freshly downloaded model ready to transcribe.
+    ///
+    /// Loading a model takes tens of seconds the first time. Doing it lazily at
+    /// the first dictation means the user hits that wait mid-sentence, behind a
+    /// "warming up" label; doing it here spends the wait while they are still
+    /// looking at the AI Models screen, right after a download they already
+    /// waited on.
+    ///
+    /// Only warms the model the user is actually going to use: the selected one,
+    /// or any model when nothing is selected yet (the first-run case, where the
+    /// download that just finished is the one they came for).
+    private func warmUpAfterDownload(variant: String) {
+        let selected = UserDefaults.standard.string(forKey: ModelSelection.defaultsKey)
+            ?? ModelSelection.none
+        guard selected == variant || selected == ModelSelection.none else { return }
+        Task { @MainActor in
+            TranscriptionManager.shared.warmUp(variant: variant)
+        }
+    }
+
     /// Merges a fresh disk scan with the downloads that are still running.
     ///
     /// The AI Models screen refreshes on every appearance, so a refresh must not
@@ -348,6 +373,7 @@ class ModelDownloadService: ObservableObject {
                     self.isDownloading[variant] = false
                     self.downloadProgress[variant] = 1.0
                     self.activeTasks[variant] = nil // Cleanup task
+                    self.warmUpAfterDownload(variant: variant)
                 }
             } catch {
                 if Task.isCancelled {
@@ -393,6 +419,7 @@ class ModelDownloadService: ObservableObject {
                              self.downloadProgress[variant] = 1.0
                              self.downloadError[variant] = nil
                              self.activeTasks[variant] = nil
+                             self.warmUpAfterDownload(variant: variant)
                          }
                      } catch {
                          if Task.isCancelled { return }
@@ -445,6 +472,7 @@ class ModelDownloadService: ObservableObject {
                     self.isDownloading[variant] = false
                     self.downloadProgress[variant] = 1.0
                     self.activeTasks[variant] = nil
+                    self.warmUpAfterDownload(variant: variant)
                 }
             } catch {
                 if Task.isCancelled {

@@ -12,6 +12,7 @@ struct AIModelsView: View {
 
     // MARK: - Derived
 
+    private var transcription: TranscriptionManager { TranscriptionManager.shared }
     private var capability: DeviceCapability { .current }
     private var useCase: AIModel.UseCase { AIModel.UseCase(rawValue: useCaseRaw) ?? .dictation }
     private var recommendedModel: AIModel { AIModel.recommendedModel(for: capability, useCase: useCase) }
@@ -20,7 +21,7 @@ struct AIModelsView: View {
     }
 
     private func isDownloaded(_ variant: String) -> Bool {
-        (downloadService.downloadProgress[variant] ?? 0) >= 1.0
+        downloadService.isDownloaded(variant)
     }
 
     /// Engine groups for the list — the recommended model is intentionally left
@@ -196,10 +197,21 @@ struct AIModelsView: View {
     private func heroAction(rec: AIModel, downloaded: Bool, active: Bool) -> some View {
         let downloading = downloadService.isDownloading[rec.variant] ?? false
         let error = downloadService.downloadError[rec.variant]
+        let warming = transcription.warmingVariant == rec.variant
 
         return VStack(alignment: .leading, spacing: 12) {
             if downloading {
                 heroDownloadProgress(variant: rec.variant)
+            } else if warming {
+                // Checked before the "default model" branch: selecting flips
+                // `active` immediately, so an equally-early `active` check would
+                // hide the readiness spinner entirely.
+                HStack(spacing: 9) {
+                    Spinner(size: 13, lineWidth: 2, tint: Color.brandAccent)
+                    Text("Getting it ready…")
+                        .font(Typography.uiBold(13))
+                        .foregroundStyle(Color.textSecondary)
+                }
             } else if active && downloaded {
                 HStack(spacing: 7) {
                     Image(systemName: "checkmark.circle.fill")
@@ -208,7 +220,12 @@ struct AIModelsView: View {
                 .foregroundStyle(Color.brandAccent)
             } else if downloaded {
                 Button {
+                    // Selecting used to only write the preference, leaving the
+                    // model to load lazily at the first dictation — which is
+                    // exactly the mid-sentence "warming up" wait. Load it here,
+                    // while the user is still on this screen.
                     selectedModel = rec.variant
+                    transcription.warmUp(variant: rec.variant)
                 } label: {
                     ActionButton.label(title: "Use this model", icon: "arrow.right",
                                        style: .primary, large: true)

@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		1C547F2B2F0E7DC0008120A6 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1C547F2A2F0E7DC0008120A6 /* WhisperKit */; };
 		1CE4CB3F2F0EF6AF00C01C62 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 1CE4CB3E2F0EF6AF00C01C62 /* KeyboardShortcuts */; };
-		1CE4CB412F0EF86B00C01C62 /* whisperkit-cli in Frameworks */ = {isa = PBXBuildFile; productRef = 1CE4CB402F0EF86B00C01C62 /* whisperkit-cli */; };
 		FA0000000000000000000003 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = FA0000000000000000000002 /* FluidAudio */; };
 /* End PBXBuildFile section */
 
@@ -74,7 +73,6 @@
 			files = (
 				1C547F2B2F0E7DC0008120A6 /* WhisperKit in Frameworks */,
 				1CE4CB3F2F0EF6AF00C01C62 /* KeyboardShortcuts in Frameworks */,
-				1CE4CB412F0EF86B00C01C62 /* whisperkit-cli in Frameworks */,
 				FA0000000000000000000003 /* FluidAudio in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -146,7 +144,6 @@
 			packageProductDependencies = (
 				1C547F2A2F0E7DC0008120A6 /* WhisperKit */,
 				1CE4CB3E2F0EF6AF00C01C62 /* KeyboardShortcuts */,
-				1CE4CB402F0EF86B00C01C62 /* whisperkit-cli */,
 				FA0000000000000000000002 /* FluidAudio */,
 			);
 			productName = speaktype;
@@ -431,19 +428,19 @@
 		362947442F0DBC5100BE895D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_DISPLAY_NAME = SpeakType;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = speaktype/Resources/speaktype.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 27;
-				DEVELOPMENT_TEAM = PCV4UMSRZX;
+				DEVELOPMENT_TEAM = ZJ8C58LQA4;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
-				APP_DISPLAY_NAME = SpeakType;
 				INFOPLIST_FILE = speaktype/Resources/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -466,19 +463,19 @@
 		362947452F0DBC5100BE895D /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_DISPLAY_NAME = SpeakType;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = speaktype/Resources/speaktype.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 27;
-				DEVELOPMENT_TEAM = PCV4UMSRZX;
+				DEVELOPMENT_TEAM = ZJ8C58LQA4;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
-				APP_DISPLAY_NAME = SpeakType;
 				INFOPLIST_FILE = speaktype/Resources/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -652,11 +649,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1CE4CB3D2F0EF6AF00C01C62 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
 			productName = KeyboardShortcuts;
-		};
-		1CE4CB402F0EF86B00C01C62 /* whisperkit-cli */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 1C547F222F0E7D07008120A6 /* XCRemoteSwiftPackageReference "WhisperKit" */;
-			productName = "whisperkit-cli";
 		};
 		FA0000000000000000000002 /* FluidAudio */ = {
 			isa = XCSwiftPackageProductDependency;

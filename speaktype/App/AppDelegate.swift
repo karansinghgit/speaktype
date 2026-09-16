@@ -73,6 +73,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        AudioRecordingService.shared.restorePausedMediaIfNeeded()
+    }
+
     // MARK: - Dock icon visibility (accessory ↔ regular)
 
     /// SpeakType should feel like a menu-bar app: the Dock icon appears only while

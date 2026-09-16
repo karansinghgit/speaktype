@@ -53,6 +53,7 @@ class AudioRecordingService: NSObject, ObservableObject {
     private var smoothedAudioFrequency: Float = 0.0
 
     private let audioQueue = DispatchQueue(label: "com.speaktype.audioQueue")
+    private let mediaCoordinator: RecordingMediaCoordinator
 
     private func validatedAudioFileURL(
         at url: URL,
@@ -118,7 +119,8 @@ class AudioRecordingService: NSObject, ObservableObject {
         isRotatingChunk = false
     }
 
-    override init() {
+    init(mediaCoordinator: RecordingMediaCoordinator = RecordingMediaCoordinator()) {
+        self.mediaCoordinator = mediaCoordinator
         super.init()
         // Restore the persisted device before discovery completes; AVCaptureDevice(uniqueID:)
         // resolves it directly, and fetchAvailableDevices() falls back if it is gone.
@@ -249,6 +251,7 @@ class AudioRecordingService: NSObject, ObservableObject {
 
         guard !isRecording else { return }
         if captureSession == nil { setupSession() }
+        mediaCoordinator.recordingWillStart()
 
         // 1. Reset flags and stale writer state before any new samples arrive.
         isStopping = false
@@ -327,6 +330,7 @@ class AudioRecordingService: NSObject, ObservableObject {
             } catch {
                 print("Error starting recording: \(error)")
                 isRecording = false  // Revert if failed
+                mediaCoordinator.recordingDidFinish()
                 audioQueue.async {
                     self.captureSession?.stopRunning()
                 }
@@ -338,7 +342,10 @@ class AudioRecordingService: NSObject, ObservableObject {
         // Wait for setup to complete if it's running
         _ = await setupTask?.value
 
-        guard isRecording, let url = currentFileURL else { return nil }
+        guard isRecording, let url = currentFileURL else {
+            mediaCoordinator.recordingDidFinish()
+            return nil
+        }
         shouldDiscardCurrentRecordingOutput = discardOutput
 
         // Ensure minimum recording duration to prevent empty/corrupted WAV files
@@ -431,10 +438,15 @@ class AudioRecordingService: NSObject, ObservableObject {
                     self.captureSession?.stopRunning()
                     self.isStopping = false
                     self.shouldDiscardCurrentRecordingOutput = false
+                    self.mediaCoordinator.recordingDidFinish()
                     continuation.resume(returning: finalizedRecordingURL)
                 }
             }
         }
+    }
+
+    func restorePausedMediaIfNeeded() {
+        mediaCoordinator.recordingDidFinish()
     }
 
     func requestPermission() {

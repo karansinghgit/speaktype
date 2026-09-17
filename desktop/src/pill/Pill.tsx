@@ -6,7 +6,7 @@ import { formatClock } from "@/lib/format";
 import { useNow } from "@/lib/hooks";
 import { useApplyTheme } from "@/lib/theme";
 import { useTauriEvent } from "@/lib/useTauriEvent";
-import { showLanguageMenu, showMicrophoneMenu, showModeMenu } from "@/lib/menus";
+import { showLanguageMenu, showMicrophoneMenu, showModeMenu, showModelMenu } from "@/lib/menus";
 
 const WAVE_BARS = 34;
 const WAVE_HEIGHT = 22;
@@ -57,6 +57,10 @@ export function Pill() {
   return (
     <div className="flex h-full items-center justify-center">
       <div
+        onContextMenu={(e) => {
+          e.preventDefault();
+          if (settings) showModelMenu(settings);
+        }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{ width: size.width, height: size.height, borderRadius: size.height / 2 }}

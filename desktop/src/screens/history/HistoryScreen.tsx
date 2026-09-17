@@ -15,9 +15,10 @@ import {
 } from "@/components/ui";
 import { api, errorMessage, type HistoryItem } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { formatDay, formatDuration, formatNumber, formatTime, startOfDay } from "@/lib/format";
+import { formatDay, formatDuration, formatNumber, formatTime } from "@/lib/format";
 import { useCopy, useHistory } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
+import { groupHistory } from "./groupHistory";
 
 export function HistoryScreen() {
   const { settings, status } = useStore();
@@ -28,16 +29,7 @@ export function HistoryScreen() {
   const [deleting, setDeleting] = useState<HistoryItem | null>(null);
   const [clearing, setClearing] = useState(false);
 
-  const groups = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = (items ?? []).filter((item) => !q || item.transcript.toLowerCase().includes(q));
-    const byDay = new Map<number, HistoryItem[]>();
-    for (const item of filtered) {
-      const day = startOfDay(item.createdAt);
-      byDay.set(day, [...(byDay.get(day) ?? []), item]);
-    }
-    return [...byDay.entries()];
-  }, [items, query]);
+  const groups = useMemo(() => groupHistory(items ?? [], query), [items, query]);
 
   const run = (action: Promise<unknown>) => action.catch((e) => toast(errorMessage(e), "error"));
   const revealLabel = status.os === "macos" ? "Show in Finder" : status.os === "windows" ? "Show in Explorer" : "Show in folder";

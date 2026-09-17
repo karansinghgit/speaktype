@@ -19,6 +19,7 @@ use tauri::{
 use crate::{
     AppState, LockExt,
     dictation::{DictationState, Event},
+    platform,
 };
 
 pub const TRAY_ID: &str = "main";
@@ -143,7 +144,7 @@ fn toggle_panel(app: &AppHandle, icon: Rect) {
         let _ = panel.set_position(position);
     }
     let _ = panel.show();
-    let _ = panel.set_focus();
+    platform::focus_panel(&panel);
     let _ = app.emit_to(PANEL_LABEL, "panel-shown", ());
 }
 

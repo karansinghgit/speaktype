@@ -23,7 +23,7 @@ Hold <kbd>fn</kbd>, say what you want to write, and let go. Your words appear wh
 
 **🔒 Your voice stays on your computer.** No account, no cloud, no tracking. Pull the network cable and it still works.
 
-**⚡ Faster than you can reach the keyboard.** Parakeet turns a 35-second ramble into punctuated text in about a second on Apple Silicon, and models stay warm in the background, so there's no waiting to start.
+**⚡ Faster than you can reach the keyboard.** Parakeet turns a 35-second ramble into punctuated text in under two seconds on an M3 Pro, and models stay warm in the background, so there's no waiting to start.
 
 **🆓 Free. Actually free.** No trial, no word limits, no monthly plan. MIT licensed, so you can read every line.
 

@@ -1,0 +1,65 @@
+name: Bug report
+description: Report something that is not working in SpeakType.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this.
+
+        If your SpeakType build has `Settings > General > Support`, click `Copy Support Info` and paste that output below.
+        If not, that is fine. Please include your SpeakType version and macOS version in the report description.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you were trying to do.
+      placeholder: SpeakType started recording, but...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact actions that trigger the issue.
+      placeholder: |
+        1. Open SpeakType
+        2. Press the hotkey
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect SpeakType to do instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: support-info
+    attributes:
+      label: Support info
+      description: Optional. Paste the output from `Settings > General > Support > Copy Support Info`.
+      render: shell
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Screenshots or logs
+      description: Add screenshots, screen recordings, or relevant Console logs if available.
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and did not find the same report.
+          required: true

@@ -114,7 +114,7 @@ The repo is new and the codebase is small, so it's a good time to jump in.
 
 Don't let Rust put you off. There's no legacy code to wade through, which makes this a great place to learn it. Windows and Linux support especially could use people who use them every day.
 
-[Open an issue](https://github.com/karansinghgit/speaktype/issues) with what you'd like to pick up, and we'll help you get started.
+The **[contributing guide](CONTRIBUTING.md)** walks you through setting up macOS, Windows or Linux, running and testing the app, and opening your first pull request. Then [open an issue](https://github.com/karansinghgit/speaktype/issues) with what you'd like to pick up, and we'll help you get started.
 
 ---
 

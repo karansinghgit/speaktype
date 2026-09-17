@@ -38,7 +38,7 @@ Hold <kbd>fn</kbd>, say what you want to write, and let go. Your words appear wh
 - **Neural Engine acceleration** for Whisper on Apple Silicon.
 - **A dictionary** for names, jargon and anything else it keeps getting wrong.
 - **Cleaner text:** filler words like "um" and "uh" are removed, and punctuation is tidied up.
-- **History with playback.** Search past dictations, copy them again, and replay the recording.
+- **History with playback.** Copy past dictations again and replay their recordings.
 - **Stats** on words dictated and typing time saved.
 - **A recorder pill** that shows a live waveform while you talk, placed wherever you want it on screen.
 

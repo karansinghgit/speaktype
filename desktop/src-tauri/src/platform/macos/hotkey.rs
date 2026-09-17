@@ -190,6 +190,7 @@ const RETRY_INTERVAL: Duration = Duration::from_secs(2);
 /// creation fails, so it retries until the user grants it, and it starts over
 /// if the tap's port is ever invalidated.
 fn run_tap() {
+    let mut reported_failure = false;
     loop {
         let mask = (1u64 << FLAGS_CHANGED) | (1u64 << KEY_DOWN);
         // SAFETY: the arguments are valid CGEventTapLocation, placement and
@@ -205,10 +206,23 @@ fn run_tap() {
             )
         };
         if !port.is_null() {
+            if reported_failure {
+                eprintln!("[hotkey] Accessibility granted, listening again");
+                reported_failure = false;
+            }
             // SAFETY: CGEventTapCreate follows the Create rule, so the port is
             // ours to release, which the wrapper does when dropped.
             let port = unsafe { CFMachPort::wrap_under_create_rule(port) };
             run_until_invalidated(&port);
+        } else if !reported_failure {
+            // Said once, not every retry. macOS caches the answer per process,
+            // so granting Accessibility while the app runs usually needs a
+            // restart before this clears.
+            eprintln!(
+                "[hotkey] couldn't create the event tap: Accessibility permission is missing. \
+                 Grant it, then restart SpeakType."
+            );
+            reported_failure = true;
         }
         thread::sleep(RETRY_INTERVAL);
     }

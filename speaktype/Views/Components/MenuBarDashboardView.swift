@@ -1,8 +1,11 @@
+import AVFoundation
 import AppKit
 import SwiftUI
 
 struct MenuBarDashboardView: View {
     @StateObject private var historyService = HistoryService.shared
+    @StateObject private var audioRecorder = AudioRecordingService.shared
+    @AppStorage("showAudioDevicesInMenuBar") private var showAudioDevicesInMenuBar: Bool = false
 
     let openDashboard: () -> Void
     let quit: () -> Void
@@ -36,11 +39,62 @@ struct MenuBarDashboardView: View {
         VStack(alignment: .leading, spacing: 16) {
             header
             statsGrid
+            if showAudioDevicesInMenuBar {
+                audioDevicesSection
+            }
             recentTranscriptsSection
             actionRow
         }
         .padding(16)
         .frame(width: 388)
+        .onAppear { audioRecorder.fetchAvailableDevices() }
+    }
+
+    private var audioDevicesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Input Device", systemImage: "mic")
+                    .font(Typography.headlineMedium)
+                    .foregroundStyle(Color.textPrimary)
+
+                Spacer()
+
+                Button(action: { audioRecorder.fetchAvailableDevices() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11))
+                        Text("Refresh")
+                            .font(Typography.captionSmall)
+                    }
+                    .foregroundStyle(Color.textSecondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if audioRecorder.availableDevices.isEmpty {
+                Text("No input devices found")
+                    .font(Typography.caption)
+                    .foregroundStyle(Color.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(Color.bgCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.border, lineWidth: 1)
+                    }
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(audioRecorder.availableDevices, id: \.uniqueID) { device in
+                        MenuBarDeviceRow(
+                            name: device.localizedName,
+                            isSelected: audioRecorder.selectedDeviceId == device.uniqueID,
+                            action: { audioRecorder.selectedDeviceId = device.uniqueID }
+                        )
+                    }
+                }
+            }
+        }
     }
 
     private var header: some View {
@@ -251,6 +305,46 @@ private struct MenuBarStatCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.border, lineWidth: 1)
         }
+    }
+}
+
+private struct MenuBarDeviceRow: View {
+    let name: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: "mic")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isSelected ? Color.accentPrimary : Color.textSecondary)
+                    .frame(width: 24, height: 24)
+                    .background((isSelected ? Color.accentPrimary : Color.textSecondary).opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+
+                Text(name)
+                    .font(Typography.bodySmall)
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.accentPrimary)
+                }
+            }
+            .padding(10)
+            .background(Color.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? Color.accentPrimary : Color.border, lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 

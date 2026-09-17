@@ -560,6 +560,7 @@ struct GeneralSettingsTab: View {
 
 struct AudioSettingsTab: View {
     @StateObject private var audioRecorder = AudioRecordingService.shared
+    @AppStorage("showAudioDevicesInMenuBar") private var showAudioDevicesInMenuBar: Bool = false
 
     var body: some View {
         ScrollView {
@@ -603,6 +604,27 @@ struct AudioSettingsTab: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 8)
+                }
+
+                SettingsSection {
+                    SettingsSectionHeader(
+                        icon: "menucard", title: "Menu Bar",
+                        subtitle: "What the SpeakType menu bar item shows")
+
+                    HStack {
+                        Text("Show audio devices in menu bar")
+                            .font(Typography.bodyMedium)
+                            .foregroundStyle(Color.textPrimary)
+                        Spacer()
+                        Toggle("", isOn: $showAudioDevicesInMenuBar)
+                            .labelsHidden()
+                    }
+
+                    Text(
+                        "Lists your input microphones on the SpeakType menu bar item so you can switch devices without opening Settings."
+                    )
+                    .font(Typography.captionSmall)
+                    .foregroundStyle(Color.textMuted)
                 }
             }
             .padding(24)

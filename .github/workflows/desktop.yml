@@ -124,7 +124,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-desktop-build
       - name: Build installers
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Only warnings in our own code should fail the lint job, not the installer build.

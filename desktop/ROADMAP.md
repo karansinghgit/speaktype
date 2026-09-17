@@ -25,7 +25,7 @@ Each milestone is tagged `v2.0.0-alpha.N` so any build can be rolled back to.
 - [x] Nine screen positions, always-show option
 - [x] Hover controls: microphone, mode, language
 - [x] Click the dot to stop
-- [ ] Right-click menu to switch model
+- [x] Right-click menu to switch model
 - [ ] Frosted idle look in light mode
 
 ### Transcription

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="speaktype/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="96" alt="SpeakType icon">
+<img src=".github/assets/icon.png" width="112" alt="SpeakType icon">
 
 # SpeakType
 
@@ -126,4 +126,4 @@ Don't let Rust put you off. There's no legacy code to wade through, which makes 
 
 </div>
 
-<sub>Speech recognition by [OpenAI Whisper](https://github.com/openai/whisper) and [NVIDIA Parakeet](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), running on [whisper.cpp](https://github.com/ggml-org/whisper.cpp), [ONNX Runtime](https://onnxruntime.ai), [WhisperKit](https://github.com/argmaxinc/WhisperKit) and [FluidAudio](https://github.com/FluidInference/FluidAudio). [MIT licensed](LICENSE). Made by [2048 Labs](https://tryspeaktype.com).</sub>
+<sub>Speech recognition by [OpenAI Whisper](https://github.com/openai/whisper) and [NVIDIA Parakeet](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), running on [whisper.cpp](https://github.com/ggml-org/whisper.cpp), [ONNX Runtime](https://onnxruntime.ai), [WhisperKit](https://github.com/argmaxinc/WhisperKit) and [FluidAudio](https://github.com/FluidInference/FluidAudio). [MIT licensed](LICENSE).</sub>

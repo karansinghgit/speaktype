@@ -7,7 +7,10 @@
 //! dictionary again, which only adds what's missing and leaves settings alone.
 //! Recordings stay where SpeakType 1 saved them.
 
-use std::path::{Path, PathBuf};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+};
 
 use plist::{Dictionary, Value};
 use serde::{Deserialize, Serialize};
@@ -24,6 +27,28 @@ const APPLE_EPOCH_OFFSET_SECS: f64 = 978_307_200.0;
 /// SpeakType 1's preferences file, if this system could have one.
 pub fn preferences_path(home: &Path) -> Option<PathBuf> {
     cfg!(target_os = "macos").then(|| home.join("Library/Preferences/com.2048labs.speaktype.plist"))
+}
+
+/// Early SpeakType 2 builds used the app ID `com.2048labs.speaktype.desktop`,
+/// before taking over SpeakType 1's `com.2048labs.speaktype` so the old app can
+/// update in place. Moves an early build's folder (`dir` plus `.desktop`) to
+/// `dir`, unless `dir` already has something in it. Returns whether it moved.
+pub fn move_early_build_folder(dir: &Path) -> io::Result<bool> {
+    let Some(name) = dir.file_name().and_then(|n| n.to_str()) else {
+        return Ok(false);
+    };
+    let old = dir.with_file_name(format!("{name}.desktop"));
+    if !old.is_dir() {
+        return Ok(false);
+    }
+    if dir.exists() {
+        if fs::read_dir(dir)?.next().is_some() {
+            return Ok(false);
+        }
+        fs::remove_dir(dir)?;
+    }
+    fs::rename(&old, dir)?;
+    Ok(true)
 }
 
 /// What an import brought over, for the UI to report.
@@ -423,14 +448,14 @@ mod tests {
     impl TempDir {
         fn new() -> Self {
             let dir = std::env::temp_dir().join(format!("speaktype-test-{}", uuid::Uuid::new_v4()));
-            std::fs::create_dir_all(&dir).unwrap();
+            fs::create_dir_all(&dir).unwrap();
             Self(dir)
         }
     }
 
     impl Drop for TempDir {
         fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
+            let _ = fs::remove_dir_all(&self.0);
         }
     }
 
@@ -556,6 +581,30 @@ mod tests {
         assert!(settings.auto_update && !settings.has_completed_onboarding);
 
         assert!(!data(&[]).import_settings(&mut Settings::default()));
+    }
+
+    #[test]
+    fn moves_an_early_build_folder_once_and_never_over_data() {
+        let root = TempDir::new();
+        let dir = root.0.join("com.2048labs.speaktype");
+        let old = root.0.join("com.2048labs.speaktype.desktop");
+        assert!(!move_early_build_folder(&dir).unwrap(), "nothing to move");
+
+        fs::create_dir_all(old.join("models")).unwrap();
+        fs::write(old.join("settings.json"), "{}").unwrap();
+        fs::create_dir_all(&dir).unwrap(); // created empty by something else
+        assert!(move_early_build_folder(&dir).unwrap());
+        assert!(dir.join("settings.json").is_file() && dir.join("models").is_dir());
+        assert!(!old.exists());
+        assert!(!move_early_build_folder(&dir).unwrap(), "only once");
+
+        fs::create_dir_all(&old).unwrap();
+        fs::write(old.join("settings.json"), "{\"old\":true}").unwrap();
+        assert!(
+            !move_early_build_folder(&dir).unwrap(),
+            "existing data wins"
+        );
+        assert_eq!(fs::read_to_string(dir.join("settings.json")).unwrap(), "{}");
     }
 
     #[test]

@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "SpeakType",
   "version": "2.0.0",
-  "identifier": "com.2048labs.speaktype.desktop",
+  "identifier": "com.2048labs.speaktype",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",

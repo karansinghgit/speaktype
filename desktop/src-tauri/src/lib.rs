@@ -237,6 +237,16 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             engine::silence_logs();
+            for dir in [app.path().app_config_dir()?, app.path().app_data_dir()?] {
+                match legacy::move_early_build_folder(&dir) {
+                    Ok(true) => eprintln!(
+                        "[legacy] moved data from an early build to {}",
+                        dir.display()
+                    ),
+                    Ok(false) => {}
+                    Err(e) => eprintln!("[legacy] couldn't move an early build's data: {e}"),
+                }
+            }
             let settings_store = SettingsStore::new(app.path().app_config_dir()?);
             let fresh_install = !settings_store.exists();
             let mut settings = settings_store.load();

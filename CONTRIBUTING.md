@@ -222,8 +222,8 @@ npm run app -- --features cuda     # or --features vulkan
 
 | | macOS | Windows | Linux |
 | --- | --- | --- | --- |
-| Settings | `~/Library/Application Support/com.2048labs.speaktype.desktop/` | `%APPDATA%\com.2048labs.speaktype.desktop\` | `~/.config/com.2048labs.speaktype.desktop/` |
-| History, recordings, models | same folder | same folder | `~/.local/share/com.2048labs.speaktype.desktop/` |
+| Settings | `~/Library/Application Support/com.2048labs.speaktype/` | `%APPDATA%\com.2048labs.speaktype\` | `~/.config/com.2048labs.speaktype/` |
+| History, recordings, models | same folder | same folder | `~/.local/share/com.2048labs.speaktype/` |
 
 - **See onboarding again:** quit the app and delete `settings.json`.
 - **Start completely fresh:** delete both folders. You'll have to download a model again.

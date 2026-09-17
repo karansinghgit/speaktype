@@ -28,7 +28,7 @@ jobs:
       # Cache resolved Swift packages so WhisperKit / FluidAudio / swift-transformers
       # aren't re-fetched and recompiled every run. Keyed on the resolved graph.
       - name: Cache SwiftPM
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: SourcePackages
           key: ${{ runner.os }}-spm-${{ hashFiles('speaktype.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}

@@ -18,103 +18,126 @@
 
 </div>
 
-<p align="center"><b>Hold <kbd>fn</kbd>, talk, let go.</b> Your words land wherever your cursor is, in any app.</p>
+## What is SpeakType?
 
-## Why SpeakType
+SpeakType lets you type with your voice. Hold a key, say what you want to write, and let go. Your words appear wherever your cursor is: an email, a chat, a document, a code editor, anywhere.
 
-|  | SpeakType | Cloud dictation |
+Most voice typing apps send your recordings to a company's servers and charge a monthly fee. SpeakType does all the work on your own computer, so it's **free**, it **works without internet**, and **nothing you say ever leaves your computer**.
+
+## How it works
+
+1. **Install SpeakType** and open it.
+2. **Download a speech model** when SpeakType asks. This is the part that turns your voice into text. It's a one-time download of 75 MB to 1.6 GB, and SpeakType suggests one that suits your computer.
+3. **Hold your shortcut and talk.** Click into any text box, hold <kbd>fn</kbd> on a Mac or <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Space</kbd> on Windows and Linux, speak, and let go. You can change the shortcut in Settings.
+
+## Why people use it
+
+|  | SpeakType | Typical voice typing apps |
 | --- | --- | --- |
-| **Price** | Free, no limits | Monthly subscription |
-| **Your voice** | Never leaves your computer | Uploaded to their servers |
-| **Works offline** | ✅ | ❌ |
-| **Account** | None | Required |
-| **Source code** | Open, MIT licensed | Closed |
+| **Cost** | Free, with no limits | Monthly subscription |
+| **Your recordings** | Stay on your computer | Uploaded to the company's servers |
+| **Without internet** | Works | Doesn't work |
+| **Account** | Not needed | Required |
 
-<table>
-<tr>
-<td width="33%" valign="top">
-
-**⚡ Fast**<br>
-Parakeet turns a 35-second ramble into punctuated text in under two seconds.
-
-</td>
-<td width="33%" valign="top">
-
-**🪶 Tiny**<br>
-15 MB to install, about 285 MB of memory with a model loaded, 0% CPU while idle.
-
-</td>
-<td width="33%" valign="top">
-
-**🌍 Multilingual**<br>
-25 European languages with Parakeet, 99 with Whisper.
-
-</td>
-</tr>
-<tr>
-<td valign="top">
-
-**⌨️ Any app**<br>
-Pastes wherever you're typing, then puts your clipboard back.
-
-</td>
-<td valign="top">
-
-**📖 Spelled right**<br>
-A dictionary for names and jargon. Filler words like "um" are removed.
-
-</td>
-<td valign="top">
-
-**🕘 History and stats**<br>
-Replay and copy past dictations, and see the typing time you've saved.
-
-</td>
-</tr>
-</table>
+- **⚡ Fast.** A 35-second ramble becomes neat, punctuated text in under two seconds.
+- **🪶 Light.** A 15 MB install that stays out of the way while you're not talking.
+- **⌨️ Works in every app.** It types into whatever you're using, and puts back anything you had copied.
+- **🌍 Many languages.** Up to 99 languages, depending on the model you pick.
+- **📖 Gets your words right.** Teach it names and terms it mishears, and filler words like "um" are removed.
+- **🕘 Keeps a history.** Copy and replay past dictations, and see how much typing you've saved.
 
 ## Download
 
-| macOS 13+ (Apple Silicon) | Windows 10 and 11 | Linux |
-| :---: | :---: | :---: |
-| [`.dmg`](https://github.com/karansinghgit/speaktype/releases?q=v2&expanded=true) | [`.exe`](https://github.com/karansinghgit/speaktype/releases?q=v2&expanded=true) | [`.deb`](https://github.com/karansinghgit/speaktype/releases?q=v2&expanded=true) · [`.AppImage`](https://github.com/karansinghgit/speaktype/releases?q=v2&expanded=true) |
+**[Go to the downloads page](https://github.com/karansinghgit/speaktype/releases?q=v2&expanded=true)** and, under the newest version, click the file for your computer:
+
+| Your computer | Download this file |
+| --- | --- |
+| **Mac** with Apple Silicon (M1 or newer), macOS 13 or later | the file ending in `.dmg` |
+| **Windows** 10 or 11 | the file ending in `-setup.exe` |
+| **Linux:** Ubuntu, Debian, Mint or Pop!_OS | the file ending in `.deb` |
+| **Linux:** any other distribution | the file ending in `.AppImage` |
+
+### Installing
+
+**Mac**
+1. Open the `.dmg` file and drag SpeakType into your Applications folder.
+2. Open SpeakType. If macOS says it can't check the app, go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**. You only need to do this once.
+3. When asked, allow microphone access (so it can hear you) and accessibility access (so it can type for you).
+
+**Windows**
+1. Run the `-setup.exe` file.
+2. If a blue "Windows protected your PC" box appears, click **More info**, then **Run anyway**. You only need to do this once.
+
+**Linux**
+- **`.deb`:** double-click it to install with your software center, or run `sudo apt install ./SpeakType_*.deb`.
+- **`.AppImage`:** make it runnable with `chmod +x SpeakType_*.AppImage`, then double-click it.
+
+The extra steps on Mac and Windows are there because SpeakType isn't signed by Apple or Microsoft yet. That's coming soon.
+
+## Questions
 
 <details>
-<summary><b>First launch</b></summary>
+<summary><b>Is it really free?</b></summary>
 
-<br>
-
-The builds aren't signed by Apple or Microsoft yet, so opening SpeakType the first time takes one extra step.
-
-- **macOS:** if it says Apple couldn't check the app, open System Settings → Privacy & Security and click **Open Anyway**.
-- **Windows:** on the SmartScreen prompt, click **More info**, then **Run anyway**.
-
-Then allow microphone and accessibility access, pick the model SpeakType recommends, and hold your hotkey to talk.
+Yes. There's no trial, no word limit and no paid plan. SpeakType is open source under the MIT license, so anyone can read or reuse the code.
 
 </details>
 
-SpeakType 2 is new, so please [open an issue](https://github.com/karansinghgit/speaktype/issues) if something's off. Looking for the old Mac-only app? [SpeakType 1.3](https://github.com/karansinghgit/speaktype/releases/tag/v1.3.0) is still here.
+<details>
+<summary><b>Does anything get sent over the internet?</b></summary>
+
+No. Your voice is turned into text on your computer. SpeakType only goes online to download speech models when you ask it to, and to check for new versions, which you can turn off in Settings.
+
+</details>
+
+<details>
+<summary><b>Which model should I pick?</b></summary>
+
+The one SpeakType recommends is a good start. Roughly: smaller models are quicker and use less memory, and larger ones make fewer mistakes. **Parakeet** models are very fast and cover English plus 24 other European languages. **Whisper** models cover 99 languages. You can download several and switch any time.
+
+</details>
+
+<details>
+<summary><b>Where are my recordings and history kept?</b></summary>
+
+Only on your computer. You can delete single dictations or clear everything from the History screen.
+
+</details>
+
+<details>
+<summary><b>I used the old Mac app. Do I lose my history?</b></summary>
+
+No. The next SpeakType 2 update brings over your history, dictionary and settings from SpeakType 1 automatically the first time you open it. Until then, [SpeakType 1.3](https://github.com/karansinghgit/speaktype/releases/tag/v1.3.0) remains available.
+
+</details>
+
+<details>
+<summary><b>Something isn't working</b></summary>
+
+SpeakType 2 is new, and Windows and Linux support is especially young. Please [open an issue](https://github.com/karansinghgit/speaktype/issues) describing what happened and which computer you're on. It helps a lot.
+
+</details>
 
 ## What's next
 
-- **AI cleanup, still local:** tidy up and format what you said with a model on your computer.
-- **iOS and Android:** a SpeakType keyboard, with optional sync between your devices.
-- **Signed builds** for macOS and Windows.
+- **Smarter cleanup, still private:** an optional step that tidies up and formats what you said, using an AI model on your computer.
+- **iPhone and Android:** a SpeakType keyboard, with optional syncing between your devices.
+- **Signed apps** for Mac and Windows, so installing takes no extra steps.
 
-## Contribute
+## Help build SpeakType
 
-The repo is new and the codebase is small, so it's a good time to jump in.
+Everyone is welcome, and you don't have to write code. Bug reports, ideas and design feedback all help.
 
-| Area | Stack | What's there |
-| --- | --- | --- |
-| **Frontend** | React, TypeScript | App screens, the recorder pill, the menu bar panel, and screens for upcoming features |
-| **App core** | Rust | Audio, speech models, hotkeys and pasting on each system, and local post-processing models next |
-| **Product** | | Feedback, ideas and design polish |
-| **Mobile** | React Native | Coming soon: the iOS and Android keyboard and sync |
+| If you know… | You could work on… |
+| --- | --- |
+| **React and TypeScript** | The app's screens, the recording bubble and the menu bar panel |
+| **Rust**, or want to learn it | Audio, speech models, shortcuts and typing on Mac, Windows and Linux |
+| **Design or product** | Feedback, ideas and polish |
+| **React Native** | The upcoming iPhone and Android app |
 
-Don't let Rust put you off. There's no legacy code to wade through, which makes this a great place to learn it. Windows and Linux support especially could use people who use them every day.
+The project is new and the code is small and easy to find your way around, so it's a friendly place to learn. People who use Windows or Linux every day are especially welcome.
 
-The **[contributing guide](CONTRIBUTING.md)** walks you through setting up macOS, Windows or Linux, running and testing the app, and opening your first pull request. Then [open an issue](https://github.com/karansinghgit/speaktype/issues) with what you'd like to pick up, and we'll help you get started.
+Start with the **[contributing guide](CONTRIBUTING.md)**. It explains how to set up your computer, run and test SpeakType, and send your first change.
 
 ---
 

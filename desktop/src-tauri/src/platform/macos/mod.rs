@@ -4,9 +4,16 @@
 mod hotkey;
 mod permissions;
 
-use std::{path::Path, process::Command};
+use std::{path::Path, process::Command, sync::OnceLock};
 
 use enigo::{Enigo, Key};
+use objc2::{
+    class,
+    ffi::object_setClass,
+    msg_send,
+    runtime::{AnyClass, AnyObject, Bool, ClassBuilder, Sel},
+    sel,
+};
 use tauri::{TitleBarStyle, WebviewWindow};
 
 pub use hotkey::MODIFIER_HOTKEYS;
@@ -65,4 +72,100 @@ pub fn setup_notes() -> Vec<String> {
 pub fn style_main_window(window: &WebviewWindow) {
     let _ = window.set_title_bar_style(TitleBarStyle::Overlay);
     let _ = window.set_title("");
+}
+
+/// `NSWindowCollectionBehaviorCanJoinAllSpaces`: show on every regular Space.
+const CAN_JOIN_ALL_SPACES: usize = 1 << 0;
+/// `NSWindowCollectionBehaviorFullScreenAuxiliary`: also show inside another
+/// app's full screen Space. Without this a window is hidden the moment any app
+/// goes full screen, however high its level is.
+const FULL_SCREEN_AUXILIARY: usize = 1 << 8;
+/// `NSStatusWindowLevel`, the level the menu bar's own items sit at. Tauri's
+/// `alwaysOnTop` only reaches `NSFloatingWindowLevel`, which macOS keeps out of
+/// another app's full screen Space however its collection behavior is set.
+const STATUS_WINDOW_LEVEL: isize = 25;
+
+/// `NSWindowStyleMaskNonactivatingPanel`: the panel can take clicks and keys
+/// without activating SpeakType, so showing it never pulls the user out of the
+/// app, or the Space, they are in.
+const NONACTIVATING_PANEL: usize = 1 << 7;
+
+/// Gives the menu bar panel keyboard focus once it is on screen.
+///
+/// Nothing to do here: `show()` already sends `makeKeyAndOrderFront:`, and a
+/// nonactivating panel becomes key without activating SpeakType. Activating it
+/// (what Tauri's `set_focus` does) would pull the user to whichever Space the
+/// main window is on and dismiss the full screen app's menu bar.
+pub fn focus_panel(_window: &WebviewWindow) {}
+
+/// `-[NSWindow canBecomeKeyWindow]` says no for a window with no title bar.
+/// tao overrides that; its override goes away when the window becomes a panel,
+/// so this puts it back for the panel that needs keyboard focus.
+extern "C" fn can_become_key_window(_this: &AnyObject, _cmd: Sel) -> Bool {
+    Bool::YES
+}
+
+/// An `NSPanel` that can become the key window while borderless. Registered
+/// once, the first time a window needs it.
+fn key_panel_class() -> Option<&'static AnyClass> {
+    static CLASS: OnceLock<Option<&'static AnyClass>> = OnceLock::new();
+    *CLASS.get_or_init(|| {
+        let mut builder = ClassBuilder::new(c"SpeakTypeKeyPanel", class!(NSPanel))?;
+        // SAFETY: -canBecomeKeyWindow takes no arguments beyond the usual two
+        // and returns BOOL, which is what `can_become_key_window` does.
+        unsafe {
+            builder.add_method(
+                sel!(canBecomeKeyWindow),
+                can_become_key_window as extern "C" fn(_, _) -> Bool,
+            );
+        }
+        Some(builder.register())
+    })
+}
+
+/// Lets a floating window (the pill, the menu bar panel) appear over full
+/// screen apps, the way the Swift app's `NSPanel` did.
+///
+/// Three things are needed, and the window is invisible over a full screen app
+/// without any one of them:
+///
+/// - `fullScreenAuxiliary`, which Tauri never sets: `visibleOnAllWorkspaces`
+///   only gets as far as `canJoinAllSpaces`, and that covers regular Spaces.
+/// - `NSStatusWindowLevel`: `alwaysOnTop` only reaches the floating level.
+/// - being an `NSPanel`. A plain `NSWindow` of an inactive app is kept out of
+///   another app's full screen Space whatever its flags say, so the window's
+///   class is swapped for `NSPanel`, which adds no storage of its own.
+///
+/// `focusable` windows become an `NSPanel` subclass that can take keyboard
+/// focus: the menu bar panel needs it, both to be used and so that losing it
+/// closes the panel. The pill never wants focus, so it stays a plain panel.
+///
+/// Must run on the main thread, before the window is first shown.
+pub fn float_over_fullscreen(window: &WebviewWindow, focusable: bool) {
+    let Ok(ns_window) = window.ns_window() else {
+        return;
+    };
+    let ns_window = ns_window.cast::<AnyObject>();
+    // SAFETY: `ns_window()` returns this window's live `NSWindow`. `NSPanel` is
+    // a subclass of `NSWindow` that declares no extra instance variables, so an
+    // `NSWindow` can safely be made one in place. Every message below is part
+    // of `NSPanel`'s public interface, and this runs on the main thread.
+    unsafe {
+        let panel_class = match focusable.then(key_panel_class) {
+            Some(Some(class)) => class,
+            _ => class!(NSPanel),
+        };
+        object_setClass(ns_window, panel_class);
+
+        let style: usize = msg_send![ns_window, styleMask];
+        let _: () = msg_send![ns_window, setStyleMask: style | NONACTIVATING_PANEL];
+        // An NSPanel hides itself when its app stops being active, which for
+        // these two windows is most of the time.
+        let _: () = msg_send![ns_window, setHidesOnDeactivate: false];
+
+        let current: usize = msg_send![ns_window, collectionBehavior];
+        let behavior = current | CAN_JOIN_ALL_SPACES | FULL_SCREEN_AUXILIARY;
+        let _: () = msg_send![ns_window, setCollectionBehavior: behavior];
+        let _: () = msg_send![ns_window, setLevel: STATUS_WINDOW_LEVEL];
+    }
 }

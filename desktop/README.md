@@ -37,6 +37,8 @@ npm run release          # tags the next alpha, e.g. v2.0.0-alpha.5, and pushes 
 npm run release -- beta  # or the next beta
 ```
 
+Releasing needs the [GitHub CLI](https://cli.github.com), signed in with `gh auth login`. The script creates the release on GitHub, and CI attaches the installers to it.
+
 Every push and pull request that touches `desktop/` runs `.github/workflows/desktop.yml`:
 - type checks, tests and a production build of the UI
 - format, lint and tests of the app core on macOS, Windows and Linux

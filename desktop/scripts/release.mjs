@@ -9,6 +9,13 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
+const NOTES = `An early build of SpeakType 2 for macOS, Windows and Linux. Expect rough edges.
+SpeakType 1 remains the stable release. See desktop/ROADMAP.md for what's left.
+
+These builds aren't signed by Apple or Microsoft yet, so the first launch needs one extra step:
+- macOS: if it says Apple couldn't check the app, open System Settings → Privacy & Security and click Open Anyway.
+- Windows: on the SmartScreen prompt, click More info, then Run anyway.`;
+
 const git = (...args) => execFileSync("git", args, { encoding: "utf8" }).trim();
 const fail = (message) => {
   console.error(`release: ${message}`);
@@ -24,6 +31,11 @@ const { version } = JSON.parse(readFileSync(new URL("../src-tauri/tauri.conf.jso
 const base = `v${version}-${channel}.`;
 
 if (!dryRun) {
+  try {
+    execFileSync("gh", ["auth", "status"], { stdio: "ignore" });
+  } catch {
+    fail("install the GitHub CLI and run `gh auth login` first");
+  }
   if (git("status", "--porcelain")) fail("commit or stash your changes first");
   git("fetch", "--tags", "--quiet");
   const branch = git("rev-parse", "--abbrev-ref", "HEAD");
@@ -44,5 +56,14 @@ if (dryRun) {
 
 git("tag", "-a", tag, "-m", `SpeakType ${tag}`);
 git("push", "origin", tag);
+
+// Create the release here, with your GitHub login, and let CI attach the
+// installers. Since v2.0.0-alpha.7, GitHub refuses to let the build's own token
+// create a release, though it can still upload to an existing one.
+execFileSync(
+  "gh",
+  ["release", "create", tag, "--verify-tag", "--prerelease", "--title", `SpeakType ${tag}`, "--notes", NOTES],
+  { stdio: "inherit" },
+);
 console.log(`Pushed ${tag}. CI is building the installers:`);
 console.log(`https://github.com/karansinghgit/speaktype/actions/workflows/desktop.yml`);

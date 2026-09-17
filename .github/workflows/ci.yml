@@ -15,7 +15,7 @@ jobs:
     name: Build & Unit Test
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Select Xcode
         run: sudo xcode-select -switch /Applications/Xcode.app
@@ -59,7 +59,7 @@ jobs:
     name: SwiftLint
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # SwiftLint is preinstalled on the macOS runner image; only fall back to
       # brew (slow) if it's ever missing.

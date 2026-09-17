@@ -66,6 +66,15 @@ pub fn permission_settings_url(_kind: PermissionKind) -> Option<&'static str> {
 
 pub fn style_main_window(_window: &WebviewWindow) {}
 
+/// Always on top is enough here: neither system hides floating windows for
+/// full screen apps the way macOS Spaces do.
+pub fn float_over_fullscreen(_window: &WebviewWindow, _focusable: bool) {}
+
+/// Showing a window here doesn't give it focus, so ask for it.
+pub fn focus_panel(window: &WebviewWindow) {
+    let _ = window.set_focus();
+}
+
 /// Single-modifier hotkeys aren't supported here yet.
 pub const MODIFIER_HOTKEYS: &[&str] = &[];
 

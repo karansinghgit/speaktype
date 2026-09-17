@@ -116,6 +116,7 @@ struct GeneralSettingsTab: View {
 
     @State private var showLicenseSheet = false
     @State private var showDeactivateAlert = false
+    @State private var supportInfoCopied = false
 
     var body: some View {
         ScrollView {
@@ -479,6 +480,37 @@ struct GeneralSettingsTab: View {
                     }
                 }
 
+                SettingsSection {
+                    SettingsSectionHeader(
+                        icon: "ladybug", title: "Support",
+                        subtitle: "Copy app details for bug reports")
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(
+                            "If something breaks, copy this block and paste it into your GitHub issue. It includes the app version, macOS version, permissions, selected model, and current recording settings."
+                        )
+                        .font(Typography.captionSmall)
+                        .foregroundStyle(Color.textMuted)
+
+                        Button(action: copySupportInfo) {
+                            HStack(spacing: 8) {
+                                Image(systemName: supportInfoCopied ? "checkmark" : "doc.on.doc")
+                                    .font(.system(size: 12))
+                                Text(supportInfoCopied ? "Copied" : "Copy Support Info")
+                                    .font(Typography.labelMedium)
+                            }
+                            .foregroundStyle(
+                                supportInfoCopied ? Color.accentSuccess : Color.textPrimary
+                            )
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.bgHover)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 // License - Hidden (logic kept for future use)
                 // SettingsSection {
                 //     SettingsSectionHeader(
@@ -518,6 +550,18 @@ struct GeneralSettingsTab: View {
             }
         } message: {
             Text("Are you sure you want to deactivate your Pro license?")
+        }
+    }
+
+    private func copySupportInfo() {
+        _ = SupportInfoService.shared.copySupportInfo()
+        supportInfoCopied = true
+
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await MainActor.run {
+                supportInfoCopied = false
+            }
         }
     }
 

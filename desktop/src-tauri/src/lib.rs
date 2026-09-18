@@ -233,6 +233,9 @@ fn import_speaktype1(
 
 pub fn run() {
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            tray::open_main_window(app, None);
+        }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
@@ -301,6 +304,7 @@ pub fn run() {
                 })?;
 
             tray::build(app.handle(), show_tray_icon)?;
+            tray::open_main_window(app.handle(), None);
             Ok(())
         })
         .on_window_event(|window, event| match (window.label(), event) {

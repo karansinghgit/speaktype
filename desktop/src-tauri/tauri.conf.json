@@ -4,9 +4,6 @@
   "version": "2.0.0",
   "identifier": "com.2048labs.speaktype",
   "build": {
-    "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -19,7 +16,10 @@
         "width": 1200,
         "height": 800,
         "minWidth": 960,
-        "minHeight": 640
+        "minHeight": 640,
+        "visible": true,
+        "center": true,
+        "focus": true
       },
       {
         "label": "pill",

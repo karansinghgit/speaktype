@@ -100,7 +100,9 @@ pub fn open_main_window(app: &AppHandle, route: Option<&str>) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
+        let _ = window.set_always_on_top(true);
         let _ = window.set_focus();
+        let _ = window.set_always_on_top(false);
         if let Some(route) = route {
             let _ = app.emit_to("main", "navigate", route);
         }

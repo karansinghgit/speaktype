@@ -9,6 +9,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - Fix: the recorder's warming-up message was clipped mid-word, and pressing esc left it wedged on screen. It now shows the real loading stage, elapsed time, and settles back to idle.
 - Fix: the recommended model on the AI Models screen now shows download progress, a cancel button, and the actual reason a download failed (with a retry) instead of a Download button that appeared to do nothing.
 - Fix: a half-finished Parakeet download is no longer reported as installed.
+- Fix: ending a dictation occasionally left the recorder stuck showing an active recording that couldn't be ended, usually resolved by force quitting. Saving the audio can stall; when it does, the recorder now gives up after 10 seconds and returns to idle instead of waiting forever.
+- Fix: unplugging your microphone mid-dictation could freeze the app.
 
 ## [1.3.0] - 2026-07-10
 - 

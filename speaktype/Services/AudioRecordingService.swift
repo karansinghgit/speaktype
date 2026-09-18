@@ -3,6 +3,32 @@ import Combine
 import CoreMedia
 import Foundation
 
+/// One-shot wrapper around a `CheckedContinuation` so several racing paths (the
+/// writers finishing, a watchdog firing) can each try to resume it and only the
+/// first wins. Resuming a continuation twice traps.
+private final class ContinuationGuard<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<T, Never>?
+
+    init(_ continuation: CheckedContinuation<T, Never>) {
+        self.continuation = continuation
+    }
+
+    /// - Returns: whether this call was the one that resumed.
+    @discardableResult
+    func resume(_ value: T) -> Bool {
+        lock.lock()
+        guard let continuation else {
+            lock.unlock()
+            return false
+        }
+        self.continuation = nil
+        lock.unlock()
+        continuation.resume(returning: value)
+        return true
+    }
+}
+
 class AudioRecordingService: NSObject, ObservableObject {
     static let shared = AudioRecordingService()  // Shared instance for settings/dashboard sync
 
@@ -52,7 +78,39 @@ class AudioRecordingService: NSObject, ObservableObject {
     private var smoothedAudioLevel: Float = 0.0
     private var smoothedAudioFrequency: Float = 0.0
 
+    /// Delivery queue for `AVCaptureAudioDataOutput` sample buffers, and the only
+    /// queue that touches the asset writers.
     private let audioQueue = DispatchQueue(label: "com.speaktype.audioQueue")
+
+    /// Queue for `AVCaptureSession` lifecycle work (`startRunning`/`stopRunning`,
+    /// teardown, idle-stop bookkeeping).
+    ///
+    /// This must never be `audioQueue`. `stopRunning()` blocks until the session
+    /// has fully stopped, which includes draining sample-buffer callbacks already
+    /// queued for delivery — and those are delivered on `audioQueue`. Calling it
+    /// from `audioQueue` (a serial queue) means the pending buffer cannot run
+    /// until the current block returns, and the current block cannot return until
+    /// that buffer runs.
+    ///
+    /// The dependency is strictly one-way: `sessionQueue` may wait on `audioQueue`,
+    /// `audioQueue` never waits on `sessionQueue`.
+    private let sessionQueue = DispatchQueue(label: "com.speaktype.sessionQueue")
+
+    /// Set when a device change asks for a session rebuild mid-recording. Swapping
+    /// the session out from under a live writer strands the dictation, so the
+    /// rebuild is deferred until the recording finishes.
+    private(set) var needsSessionRebuild = false
+
+    /// How long `stopRecording()` waits for the asset writers to finalize before
+    /// giving up.
+    ///
+    /// `AVAssetWriter.finishWriting(completionHandler:)` has been observed never
+    /// calling its handler: the recording is fully written to disk but its header
+    /// is never finalized, so the `DispatchGroup` below never reaches zero and the
+    /// stop never returns. Finalizing a few hundred KB of PCM is normally
+    /// sub-second, so this bound is generous; exceeding it means the writer is
+    /// stuck and the dictation is already lost.
+    private static let finalizeTimeout: TimeInterval = 10
 
     private func validatedAudioFileURL(
         at url: URL,
@@ -178,7 +236,35 @@ class AudioRecordingService: NSObject, ObservableObject {
     }
 
     func setupSession() {
-        captureSession?.stopRunning()
+        // A device change (AirPods disconnecting, a USB mic unplugged) can land
+        // here mid-dictation via `selectedDeviceId.didSet`. Replacing the session
+        // while the writer is live loses the recording and, worse, used to block
+        // the main thread inside `stopRunning()`. Defer instead.
+        guard !isRecording else {
+            print("🎤 Session rebuild requested while recording — deferring until stop")
+            needsSessionRebuild = true
+            return
+        }
+        rebuildSession()
+    }
+
+    /// Tear down the current session and build a fresh one for `selectedDeviceId`.
+    private func rebuildSession() {
+        needsSessionRebuild = false
+
+        // Detach and stop the outgoing session on `sessionQueue`. Both calls can
+        // block on in-flight `audioQueue` deliveries, so neither may run on the
+        // caller's thread (usually main) or on `audioQueue` itself.
+        if let outgoingSession = captureSession {
+            let outgoingOutput = audioOutput
+            captureSession = nil
+            audioOutput = nil
+            sessionQueue.async {
+                outgoingOutput?.setSampleBufferDelegate(nil, queue: nil)
+                outgoingSession.stopRunning()
+            }
+        }
+
         captureSession = AVCaptureSession()
 
         guard let deviceId = selectedDeviceId,
@@ -221,7 +307,7 @@ class AudioRecordingService: NSObject, ObservableObject {
     func prewarmSession() {
         if captureSession == nil { setupSession() }
 
-        audioQueue.async {
+        sessionQueue.async {
             guard let session = self.captureSession, !session.isRunning else { return }
             print("🎤 Pre-warming audio capture session...")
             session.startRunning()
@@ -234,13 +320,33 @@ class AudioRecordingService: NSObject, ObservableObject {
 
     /// Stop the prewarmed capture session when the recorder is no longer visible.
     func stopSessionIfIdle() {
-        audioQueue.async {
+        sessionQueue.async {
             self.cancelIdleSessionStop()
             guard !self.isRecording, let session = self.captureSession, session.isRunning else {
                 return
             }
             print("🎤 Stopping idle audio capture session")
             session.stopRunning()
+        }
+    }
+
+    /// Apply a session rebuild that a device change deferred because a recording
+    /// was in flight. No-op when nothing is pending or a recording is still live.
+    private func flushPendingSessionRebuild() {
+        DispatchQueue.main.async {
+            guard self.needsSessionRebuild, !self.isRecording else { return }
+            print("🎤 Applying deferred session rebuild")
+            self.rebuildSession()
+        }
+    }
+
+    /// Stop the capture session in the background so the microphone goes idle
+    /// between dictations, without blocking the caller.
+    private func stopCaptureSession() {
+        let session = captureSession
+        sessionQueue.async {
+            self.cancelIdleSessionStop()
+            session?.stopRunning()
         }
     }
 
@@ -258,16 +364,18 @@ class AudioRecordingService: NSObject, ObservableObject {
         resetChunkWriterState()
         isRecording = true
         recordingStartTime = Date()
-        // Hop onto audioQueue: idleSessionStopWorkItem is only ever touched there,
+        // Hop onto sessionQueue: idleSessionStopWorkItem is only ever touched there,
         // and startRecording runs on the main thread.
-        audioQueue.async { self.cancelIdleSessionStop() }
+        sessionQueue.async { self.cancelIdleSessionStop() }
 
         // 2. Wrap setup in a Task so stopRecording can wait for it
         setupTask = Task { @MainActor in
             // Ensure the capture session is running before setting up the writer.
             let didColdStart = await withCheckedContinuation {
                 (continuation: CheckedContinuation<Bool, Never>) in
-                audioQueue.async {
+                // `startRunning()` blocks, so it runs on sessionQueue — never on
+                // audioQueue, which must stay free to deliver sample buffers.
+                sessionQueue.async {
                     if self.captureSession?.isRunning != true {
                         print("🎤 Starting capture session...")
                         self.captureSession?.startRunning()
@@ -327,9 +435,7 @@ class AudioRecordingService: NSObject, ObservableObject {
             } catch {
                 print("Error starting recording: \(error)")
                 isRecording = false  // Revert if failed
-                audioQueue.async {
-                    self.captureSession?.stopRunning()
-                }
+                stopCaptureSession()
             }
         }
     }
@@ -338,7 +444,10 @@ class AudioRecordingService: NSObject, ObservableObject {
         // Wait for setup to complete if it's running
         _ = await setupTask?.value
 
-        guard isRecording, let url = currentFileURL else { return nil }
+        guard isRecording, let url = currentFileURL else {
+            flushPendingSessionRebuild()
+            return nil
+        }
         shouldDiscardCurrentRecordingOutput = discardOutput
 
         // Ensure minimum recording duration to prevent empty/corrupted WAV files
@@ -361,7 +470,22 @@ class AudioRecordingService: NSObject, ObservableObject {
             self.audioFrequency = 0.0
         }
 
-        return await withCheckedContinuation { continuation in
+        let finalizedURL: URL? = await withCheckedContinuation { continuation in
+            let guarded = ContinuationGuard(continuation)
+
+            // Watchdog: if the writers never call back, give up rather than leaving
+            // the recorder stuck showing an active dictation that cannot be ended.
+            DispatchQueue.global().asyncAfter(deadline: .now() + Self.finalizeTimeout) {
+                guard guarded.resume(nil) else { return }
+                AppLogger.error(
+                    "Recording finalize timed out after \(Self.finalizeTimeout)s — dictation lost",
+                    category: AppLogger.audio
+                )
+                self.isStopping = false
+                self.shouldDiscardCurrentRecordingOutput = false
+                self.stopCaptureSession()
+            }
+
             audioQueue.async {
                 // --- Finalize the last in-flight chunk ---
                 let finishGroup = DispatchGroup()
@@ -426,15 +550,23 @@ class AudioRecordingService: NSObject, ObservableObject {
                 }
 
                 finishGroup.notify(queue: self.audioQueue) {
-                    // Keep microphone fully idle outside active recordings.
-                    self.cancelIdleSessionStop()
-                    self.captureSession?.stopRunning()
                     self.isStopping = false
                     self.shouldDiscardCurrentRecordingOutput = false
-                    continuation.resume(returning: finalizedRecordingURL)
+                    // Hand the caller its file first. Keeping the microphone idle
+                    // between dictations is worth doing, but `stopRunning()` blocks
+                    // on this very queue's pending deliveries, so it must not gate
+                    // the stop — and must not run here.
+                    guarded.resume(finalizedRecordingURL)
+                    self.stopCaptureSession()
                 }
             }
         }
+
+        // A device change that arrived mid-recording deferred its session rebuild
+        // so it wouldn't strand the dictation. Now is the safe moment.
+        flushPendingSessionRebuild()
+
+        return finalizedURL
     }
 
     func requestPermission() {
@@ -500,7 +632,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         }
 
         idleSessionStopWorkItem = work
-        audioQueue.asyncAfter(deadline: .now() + delay, execute: work)
+        sessionQueue.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     private func cancelIdleSessionStop() {

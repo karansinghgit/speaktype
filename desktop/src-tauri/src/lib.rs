@@ -276,7 +276,6 @@ pub fn run() {
             if let Some(main) = app.get_webview_window("main") {
                 platform::style_main_window(&main);
             }
-            pill::set_interactive(app.handle(), false);
 
             // Shortcut registration waits on the main thread, so it can't run
             // here before the event loop starts.

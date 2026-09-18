@@ -44,7 +44,9 @@ pub fn update(app: &AppHandle, state: PillState, position: PillPosition, always_
 /// Lets the pill receive clicks and hover (while recording) or passes them
 /// through to whatever is underneath (otherwise).
 pub fn set_interactive(app: &AppHandle, interactive: bool) {
-    if let Some(window) = app.get_webview_window(LABEL) {
+    if let Some(window) = app.get_webview_window(LABEL)
+        && window.is_visible().unwrap_or(false)
+    {
         let _ = window.set_ignore_cursor_events(!interactive);
     }
 }

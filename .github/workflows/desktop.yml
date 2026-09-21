@@ -129,6 +129,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Only warnings in our own code should fail the lint job, not the installer build.
           RUSTFLAGS: ""
+          # Signs and notarizes the macOS app, so it opens without Gatekeeper warnings and
+          # SpeakType 1 accepts it as an update. Ignored on Windows and Linux.
+          APPLE_CERTIFICATE: ${{ secrets.DEVELOPER_ID_APPLICATION_CERT }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_CERT_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.NOTARIZATION_APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.NOTARIZATION_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: desktop
           tauriScript: npx tauri

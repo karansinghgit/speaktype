@@ -175,6 +175,7 @@ mod tests {
         assert_eq!(settings.language, "auto");
         assert_eq!(settings.pill_position, PillPosition::BottomCenter);
         assert!(settings.smart_trailing_punctuation && settings.restore_clipboard);
+        assert!(settings.save_audio_recordings);
         assert!(!dir.exists(), "loading doesn't create anything");
     }
 
@@ -183,6 +184,7 @@ mod tests {
         let (store, dir) = temp_store();
         let mut settings = Settings {
             recording_mode: RecordingMode::Toggle,
+            save_audio_recordings: false,
             selected_model: "base".into(),
             recent_languages: vec!["de".into(), "fr".into()],
             ..Settings::default()
@@ -194,6 +196,7 @@ mod tests {
         let loaded = store.load();
         assert_eq!(loaded.theme, Theme::Dark);
         assert_eq!(loaded.recording_mode, RecordingMode::Toggle);
+        assert!(!loaded.save_audio_recordings);
         assert_eq!(loaded.selected_model, "base");
         assert_eq!(loaded.recent_languages, ["de", "fr"]);
         assert!(!dir.join("config/settings.json.tmp").exists());
@@ -214,6 +217,7 @@ mod tests {
         assert_eq!(settings.pill_position, PillPosition::TopRight);
         assert_eq!(settings.hotkey, crate::platform::DEFAULT_HOTKEY);
         assert!(settings.show_tray_icon);
+        assert!(settings.save_audio_recordings);
         let entry = &settings.dictionary[0];
         assert!(entry.is_enabled && entry.match_whole_word);
     }
@@ -232,6 +236,7 @@ mod tests {
             "autoEdit",
             "smartTrailingPunctuation",
             "restoreClipboard",
+            "saveAudioRecordings",
             "alwaysShowPill",
             "pillPosition",
             "showTrayIcon",

@@ -278,6 +278,7 @@ Automated tests can't press your hotkey or paste into another app. For anything 
 **History and settings**
 - [ ] A new dictation appears on the Dashboard and in History, and its recording plays.
 - [ ] Settings survive quitting and reopening the app.
+- [ ] Turn off Settings → General → Save audio recordings, dictate, and restart: the transcript and statistics remain, with no new audio file or playback control. Existing recordings still play. Turn the setting back on and check that the next dictation saves playable audio again.
 
 **Per system**
 

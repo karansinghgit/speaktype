@@ -62,6 +62,8 @@ pub struct Settings {
     pub auto_edit: bool,
     pub smart_trailing_punctuation: bool,
     pub restore_clipboard: bool,
+    /// Keep audio for playback in history. Disabling this leaves existing recordings alone.
+    pub save_audio_recordings: bool,
     pub always_show_pill: bool,
     pub pill_position: PillPosition,
     pub show_tray_icon: bool,
@@ -85,6 +87,7 @@ impl Default for Settings {
             auto_edit: false,
             smart_trailing_punctuation: true,
             restore_clipboard: true,
+            save_audio_recordings: true,
             always_show_pill: false,
             pill_position: PillPosition::BottomCenter,
             show_tray_icon: true,

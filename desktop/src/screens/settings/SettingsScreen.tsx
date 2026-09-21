@@ -169,6 +169,21 @@ function GeneralTab() {
         </SettingRow>
       </Section>
 
+      <Section title="Privacy">
+        <SettingRow
+          icon={Shield}
+          tone="neutral"
+          label="Save audio recordings"
+          description="Keep audio for playback in History. When off, new transcriptions save only text and statistics. Existing recordings are kept."
+        >
+          <Switch
+            label="Save audio recordings"
+            checked={settings.saveAudioRecordings}
+            onChange={(saveAudioRecordings) => save({ saveAudioRecordings })}
+          />
+        </SettingRow>
+      </Section>
+
       <Section title="Transcript cleanup" description="Light, offline tidying after each dictation.">
         <SettingRow
           icon={Wand2}

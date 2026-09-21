@@ -33,6 +33,8 @@ runs:
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy, rustfmt
+        # The macOS app ships as a universal binary, so it runs on Intel Macs too.
+        targets: ${{ runner.os == 'macOS' && 'x86_64-apple-darwin,aarch64-apple-darwin' || '' }}
 
     - uses: Swatinem/rust-cache@v2
       with:

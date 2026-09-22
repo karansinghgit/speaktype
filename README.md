@@ -121,7 +121,10 @@ SpeakType 2 is new, and Windows and Linux support is especially young. Please [o
 
 - **Smarter cleanup, still private:** an optional step that tidies up and formats what you said, using an AI model on your computer.
 - **iPhone and Android:** a SpeakType keyboard, with optional syncing between your devices.
+- **Words as you speak**, instead of after you stop.
 - **A signed Windows app**, so installing takes no extra steps.
+
+The **[roadmap](ROADMAP.md)** has the rest: what's being worked on now, what's coming later, and what SpeakType will never do.
 
 ## Help build SpeakType
 

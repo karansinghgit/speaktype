@@ -39,6 +39,7 @@ pub const NEURAL_ENGINE: bool = true;
 /// Parakeet runs on the CPU. ONNX Runtime's CoreML provider can't run most of the
 /// int8 model, and splitting it made transcription 3–4x slower on an M3 Pro
 /// (35 s of audio: 1.2–1.4 s on CPU, 3.5–5.2 s with CoreML).
+#[cfg(parakeet)]
 pub const ORT_ACCELERATOR: transcribe_rs::OrtAccelerator = transcribe_rs::OrtAccelerator::CpuOnly;
 
 /// Unzips with `ditto`, which ships with macOS and keeps bundle metadata intact.

@@ -4,6 +4,7 @@
 //!   Engine for the encoder when the model's CoreML companion is downloaded.
 //! - Parakeet runs through ONNX Runtime.
 
+#[cfg(parakeet)]
 mod parakeet;
 mod whisper;
 
@@ -15,6 +16,7 @@ use crate::models::{EngineKind, ModelInfo};
 
 enum Loaded {
     Whisper(whisper::Whisper),
+    #[cfg(parakeet)]
     Parakeet(parakeet::Parakeet),
 }
 
@@ -38,7 +40,10 @@ impl Engine {
         self.loaded = None;
         let loaded = match model.engine {
             EngineKind::Whisper => Loaded::Whisper(whisper::Whisper::load(path)?),
+            #[cfg(parakeet)]
             EngineKind::Parakeet => Loaded::Parakeet(parakeet::Parakeet::load(path)?),
+            #[cfg(not(parakeet))]
+            EngineKind::Parakeet => return Err("Parakeet models don't run on Intel Macs".into()),
         };
         self.loaded = Some((model.id, loaded));
         Ok(())
@@ -53,6 +58,7 @@ impl Engine {
     pub fn transcribe(&mut self, samples: &[f32], language: &str) -> Result<String, String> {
         match &mut self.loaded {
             Some((_, Loaded::Whisper(model))) => model.transcribe(samples, language),
+            #[cfg(parakeet)]
             Some((_, Loaded::Parakeet(model))) => model.transcribe(samples),
             None => Err("No model loaded".into()),
         }

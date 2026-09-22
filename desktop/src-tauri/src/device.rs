@@ -90,8 +90,7 @@ fn apple_silicon_generation(chip: &str) -> Option<u32> {
 
 /// Picks the model that best balances speed and accuracy for dictation on this machine.
 pub fn recommend(device: &DeviceInfo, language: &str) -> Recommendation {
-    let candidates: Vec<&ModelInfo> = CATALOG
-        .iter()
+    let candidates: Vec<&ModelInfo> = crate::models::available()
         .filter(|m| m.supports_language(language))
         .collect();
     let fits: Vec<&ModelInfo> = candidates

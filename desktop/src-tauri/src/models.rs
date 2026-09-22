@@ -216,8 +216,24 @@ pub const CATALOG: &[ModelInfo] = &[
     },
 ];
 
+/// Whether this build includes Parakeet. Intel Macs don't (see build.rs).
+pub const PARAKEET: bool = cfg!(parakeet);
+
+impl ModelInfo {
+    /// Whether this build can run the model.
+    pub fn is_available(&self) -> bool {
+        self.engine != EngineKind::Parakeet || PARAKEET
+    }
+}
+
+/// The models this build can run, in catalog order.
+pub fn available() -> impl Iterator<Item = &'static ModelInfo> {
+    CATALOG.iter().filter(|m| m.is_available())
+}
+
+/// A model this build can run, by id.
 pub fn find(id: &str) -> Option<&'static ModelInfo> {
-    CATALOG.iter().find(|m| m.id == id)
+    available().find(|m| m.id == id)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -357,8 +373,7 @@ impl ModelStore {
 
     pub fn statuses(&self) -> Vec<ModelStatus> {
         let active = self.active();
-        CATALOG
-            .iter()
+        available()
             .map(|m| ModelStatus {
                 info: *m,
                 downloaded: self.is_ready(m),
@@ -748,7 +763,7 @@ mod tests {
     fn statuses_include_small_encoders_in_the_download_size() {
         let store = ModelStore::new(PathBuf::from("/nonexistent/models"));
         let statuses = store.statuses();
-        assert_eq!(statuses.len(), CATALOG.len());
+        assert_eq!(statuses.len(), available().count());
         let size = |id: &str| {
             statuses
                 .iter()

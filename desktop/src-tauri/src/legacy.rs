@@ -367,6 +367,9 @@ fn hotkey_name(v1: &str) -> Option<&'static str> {
 /// SpeakType 1's model to the closest one here, if there is one.
 fn model_id(variant: &str) -> Option<&'static str> {
     let v = variant.to_lowercase();
+    if v.contains("parakeet") && !crate::models::PARAKEET {
+        return None;
+    }
     Some(if v.contains("parakeet") && v.contains("v3") {
         "parakeet-tdt-v3"
     } else if v.contains("parakeet") && v.contains("v2") {

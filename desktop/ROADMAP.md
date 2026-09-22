@@ -1,9 +1,7 @@
-# SpeakType 2
+# SpeakType 2: what's left
 
-SpeakType 2 is built alongside the current macOS app in `speaktype/`. The old
-app keeps shipping until everything below is checked, then it is retired.
-
-Each milestone is tagged `v2.0.0-alpha.N` so any build can be rolled back to.
+The engineering checklist for the app in `desktop/`. For what's coming as a
+product, and why, see [ROADMAP.md](../ROADMAP.md) at the root of the repo.
 
 ## Parity with SpeakType 1 (macOS)
 

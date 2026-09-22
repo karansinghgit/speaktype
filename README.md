@@ -87,7 +87,7 @@ Yes. There's no trial, no word limit and no paid plan. SpeakType is open source 
 <details>
 <summary><b>Does anything get sent over the internet?</b></summary>
 
-No. Your voice is turned into text on your computer. SpeakType only goes online to download speech models when you ask it to, and to check for new versions, which you can turn off in Settings.
+No. Your voice is turned into text on your computer. SpeakType only goes online to download speech models when you ask it to, and to check for new versions, which you can turn off in Settings. There's no account, and nothing is collected about how you use it.
 
 </details>
 

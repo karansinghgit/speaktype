@@ -55,12 +55,18 @@ Wanted, but not started.
 - **Who said what** ([#80](https://github.com/karansinghgit/speaktype/issues/80)), labelling speakers when transcribing a recording with several people in it.
 - **Voice commands,** such as "scratch that" or "new paragraph", handled as you speak.
 
+## Optional, and off by default
+
+Two things that some people want and others never will. Both are a choice you make, never a wall in front of the app.
+
+- **An account** ([#175](https://github.com/karansinghgit/speaktype/issues/175)), if you want one. Nothing is locked behind it. It exists for syncing between your devices once the phone keyboard lands, and for the reports below.
+- **Usage reports** ([#176](https://github.com/karansinghgit/speaktype/issues/176)), off unless you switch them on. Counts only: which system, which model, whether a dictation worked. Never a transcript, never audio, never the names of your apps or files. The app will show you the exact contents before you agree to anything.
+
 ## Not planned
 
 - **Cloud transcription.** The whole point is that your voice stays on your computer.
-- **Accounts for the desktop app.** Nothing here needs one.
 - **Paid tiers.** SpeakType is free and stays free.
-- **Telemetry.** We don't collect usage data, and won't.
+- **Collecting anything quietly.** Nothing leaves your computer unless you have turned something on, and you can see what it is.
 
 ## Helping
 

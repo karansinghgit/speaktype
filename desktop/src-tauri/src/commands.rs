@@ -342,7 +342,8 @@ pub async fn import_legacy(
     let transcripts = data.import_history(&mut state.history.lock_unpoisoned())?;
     let mut settings = state.settings();
     let dictionary = data.import_dictionary(&mut settings);
-    if dictionary > 0 {
+    if dictionary > 0 || !settings.has_imported_v1 {
+        settings.has_imported_v1 = true;
         state.replace_settings(settings)?;
         let _ = app.emit("settings-changed", ());
     }

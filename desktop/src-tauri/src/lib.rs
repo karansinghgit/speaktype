@@ -200,16 +200,21 @@ impl AppState {
     }
 }
 
-/// On a fresh install, brings over everything SpeakType 1 saved on this computer.
+/// Brings over what SpeakType 1 saved on this computer, once.
 ///
-/// Settings are saved straight away, so this only ever happens once. Failures are
-/// logged and the app starts normally without the old data.
+/// Settings only come across on a fresh install: someone who already set
+/// SpeakType 2 up keeps their own. Either way this is recorded in settings, so
+/// it never runs twice. Failures are logged and the app starts without the old data.
 fn import_speaktype1(
     app: &AppHandle,
     store: &SettingsStore,
     settings: &mut Settings,
     history: &mut History,
+    fresh_install: bool,
 ) -> Option<legacy::ImportSummary> {
+    if settings.has_imported_v1 {
+        return None;
+    }
     let path = legacy::preferences_path(&app.path().home_dir().ok()?)?;
     let data = match legacy::V1Data::read(&path) {
         Ok(data) => data?,
@@ -218,13 +223,14 @@ fn import_speaktype1(
             return None;
         }
     };
-    let summary = match legacy::import_all(&data, settings, history) {
+    let summary = match legacy::import_all(&data, settings, history, fresh_install) {
         Ok(summary) => summary,
         Err(e) => {
             eprintln!("[legacy] couldn't import history: {e}");
             return None;
         }
     };
+    settings.has_imported_v1 = true;
     if let Err(e) = store.save(settings) {
         eprintln!("[legacy] couldn't save imported settings: {e}");
     }
@@ -233,6 +239,11 @@ fn import_speaktype1(
 
 pub fn run() {
     let app = tauri::Builder::default()
+        // Launching SpeakType again brings the running app forward instead of
+        // starting a second copy with its own tray icon and hotkey.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            tray::open_main_window(app, None);
+        }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
@@ -252,11 +263,13 @@ pub fn run() {
             let mut settings = settings_store.load();
             let data_dir = app.path().app_data_dir()?;
             let mut history = History::load(&data_dir);
-            let legacy_import = if fresh_install {
-                import_speaktype1(app.handle(), &settings_store, &mut settings, &mut history)
-            } else {
-                None
-            };
+            let legacy_import = import_speaktype1(
+                app.handle(),
+                &settings_store,
+                &mut settings,
+                &mut history,
+                fresh_install,
+            );
             let show_tray_icon = settings.show_tray_icon;
 
             app.manage(AppState {

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, errorMessage, type DownloadProgress, type ModelStatus, type Settings, type Status } from "./api";
+import { StartupScreen } from "@/components/StartupScreen";
 import { useTauriEvent } from "./useTauriEvent";
 
 interface AppStore {
@@ -16,6 +17,10 @@ interface AppStore {
   refreshStatus: () => Promise<void>;
 }
 
+/** How long the first load keeps retrying while the app's core starts: 20 × 150ms. */
+const STARTUP_ATTEMPTS = 20;
+const STARTUP_RETRY_MS = 150;
+
 const StoreContext = createContext<AppStore | null>(null);
 
 export function useStore() {
@@ -31,15 +36,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<Record<string, DownloadProgress>>({});
   const [downloadErrors, setDownloadErrors] = useState<Record<string, string>>({});
 
+  const [startupError, setStartupError] = useState<string>();
+
   const refreshModels = useCallback(async () => setModels(await api.listModels()), []);
   const refreshStatus = useCallback(async () => setStatus(await api.getStatus()), []);
   const refreshSettings = useCallback(async () => setSettings(await api.getSettings()), []);
 
+  // The window can be drawing before the app's core has finished starting, and
+  // then the first calls are rejected with "state not managed". Retrying for a
+  // few seconds covers that, on slow machines too.
+  const start = useCallback(async () => {
+    setStartupError(undefined);
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const [settings, status, models] = await Promise.all([
+          api.getSettings(),
+          api.getStatus(),
+          api.listModels(),
+        ]);
+        setSettings(settings);
+        setStatus(status);
+        setModels(models);
+        return;
+      } catch (error) {
+        if (attempt >= STARTUP_ATTEMPTS) return setStartupError(errorMessage(error));
+        await new Promise((resolve) => setTimeout(resolve, STARTUP_RETRY_MS));
+      }
+    }
+  }, []);
+
   useEffect(() => {
-    refreshSettings();
-    refreshStatus();
-    refreshModels();
-  }, [refreshSettings, refreshStatus, refreshModels]);
+    start();
+  }, [start]);
 
   // Permissions can change while the app is in the background.
   useEffect(() => {
@@ -100,6 +128,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [settings, status, models, progress, downloadErrors, downloadModel, updateSettings, refreshModels, refreshStatus],
   );
 
-  if (!value) return null;
+  if (!value) return <StartupScreen error={startupError} onRetry={start} />;
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

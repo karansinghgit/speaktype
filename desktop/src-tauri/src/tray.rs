@@ -100,7 +100,13 @@ pub fn open_main_window(app: &AppHandle, route: Option<&str>) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
+        // Windows ignores focus requests from a background process unless the
+        // window is briefly raised above the others first.
+        #[cfg(windows)]
+        let _ = window.set_always_on_top(true);
         let _ = window.set_focus();
+        #[cfg(windows)]
+        let _ = window.set_always_on_top(false);
         if let Some(route) = route {
             let _ = app.emit_to("main", "navigate", route);
         }

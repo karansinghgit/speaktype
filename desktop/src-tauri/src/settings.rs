@@ -68,6 +68,8 @@ pub struct Settings {
     pub auto_update: bool,
     pub dictionary: Vec<DictionaryEntry>,
     pub has_completed_onboarding: bool,
+    /// Set once SpeakType 1's data has been brought over, so it only happens once.
+    pub has_imported_v1: bool,
     /// Set once the app has sent a new user to AI Models, so it only happens once.
     pub has_shown_model_prompt: bool,
 }
@@ -91,6 +93,7 @@ impl Default for Settings {
             auto_update: true,
             dictionary: Vec::new(),
             has_completed_onboarding: false,
+            has_imported_v1: false,
             has_shown_model_prompt: false,
         }
     }

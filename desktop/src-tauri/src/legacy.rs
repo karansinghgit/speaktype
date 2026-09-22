@@ -220,13 +220,14 @@ impl V1Data {
     }
 }
 
-/// Imports everything into a fresh install. Settings are only touched here.
+/// Imports history and the dictionary, and on a fresh install the settings too.
 pub fn import_all(
     data: &V1Data,
     settings: &mut Settings,
     history: &mut History,
+    with_settings: bool,
 ) -> Result<ImportSummary, String> {
-    let settings_changed = data.import_settings(settings);
+    let settings_changed = with_settings && data.import_settings(settings);
     let dictionary = data.import_dictionary(settings);
     let transcripts = data.import_history(history)?;
     Ok(ImportSummary {

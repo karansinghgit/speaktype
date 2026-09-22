@@ -78,7 +78,9 @@ execFileSync(
     "create",
     tag,
     "--verify-tag",
-    ...(stable ? ["--latest"] : ["--prerelease"]),
+    // Even a stable release starts as a pre-release: SpeakType 1 offers whatever is
+    // "Latest" as an update, and it must not see a release before its installers exist.
+    "--prerelease",
     "--title",
     `SpeakType ${tag}`,
     "--notes",
@@ -88,3 +90,7 @@ execFileSync(
 );
 console.log(`Pushed ${tag}. CI is building the installers:`);
 console.log(`https://github.com/karansinghgit/speaktype/actions/workflows/desktop.yml`);
+if (stable) {
+  console.log(`\nOnce the installers are attached, make it the Latest release:`);
+  console.log(`  gh release edit ${tag} --prerelease=false --latest`);
+}

@@ -1,0 +1,58 @@
+name: Bug report
+description: Something in SpeakType doesn't work
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect instead?
+      placeholder: I held the hotkey and spoke, but nothing was pasted...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open SpeakType
+        2. Hold the hotkey in a text field
+        3. Speak, then let go
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Which system?
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Windows
+        - Linux
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: System version
+      placeholder: macOS 15.1, Windows 11 24H2, Fedora 42...
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: SpeakType version
+      description: Shown in Settings, under Updates.
+      placeholder: "2.0.0"
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Which model were you using?
+      placeholder: Parakeet v3, Whisper Base...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Anything else?
+      description: Screenshots, a screen recording, or anything the terminal printed if you ran SpeakType from one.

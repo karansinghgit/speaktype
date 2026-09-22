@@ -22,13 +22,28 @@ The current focus, in order.
 - **Your recordings, your choice.** A setting to keep transcripts without saving the audio ([#114](https://github.com/karansinghgit/speaktype/issues/114)).
 - **The rough edges from your reports:** model loading that can hang ([#158](https://github.com/karansinghgit/speaktype/issues/158)), a microphone that goes quiet after a device change ([#157](https://github.com/karansinghgit/speaktype/issues/157)), no disk space check before a download ([#159](https://github.com/karansinghgit/speaktype/issues/159)).
 
-## Next
+## Next: everything the paid apps charge for
 
-- **Cleanup with a local AI model** ([#118](https://github.com/karansinghgit/speaktype/issues/118)). An optional pass that tidies up what you said: fix the odd word, format a list, match the tone of where you're writing. It runs on your computer, through Ollama or any compatible local endpoint, and your text is never sent anywhere. Off by default, and your raw transcript stays if it fails.
+The aim is plain: whatever Wispr Flow asks $15 a month for, SpeakType does for nothing, on your own computer. Tracked in [#166](https://github.com/karansinghgit/speaktype/issues/166).
+
+- **Cleanup with a local AI model** ([#118](https://github.com/karansinghgit/speaktype/issues/118)). An optional pass that tidies up what you said: fix the odd word, format a list, write it the way that place expects. It runs on your computer, through Ollama or any compatible local endpoint, and your text is never sent anywhere. Off by default, and your raw transcript stays if it fails. Everything below leans on this.
+- **Tone that fits where you're writing** ([#168](https://github.com/karansinghgit/speaktype/issues/168)). Casual in a chat, tidier in an email, no prose at all in a terminal.
+- **Speak an edit** ([#169](https://github.com/karansinghgit/speaktype/issues/169)). Select some text, hold the key, say "make this shorter" or "say this more politely", and it's replaced.
+- **Snippets** ([#167](https://github.com/karansinghgit/speaktype/issues/167)). Say "my email" and get your address.
 - **A dictionary that learns** ([#151](https://github.com/karansinghgit/speaktype/issues/151)). When you correct a word SpeakType keeps getting wrong, it should remember, rather than making you add the rule by hand.
 - **Words as you speak** ([#112](https://github.com/karansinghgit/speaktype/issues/112)). Text appearing while you talk, instead of after you stop. The biggest change to how dictation feels, and the hardest to get right.
 - **Wayland support that isn't a compromise** ([#163](https://github.com/karansinghgit/speaktype/issues/163)). Today the hotkey only fires while an older-style app has focus. Using the desktop portals fixes the hotkey and typing for every Linux user.
 - **Small things people keep asking for:** launch at login, hiding the Dock icon on Mac, switching model by right-clicking the pill, pausing music while you record ([#63](https://github.com/karansinghgit/speaktype/issues/63)).
+
+## Also next: meeting notes
+
+A note taker that listens to a call without joining it, writes a summary with action items, and answers questions about what was said. The same idea as the tools charging for it, except the recording, the transcript and the summary all stay on your computer, and there's no weekly limit.
+
+It's the largest thing this project has taken on: capturing what your computer plays works differently on each system, and an hour-long meeting is a different problem from a twenty-second dictation. In order:
+
+- **Capture what your computer is playing** ([#170](https://github.com/karansinghgit/speaktype/issues/170)), with the microphone, so both sides are recorded.
+- **Transcribe an hour as it happens** ([#171](https://github.com/karansinghgit/speaktype/issues/171)), with a live transcript.
+- **Summary, action items and questions** ([#172](https://github.com/karansinghgit/speaktype/issues/172)), plus who said what ([#80](https://github.com/karansinghgit/speaktype/issues/80)).
 
 ## Later
 

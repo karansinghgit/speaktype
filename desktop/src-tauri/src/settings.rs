@@ -72,7 +72,22 @@ pub struct Settings {
     pub has_imported_v1: bool,
     /// Set once the app has sent a new user to AI Models, so it only happens once.
     pub has_shown_model_prompt: bool,
+    /// Send finished transcripts to an LLM to clean them up.
+    pub llm_enabled: bool,
+    /// Base URL of an OpenAI-compatible API, e.g. "http://localhost:11434/v1".
+    pub llm_base_url: String,
+    pub llm_model: String,
+    /// System prompt sent with every transcript.
+    pub llm_prompt: String,
+    /// Sent as a bearer token when not empty. Local servers like Ollama don't need one.
+    pub llm_api_key: String,
 }
+
+pub const DEFAULT_LLM_BASE_URL: &str = "http://localhost:11434/v1";
+pub const DEFAULT_LLM_MODEL: &str = "qwen2.5:0.5b";
+pub const DEFAULT_LLM_PROMPT: &str = "You are a post-processor for voice dictation. Fix typos, \
+    remove filler words, correct grammar, and clean up the text while preserving the original \
+    meaning. Output ONLY the corrected text with no explanation.";
 
 impl Default for Settings {
     fn default() -> Self {
@@ -95,6 +110,11 @@ impl Default for Settings {
             has_completed_onboarding: false,
             has_imported_v1: false,
             has_shown_model_prompt: false,
+            llm_enabled: false,
+            llm_base_url: DEFAULT_LLM_BASE_URL.to_string(),
+            llm_model: DEFAULT_LLM_MODEL.to_string(),
+            llm_prompt: DEFAULT_LLM_PROMPT.to_string(),
+            llm_api_key: String::new(),
         }
     }
 }
@@ -182,6 +202,38 @@ mod tests {
     }
 
     #[test]
+    fn llm_post_processing_is_off_and_points_at_local_ollama_by_default() {
+        let settings = Settings::default();
+        assert!(!settings.llm_enabled);
+        assert_eq!(settings.llm_base_url, "http://localhost:11434/v1");
+        assert_eq!(settings.llm_model, DEFAULT_LLM_MODEL);
+        assert_eq!(settings.llm_prompt, DEFAULT_LLM_PROMPT);
+        assert!(settings.llm_api_key.is_empty());
+    }
+
+    #[test]
+    fn llm_settings_round_trip() {
+        let (store, dir) = temp_store();
+        let settings = Settings {
+            llm_enabled: true,
+            llm_base_url: "https://api.openai.com/v1".into(),
+            llm_model: "gpt-4o-mini".into(),
+            llm_prompt: "Only fix spelling.".into(),
+            llm_api_key: "sk-test".into(),
+            ..Settings::default()
+        };
+        store.save(&settings).unwrap();
+
+        let loaded = store.load();
+        assert!(loaded.llm_enabled);
+        assert_eq!(loaded.llm_base_url, "https://api.openai.com/v1");
+        assert_eq!(loaded.llm_model, "gpt-4o-mini");
+        assert_eq!(loaded.llm_prompt, "Only fix spelling.");
+        assert_eq!(loaded.llm_api_key, "sk-test");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn save_and_load_round_trip() {
         let (store, dir) = temp_store();
         let mut settings = Settings {
@@ -217,6 +269,9 @@ mod tests {
         assert_eq!(settings.pill_position, PillPosition::TopRight);
         assert_eq!(settings.hotkey, crate::platform::DEFAULT_HOTKEY);
         assert!(settings.show_tray_icon);
+        assert!(!settings.llm_enabled);
+        assert_eq!(settings.llm_base_url, DEFAULT_LLM_BASE_URL);
+        assert_eq!(settings.llm_prompt, DEFAULT_LLM_PROMPT);
         let entry = &settings.dictionary[0];
         assert!(entry.is_enabled && entry.match_whole_word);
     }
@@ -242,6 +297,11 @@ mod tests {
             "dictionary",
             "hasCompletedOnboarding",
             "hasShownModelPrompt",
+            "llmEnabled",
+            "llmBaseUrl",
+            "llmModel",
+            "llmPrompt",
+            "llmApiKey",
         ] {
             assert!(value.get(key).is_some(), "missing {key}");
         }

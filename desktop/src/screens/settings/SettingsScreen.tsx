@@ -264,19 +264,41 @@ function LlmSection() {
               urlProblem ? (
                 <span className="text-danger">{urlProblem}</span>
               ) : (
-                "Ollama runs at http://localhost:11434/v1, so your words stay on this computer."
+                <>
+                  Local: http://localhost:11434/v1 (Ollama, your words stay on this computer)
+                  <br />
+                  Cloud: https://api.openai.com/v1
+                </>
               )
             }
           >
-            <TextField {...baseUrl} aria-label="Server address" spellCheck={false} className="w-[260px]" />
+            <TextField
+              {...baseUrl}
+              aria-label="Server address"
+              placeholder="http://localhost:11434/v1"
+              spellCheck={false}
+              className="w-[260px]"
+            />
           </SettingRow>
           <SettingRow
             icon={Cpu}
             tone="neutral"
             label="Model"
-            description="For Ollama, install one first, e.g. “ollama pull qwen2.5:0.5b”."
+            description={
+              <>
+                Local: qwen2.5:0.5b (install it first with “ollama pull qwen2.5:0.5b”)
+                <br />
+                Cloud: gpt-4o-mini
+              </>
+            }
           >
-            <TextField {...model} aria-label="Model" spellCheck={false} className="w-[260px]" />
+            <TextField
+              {...model}
+              aria-label="Model"
+              placeholder="qwen2.5:0.5b"
+              spellCheck={false}
+              className="w-[260px]"
+            />
           </SettingRow>
           <SettingRow
             icon={KeyRound}
@@ -288,7 +310,7 @@ function LlmSection() {
               {...apiKey}
               type="password"
               aria-label="API key"
-              placeholder="Not needed for Ollama"
+              placeholder="Leave empty for Ollama"
               autoComplete="off"
               className="w-[260px]"
             />

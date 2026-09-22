@@ -56,7 +56,9 @@ async fn request(text: &str, config: &Config<'_>, timeout: Duration) -> Result<S
         "model": config.model,
         "messages": [
             {"role": "system", "content": config.prompt},
-            {"role": "user", "content": text},
+            // Framed like the default prompt's examples; sent bare, small
+            // models treat a dictated question as one to answer.
+            {"role": "user", "content": format!("Text: {text}\nFixed:")},
         ],
         "temperature": 0.3,
         "stream": false,
@@ -204,7 +206,10 @@ mod tests {
         assert_eq!(body["messages"][0]["role"], "system");
         assert_eq!(body["messages"][0]["content"], "Fix the text.");
         assert_eq!(body["messages"][1]["role"], "user");
-        assert_eq!(body["messages"][1]["content"], "um so hello world");
+        assert_eq!(
+            body["messages"][1]["content"],
+            "Text: um so hello world\nFixed:"
+        );
         assert!(!request.to_ascii_lowercase().contains("authorization:"));
     }
 

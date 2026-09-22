@@ -35,6 +35,7 @@ use crate::{
 const CANCEL_KEY: &str = "Escape";
 
 const TRANSCRIBING: &str = "Transcribing...";
+const POLISHING: &str = "Polishing...";
 const STOPPING: &str = "Stopping transcription...";
 
 /// How long status messages stay in the pill.
@@ -62,10 +63,10 @@ pub enum Event {
     /// Start or stop from the UI or tray, regardless of recording mode.
     Toggle,
     Escape,
-    /// A transcription worker started or finished waiting for the model.
-    Warming {
+    /// A transcription worker moved on to another step.
+    Status {
         session: u64,
-        warming: bool,
+        status: pipeline::Status,
     },
     Transcribed {
         session: u64,
@@ -301,7 +302,7 @@ impl Session {
             Event::HotkeyInterrupted => self.input(Input::HotkeyInterrupted),
             Event::Toggle => self.input(Input::Toggle),
             Event::Escape => self.input(Input::Escape),
-            Event::Warming { session, warming } => self.warming(session, warming),
+            Event::Status { session, status } => self.status(session, status),
             Event::Transcribed { session, outcome } => self.transcribed(session, outcome),
             Event::MessageExpired { generation } => {
                 if matches!(self.phase, Phase::Message { generation: g } if g == generation) {
@@ -396,7 +397,7 @@ impl Session {
         }
     }
 
-    fn warming(&mut self, session: u64, warming: bool) {
+    fn status(&mut self, session: u64, status: pipeline::Status) {
         // After Escape or a newer dictation the pill has moved on.
         let current = matches!(
             self.phase,
@@ -405,12 +406,13 @@ impl Session {
         if !current {
             return;
         }
-        self.show(if warming {
-            PillState::Warming
-        } else {
-            PillState::Processing {
-                message: TRANSCRIBING.into(),
-            }
+        let message = match status {
+            pipeline::Status::Warming => return self.show(PillState::Warming),
+            pipeline::Status::Transcribing => TRANSCRIBING,
+            pipeline::Status::Polishing => POLISHING,
+        };
+        self.show(PillState::Processing {
+            message: message.into(),
         });
     }
 
@@ -524,7 +526,7 @@ impl Session {
     }
 }
 
-/// Runs on a worker thread. Warming changes go through the controller, which
+/// Runs on a worker thread. Status changes go through the controller, which
 /// drops them once the session has moved on.
 fn transcribe(
     app: &AppHandle,
@@ -532,10 +534,10 @@ fn transcribe(
     session: u64,
     captured: &Captured,
 ) -> Outcome {
-    let on_warming = |warming| controller.send(Event::Warming { session, warming });
+    let on_status = |status| controller.send(Event::Status { session, status });
     // Without an outcome the session would stay transcribing until Escape.
     panic::catch_unwind(AssertUnwindSafe(|| {
-        pipeline::run(app, &captured.samples, captured.duration_secs, on_warming)
+        pipeline::run(app, &captured.samples, captured.duration_secs, on_status)
     }))
     .unwrap_or_else(|_| Err(pipeline::Error::Transcribe("The engine crashed".into())))
     .map(|item| item.transcript)

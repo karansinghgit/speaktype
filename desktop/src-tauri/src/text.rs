@@ -26,15 +26,15 @@ fn yes() -> bool {
 }
 
 pub struct Options<'a> {
-    pub auto_edit: bool,
     pub smart_trailing_punctuation: bool,
     pub dictionary: &'a [DictionaryEntry],
 }
 
-/// Full pipeline: engine cleanup, then dictionary, then trailing punctuation.
-pub fn process(raw: &str, options: &Options) -> String {
-    let text = normalize_transcription(raw, options.auto_edit);
-    let text = apply_dictionary(&text, options.dictionary);
+/// The steps after [`normalize_transcription`]: dictionary, then trailing
+/// punctuation. LLM post-processing runs between the two, so the dictionary
+/// has the last word.
+pub fn finish(text: &str, options: &Options) -> String {
+    let text = apply_dictionary(text, options.dictionary);
     if options.smart_trailing_punctuation {
         strip_trailing_period(&text)
     } else {
@@ -413,19 +413,17 @@ mod tests {
     }
 
     #[test]
-    fn process_respects_the_punctuation_toggle() {
+    fn finish_respects_the_punctuation_toggle() {
         let on = Options {
-            auto_edit: false,
             smart_trailing_punctuation: true,
             dictionary: &[],
         };
         let off = Options {
-            auto_edit: false,
             smart_trailing_punctuation: false,
             dictionary: &[],
         };
-        assert_eq!(process("Hello.", &on), "Hello");
-        assert_eq!(process("Hello.", &off), "Hello.");
-        assert_eq!(process("example.com.", &on), "example.com");
+        assert_eq!(finish("Hello.", &on), "Hello");
+        assert_eq!(finish("Hello.", &off), "Hello.");
+        assert_eq!(finish("example.com.", &on), "example.com");
     }
 }

@@ -55,6 +55,7 @@ Most voice typing apps send your recordings to a company's servers and charge a 
 | **Mac**, Apple Silicon or Intel, macOS 13 or later | the file ending in `.dmg` |
 | **Windows** 10 or 11 | the file ending in `-setup.exe` |
 | **Linux:** Ubuntu, Debian, Mint or Pop!_OS | the file ending in `.deb` |
+| **Linux:** Fedora, RHEL or openSUSE | the file ending in `.rpm` |
 | **Linux:** any other distribution | the file ending in `.AppImage` |
 
 ### Installing
@@ -69,6 +70,7 @@ Most voice typing apps send your recordings to a company's servers and charge a 
 
 **Linux**
 - **`.deb`:** double-click it to install with your software center, or run `sudo apt install ./SpeakType_*.deb`.
+- **`.rpm`:** double-click it, or run `sudo dnf install ./SpeakType-*.rpm`.
 - **`.AppImage`:** make it runnable with `chmod +x SpeakType_*.AppImage`, then double-click it.
 
 The extra step on Windows is there because the Windows app isn't signed by Microsoft yet. That's coming soon.

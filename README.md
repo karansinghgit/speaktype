@@ -6,9 +6,9 @@
 
 **Talk instead of type, in any app. Free, open source, and 100% on your computer.**
 
-[![Download for macOS](https://img.shields.io/badge/macOS-Download-111111?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/karansinghgit/speaktype/releases?q=v2&expanded=true)
-[![Download for Windows](https://img.shields.io/badge/Windows-Download-111111?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/karansinghgit/speaktype/releases?q=v2&expanded=true)
-[![Download for Linux](https://img.shields.io/badge/Linux-Download-111111?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/karansinghgit/speaktype/releases?q=v2&expanded=true)
+[![Download for macOS](https://img.shields.io/badge/macOS-Download-111111?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/karansinghgit/speaktype/releases/latest)
+[![Download for Windows](https://img.shields.io/badge/Windows-Download-111111?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/karansinghgit/speaktype/releases/latest)
+[![Download for Linux](https://img.shields.io/badge/Linux-Download-111111?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/karansinghgit/speaktype/releases/latest)
 
 [![Stars](https://img.shields.io/github/stars/karansinghgit/speaktype?style=flat-square&color=111111)](https://github.com/karansinghgit/speaktype/stargazers)
 [![Downloads](https://img.shields.io/github/downloads/karansinghgit/speaktype/total?style=flat-square&color=111111)](https://github.com/karansinghgit/speaktype/releases)
@@ -48,11 +48,11 @@ Most voice typing apps send your recordings to a company's servers and charge a 
 
 ## Download
 
-**[Go to the downloads page](https://github.com/karansinghgit/speaktype/releases?q=v2&expanded=true)** and, under the newest version, click the file for your computer:
+**[Go to the downloads page](https://github.com/karansinghgit/speaktype/releases/latest)** and click the file for your computer:
 
 | Your computer | Download this file |
 | --- | --- |
-| **Mac** with Apple Silicon (M1 or newer), macOS 13 or later | the file ending in `.dmg` |
+| **Mac**, Apple Silicon or Intel, macOS 13 or later | the file ending in `.dmg` |
 | **Windows** 10 or 11 | the file ending in `-setup.exe` |
 | **Linux:** Ubuntu, Debian, Mint or Pop!_OS | the file ending in `.deb` |
 | **Linux:** any other distribution | the file ending in `.AppImage` |
@@ -61,8 +61,7 @@ Most voice typing apps send your recordings to a company's servers and charge a 
 
 **Mac**
 1. Open the `.dmg` file and drag SpeakType into your Applications folder.
-2. Open SpeakType. If macOS says it can't check the app, go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**. You only need to do this once.
-3. When asked, allow microphone access (so it can hear you) and accessibility access (so it can type for you).
+2. Open SpeakType. When asked, allow microphone access (so it can hear you) and accessibility access (so it can type for you).
 
 **Windows**
 1. Run the `-setup.exe` file.
@@ -72,7 +71,7 @@ Most voice typing apps send your recordings to a company's servers and charge a 
 - **`.deb`:** double-click it to install with your software center, or run `sudo apt install ./SpeakType_*.deb`.
 - **`.AppImage`:** make it runnable with `chmod +x SpeakType_*.AppImage`, then double-click it.
 
-The extra steps on Mac and Windows are there because SpeakType isn't signed by Apple or Microsoft yet. That's coming soon.
+The extra step on Windows is there because the Windows app isn't signed by Microsoft yet. That's coming soon.
 
 ## Questions
 
@@ -93,7 +92,7 @@ No. Your voice is turned into text on your computer. SpeakType only goes online 
 <details>
 <summary><b>Which model should I pick?</b></summary>
 
-The one SpeakType recommends is a good start. Roughly: smaller models are quicker and use less memory, and larger ones make fewer mistakes. **Parakeet** models are very fast and cover English plus 24 other European languages. **Whisper** models cover 99 languages. You can download several and switch any time.
+The one SpeakType recommends is a good start. Roughly: smaller models are quicker and use less memory, and larger ones make fewer mistakes. **Parakeet** models are very fast and cover English plus 24 other European languages. They aren't available on Intel Macs. **Whisper** models cover 99 languages. You can download several and switch any time.
 
 </details>
 
@@ -107,7 +106,7 @@ Only on your computer. You can delete single dictations or clear everything from
 <details>
 <summary><b>I used the old Mac app. Do I lose my history?</b></summary>
 
-No. The next SpeakType 2 update brings over your history, dictionary and settings from SpeakType 1 automatically the first time you open it. Until then, [SpeakType 1.3](https://github.com/karansinghgit/speaktype/releases/tag/v1.3.0) remains available.
+No. SpeakType 1 offers SpeakType 2 as an update, and the first time you open it, your history, dictionary and settings come with you. You'll need to download a speech model again, since SpeakType 2 uses a different kind. If you'd rather stay on the old app, [SpeakType 1.3](https://github.com/karansinghgit/speaktype/releases/tag/v1.3.0) remains available.
 
 </details>
 
@@ -122,7 +121,7 @@ SpeakType 2 is new, and Windows and Linux support is especially young. Please [o
 
 - **Smarter cleanup, still private:** an optional step that tidies up and formats what you said, using an AI model on your computer.
 - **iPhone and Android:** a SpeakType keyboard, with optional syncing between your devices.
-- **Signed apps** for Mac and Windows, so installing takes no extra steps.
+- **A signed Windows app**, so installing takes no extra steps.
 
 ## Help build SpeakType
 

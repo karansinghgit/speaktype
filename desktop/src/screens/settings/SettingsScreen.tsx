@@ -1,17 +1,22 @@
 import {
   BookA,
+  Brain,
   ClipboardCheck,
   Command,
+  Cpu,
   Globe,
   Hand,
   Import,
+  KeyRound,
   Keyboard,
   Mic,
   Monitor,
   Moon,
   PanelBottom,
   RefreshCw,
+  RotateCcw,
   RotateCw,
+  Server,
   Shield,
 
   Sparkles,
@@ -36,13 +41,15 @@ import {
   Select,
   SettingRow,
   Switch,
+  TextArea,
+  TextField,
   useToast,
   type SelectOption,
 } from "@/components/ui";
 import { api, errorMessage, type InputDevice, type LegacyStatus, type Settings, type UpdateInfo } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { describeImport } from "@/lib/format";
-
+import { DEFAULT_LLM_PROMPT, llmUrlProblem } from "@/lib/llm";
 import { LANGUAGES, languageName } from "@/lib/languages";
 import { useStore } from "@/lib/store";
 
@@ -197,10 +204,113 @@ function GeneralTab() {
         />
       </Section>
 
+      <LlmSection />
       <LanguageSection />
       <UpdatesSection />
       <ImportSection />
     </>
+  );
+}
+
+/**
+ * Text settings are edited locally and saved when the field loses focus, so
+ * typing doesn't write the settings file on every key.
+ */
+function useDraft(saved: string, commit: (value: string) => void) {
+  const [draft, setDraft] = useState(saved);
+  useEffect(() => setDraft(saved), [saved]);
+  return {
+    value: draft,
+    onChange: (e: { target: { value: string } }) => setDraft(e.target.value),
+    onBlur: () => {
+      if (draft !== saved) commit(draft);
+    },
+  };
+}
+
+function LlmSection() {
+  const { settings } = useStore();
+  const save = useSave();
+  const baseUrl = useDraft(settings.llmBaseUrl, (llmBaseUrl) => save({ llmBaseUrl: llmBaseUrl.trim() }));
+  const model = useDraft(settings.llmModel, (llmModel) => save({ llmModel: llmModel.trim() }));
+  const apiKey = useDraft(settings.llmApiKey, (llmApiKey) => save({ llmApiKey: llmApiKey.trim() }));
+  const prompt = useDraft(settings.llmPrompt, (llmPrompt) => save({ llmPrompt }));
+  const urlProblem = llmUrlProblem(baseUrl.value);
+
+  return (
+    <Section
+      title="AI cleanup"
+      description="Optionally send each transcript to a language model to fix grammar and wording before it's pasted."
+    >
+      <SettingRow
+        icon={Brain}
+        tone="neutral"
+        label="Clean up with an LLM"
+        description={
+          settings.llmEnabled
+            ? "If the model can't be reached within 10 seconds, the original transcript is pasted."
+            : "Works with Ollama on this computer, or any OpenAI-compatible service."
+        }
+      >
+        <Switch checked={settings.llmEnabled} onChange={(llmEnabled) => save({ llmEnabled })} />
+      </SettingRow>
+      {settings.llmEnabled && (
+        <>
+          <SettingRow
+            icon={Server}
+            tone="neutral"
+            label="Server address"
+            description={
+              urlProblem ? (
+                <span className="text-danger">{urlProblem}</span>
+              ) : (
+                "Ollama runs at http://localhost:11434/v1, so your words stay on this computer."
+              )
+            }
+          >
+            <TextField {...baseUrl} aria-label="Server address" spellCheck={false} className="w-[260px]" />
+          </SettingRow>
+          <SettingRow
+            icon={Cpu}
+            tone="neutral"
+            label="Model"
+            description="For Ollama, install one first, e.g. “ollama pull qwen2.5:0.5b”."
+          >
+            <TextField {...model} aria-label="Model" spellCheck={false} className="w-[260px]" />
+          </SettingRow>
+          <SettingRow
+            icon={KeyRound}
+            tone="neutral"
+            label="API key"
+            description="Only for cloud services. Saved on this computer with your other settings."
+          >
+            <TextField
+              {...apiKey}
+              type="password"
+              aria-label="API key"
+              placeholder="Not needed for Ollama"
+              autoComplete="off"
+              className="w-[260px]"
+            />
+          </SettingRow>
+          <div className="flex flex-col gap-2 px-5 py-4">
+            <div className="flex items-center">
+              <span className="flex-1 type-label">Instructions</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={RotateCcw}
+                disabled={settings.llmPrompt === DEFAULT_LLM_PROMPT}
+                onClick={() => save({ llmPrompt: DEFAULT_LLM_PROMPT })}
+              >
+                Reset
+              </Button>
+            </div>
+            <TextArea {...prompt} aria-label="Instructions for the model" rows={4} />
+          </div>
+        </>
+      )}
+    </Section>
   );
 }
 

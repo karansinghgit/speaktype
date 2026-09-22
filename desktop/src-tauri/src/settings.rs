@@ -212,6 +212,15 @@ mod tests {
     }
 
     #[test]
+    fn frontend_reset_uses_the_same_default_prompt() {
+        let frontend = include_str!("../../src/lib/llm.ts");
+        assert!(
+            frontend.contains(&format!("\"{DEFAULT_LLM_PROMPT}\"")),
+            "DEFAULT_LLM_PROMPT in src/lib/llm.ts differs from settings.rs"
+        );
+    }
+
+    #[test]
     fn llm_settings_round_trip() {
         let (store, dir) = temp_store();
         let settings = Settings {

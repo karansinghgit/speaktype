@@ -5,6 +5,7 @@ mod dictation;
 mod engine;
 mod history;
 mod legacy;
+mod llm;
 mod media;
 mod models;
 mod paste;

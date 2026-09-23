@@ -3,6 +3,7 @@
  * with sample data, for design work without the native app. Never used inside Tauri.
  */
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
+import { DEFAULT_LLM_PROMPT } from "@/lib/llm";
 
 export function installBrowserPreview() {
   if ("__TAURI_INTERNALS__" in window) return;
@@ -34,6 +35,11 @@ export function installBrowserPreview() {
     hasCompletedOnboarding: params.get("onboarding") !== "1",
     hasShownModelPrompt: true,
     hasImportedV1: false,
+    llmEnabled: params.get("llm") === "1",
+    llmBaseUrl: "http://localhost:11434/v1",
+    llmModel: "qwen2.5:0.5b",
+    llmPrompt: DEFAULT_LLM_PROMPT,
+    llmApiKey: "",
   };
 
   const transcripts = [

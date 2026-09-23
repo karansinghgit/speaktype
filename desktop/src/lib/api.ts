@@ -44,6 +44,14 @@ export interface Settings {
   hasShownModelPrompt: boolean;
   /** Set once SpeakType 1's data has been brought over. */
   hasImportedV1: boolean;
+  /** Send finished transcripts to an LLM to clean them up. */
+  llmEnabled: boolean;
+  /** Base URL of an OpenAI-compatible API, e.g. "http://localhost:11434/v1". */
+  llmBaseUrl: string;
+  llmModel: string;
+  llmPrompt: string;
+  /** Empty for local servers like Ollama. */
+  llmApiKey: string;
 }
 
 export type OS = "macos" | "windows" | "linux";

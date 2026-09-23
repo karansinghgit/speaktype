@@ -173,6 +173,7 @@ enum Phase {
     Idle,
     Recording {
         recording: Recording,
+        output_mute: platform::OutputMuteGuard,
         by_hotkey: bool,
     },
     Transcribing {
@@ -338,6 +339,7 @@ impl Session {
         }
 
         let app = self.app.clone();
+        let output_mute = platform::OutputMuteGuard::mute();
         let recording = Recording::start(&settings.input_device, move |level| {
             let _ = app.emit_to(pill::LABEL, "pill-level", level);
         });
@@ -346,6 +348,7 @@ impl Session {
                 let started_at_ms = now_ms();
                 self.phase = Phase::Recording {
                     recording,
+                    output_mute,
                     by_hotkey,
                 };
                 self.set_cancel_key(true);
@@ -362,10 +365,17 @@ impl Session {
     }
 
     fn stop(&mut self, cancelled: bool) {
-        let Phase::Recording { recording, .. } = mem::replace(&mut self.phase, Phase::Idle) else {
+        let Phase::Recording {
+            recording,
+            output_mute,
+            ..
+        } = mem::replace(&mut self.phase, Phase::Idle)
+        else {
             return;
         };
-        let captured = match recording.finish() {
+        let captured = recording.finish();
+        drop(output_mute);
+        let captured = match captured {
             Ok(captured) => captured,
             Err(e) => {
                 eprintln!("[dictation] {e}");

@@ -2,6 +2,7 @@
 //! permission prompts, and the Neural Engine for Whisper.
 
 mod hotkey;
+mod output;
 mod permissions;
 
 use std::{path::Path, process::Command};
@@ -10,6 +11,7 @@ use enigo::{Enigo, Key};
 use tauri::{TitleBarStyle, WebviewWindow};
 
 pub use hotkey::MODIFIER_HOTKEYS;
+pub use output::{OutputMuteGuard, restore_output_on_exit};
 pub use permissions::{permission_settings_url, permissions, request_permission};
 
 use super::HotkeyHandler;

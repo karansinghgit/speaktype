@@ -59,7 +59,7 @@ export function Pill() {
       <div
         onContextMenu={(e) => {
           e.preventDefault();
-          if (settings) showModelMenu(settings);
+          if (state.phase === "idle" && settings) showModelMenu(settings);
         }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}

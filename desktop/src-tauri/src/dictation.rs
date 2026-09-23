@@ -480,14 +480,14 @@ impl Session {
 
     fn show(&self, state: PillState) {
         let settings = self.state().settings();
+        let interactive = settings.always_show_pill && matches!(&state, PillState::Idle);
         pill::update(
             &self.app,
             state,
             settings.pill_position,
             settings.always_show_pill,
         );
-        // The pill takes clicks only while recording, so its controls work.
-        pill::set_interactive(&self.app, matches!(self.phase, Phase::Recording { .. }));
+        pill::set_interactive(&self.app, interactive);
     }
 
     fn broadcast(&self, state: DictationState) {

@@ -360,6 +360,9 @@ pub fn run() {
         .expect("error while building SpeakType");
 
     app.run(|app, event| {
+        if let tauri::RunEvent::Exit = event {
+            platform::restore_output_on_exit();
+        }
         // macOS: clicking the Dock icon brings the hidden window back.
         #[cfg(target_os = "macos")]
         if let tauri::RunEvent::Reopen { .. } = event {

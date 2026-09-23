@@ -29,6 +29,19 @@ mod windows;
 #[cfg(target_os = "windows")]
 pub use windows::*;
 
+#[cfg(not(target_os = "macos"))]
+pub struct OutputMuteGuard;
+
+#[cfg(not(target_os = "macos"))]
+impl OutputMuteGuard {
+    pub fn mute() -> Self {
+        Self
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn restore_output_on_exit() {}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PermissionKind {

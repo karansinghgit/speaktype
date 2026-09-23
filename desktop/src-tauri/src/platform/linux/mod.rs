@@ -66,8 +66,9 @@ pub fn permission_settings_url(_kind: PermissionKind) -> Option<&'static str> {
 
 pub fn style_main_window(_window: &WebviewWindow) {}
 
-/// Always on top is enough here: neither system hides floating windows for
-/// full screen apps the way macOS Spaces do.
+/// Nothing extra is needed here today: `alwaysOnTop` is enough for the windows
+/// SpeakType shows. Exclusive full screen apps and some Wayland compositors do
+/// cover floating windows, so this is where that would be handled.
 pub fn float_over_fullscreen(_window: &WebviewWindow, _focusable: bool) {}
 
 /// Showing a window here doesn't give it focus, so ask for it.

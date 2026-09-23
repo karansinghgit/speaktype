@@ -99,26 +99,54 @@ const NONACTIVATING_PANEL: usize = 1 << 7;
 /// main window is on and dismiss the full screen app's menu bar.
 pub fn focus_panel(_window: &WebviewWindow) {}
 
-/// `-[NSWindow canBecomeKeyWindow]` says no for a window with no title bar.
-/// tao overrides that; its override goes away when the window becomes a panel,
-/// so this puts it back for the panel that needs keyboard focus.
-extern "C" fn can_become_key_window(_this: &AnyObject, _cmd: Sel) -> Bool {
+/// Answers for the `canBecomeKeyWindow` and `canBecomeMainWindow` overrides
+/// below. tao answers both from its `focusable` ivar, which belongs to the
+/// window class these windows no longer have.
+extern "C" fn yes(_this: &AnyObject, _cmd: Sel) -> Bool {
     Bool::YES
 }
 
-/// An `NSPanel` that can become the key window while borderless. Registered
-/// once, the first time a window needs it.
-fn key_panel_class() -> Option<&'static AnyClass> {
-    static CLASS: OnceLock<Option<&'static AnyClass>> = OnceLock::new();
-    *CLASS.get_or_init(|| {
-        let mut builder = ClassBuilder::new(c"SpeakTypeKeyPanel", class!(NSPanel))?;
-        // SAFETY: -canBecomeKeyWindow takes no arguments beyond the usual two
-        // and returns BOOL, which is what `can_become_key_window` does.
+extern "C" fn no(_this: &AnyObject, _cmd: Sel) -> Bool {
+    Bool::NO
+}
+
+/// The `NSPanel` subclass a window of this kind becomes, registered once.
+///
+/// Both kinds say no to `canBecomeMainWindow`: a panel is never the main
+/// window. They differ on key status. The menu bar panel needs it, to be typed
+/// into and so that losing it closes the panel. The pill must never take it:
+/// it floats above whatever app someone is dictating into, so becoming key
+/// would mean swallowing the keystrokes meant for that app.
+///
+/// Answering these here rather than leaving them to `NSPanel` is deliberate.
+/// A borderless nonactivating panel happens to answer no to both on macOS 26,
+/// so the pill behaves today either way, but that is an undocumented default
+/// rather than anything `"focusable": false` still controls once the window's
+/// class has changed.
+fn panel_class(focusable: bool) -> Option<&'static AnyClass> {
+    static KEY: OnceLock<Option<&'static AnyClass>> = OnceLock::new();
+    static QUIET: OnceLock<Option<&'static AnyClass>> = OnceLock::new();
+
+    let (class, name, can_become_key) = if focusable {
+        (
+            &KEY,
+            c"SpeakTypeKeyPanel",
+            yes as extern "C" fn(_, _) -> Bool,
+        )
+    } else {
+        (
+            &QUIET,
+            c"SpeakTypeQuietPanel",
+            no as extern "C" fn(_, _) -> Bool,
+        )
+    };
+    *class.get_or_init(|| {
+        let mut builder = ClassBuilder::new(name, class!(NSPanel))?;
+        // SAFETY: both selectors take no arguments beyond the usual two and
+        // return BOOL, which is what these functions do.
         unsafe {
-            builder.add_method(
-                sel!(canBecomeKeyWindow),
-                can_become_key_window as extern "C" fn(_, _) -> Bool,
-            );
+            builder.add_method(sel!(canBecomeKeyWindow), can_become_key);
+            builder.add_method(sel!(canBecomeMainWindow), no as extern "C" fn(_, _) -> Bool);
         }
         Some(builder.register())
     })
@@ -135,11 +163,15 @@ fn key_panel_class() -> Option<&'static AnyClass> {
 /// - `NSStatusWindowLevel`: `alwaysOnTop` only reaches the floating level.
 /// - being an `NSPanel`. A plain `NSWindow` of an inactive app is kept out of
 ///   another app's full screen Space whatever its flags say, so the window's
-///   class is swapped for `NSPanel`, which adds no storage of its own.
+///   class is swapped for one of the `NSPanel` subclasses above.
 ///
-/// `focusable` windows become an `NSPanel` subclass that can take keyboard
-/// focus: the menu bar panel needs it, both to be used and so that losing it
-/// closes the panel. The pill never wants focus, so it stays a plain panel.
+/// Changing the class costs the window everything tao put on its own class:
+/// `canBecomeKeyWindow` and `canBecomeMainWindow`, which tao answers from a
+/// `focusable` ivar, and its `sendEvent:` override, which implements dragging
+/// a window by its background. The subclasses answer the first two; the third
+/// only matters for windows with drag regions, which these two don't have.
+/// `tao::Window::set_focusable` would now abort, since it writes that ivar by
+/// name, so nothing may call it on these windows.
 ///
 /// Must run on the main thread, before the window is first shown.
 pub fn float_over_fullscreen(window: &WebviewWindow, focusable: bool) {
@@ -152,11 +184,7 @@ pub fn float_over_fullscreen(window: &WebviewWindow, focusable: bool) {
     // `NSWindow` can safely be made one in place. Every message below is part
     // of `NSPanel`'s public interface, and this runs on the main thread.
     unsafe {
-        let panel_class = match focusable.then(key_panel_class) {
-            Some(Some(class)) => class,
-            _ => class!(NSPanel),
-        };
-        object_setClass(ns_window, panel_class);
+        object_setClass(ns_window, panel_class(focusable).unwrap_or(class!(NSPanel)));
 
         let style: usize = msg_send![ns_window, styleMask];
         let _: () = msg_send![ns_window, setStyleMask: style | NONACTIVATING_PANEL];

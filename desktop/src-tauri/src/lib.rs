@@ -289,6 +289,12 @@ pub fn run() {
             if let Some(main) = app.get_webview_window("main") {
                 platform::style_main_window(&main);
             }
+            // The panel takes keyboard focus; the pill must never steal it.
+            for (label, focusable) in [(pill::LABEL, false), (tray::PANEL_LABEL, true)] {
+                if let Some(window) = app.get_webview_window(label) {
+                    platform::float_over_fullscreen(&window, focusable);
+                }
+            }
 
             // Shortcut registration waits on the main thread, so it can't run
             // here before the event loop starts.

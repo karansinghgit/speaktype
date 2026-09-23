@@ -1,16 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   accuracyTier,
   countWords,
   describeImport,
   formatBytes,
   formatClock,
+  formatCompact,
+  formatDay,
   formatDuration,
   formatMinutesSaved,
   formatLanguages,
   formatModelSize,
   formatRelative,
   hotkeyParts,
+  plural,
   speedTier,
   startOfDay,
 } from "./format";
@@ -31,7 +34,13 @@ describe("durations and sizes", () => {
 
   it("formats model and byte sizes", () => {
     expect(formatModelSize(142)).toBe("142 MB");
+    expect(formatModelSize(999)).toBe("999 MB");
+    expect(formatModelSize(1000)).toBe("1000 MB");
+    expect(formatModelSize(1023)).toBe("1023 MB");
+    expect(formatModelSize(1024)).toBe("1.0 GB");
+    expect(formatModelSize(1536)).toBe("1.5 GB");
     expect(formatModelSize(1624)).toBe("1.6 GB");
+    expect(formatModelSize(2048)).toBe("2.0 GB");
     expect(formatBytes(500)).toBe("1 KB");
     expect(formatBytes(5 * 1024 ** 2)).toBe("5 MB");
     expect(formatBytes(2.5 * 1024 ** 3)).toBe("2.50 GB");
@@ -51,6 +60,19 @@ describe("relative times", () => {
 
   it("finds the start of the local day", () => {
     expect(startOfDay(now)).toBe(new Date(2026, 8, 17).getTime());
+  });
+
+  it("formats relative days", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    expect(formatDay(now)).toBe("Today");
+    expect(formatDay(new Date(2026, 8, 16, 12, 0, 0).getTime())).toBe("Yesterday");
+    expect(formatDay(new Date(2026, 8, 14, 12, 0, 0).getTime())).toBe("Monday");
+    expect(formatDay(new Date(2026, 8, 5, 12, 0, 0).getTime())).toBe("September 5");
+    expect(formatDay(new Date(2025, 8, 5, 12, 0, 0).getTime())).toBe("September 5, 2025");
+
+    vi.useRealTimers();
   });
 });
 
@@ -72,7 +94,21 @@ describe("models", () => {
 describe("text", () => {
   it("counts words", () => {
     expect(countWords("")).toBe(0);
+    expect(countWords("    ")).toBe(0);
+    expect(countWords("single")).toBe(1);
     expect(countWords("  hello   world \n again ")).toBe(3);
+  });
+
+  it("formats plurals", () => {
+    expect(plural(0, "transcription")).toBe("0 transcriptions");
+    expect(plural(1, "transcription")).toBe("1 transcription");
+    expect(plural(2, "transcription")).toBe("2 transcriptions");
+  });
+
+  it("formats compact numbers", () => {
+    expect(formatCompact(0)).toBe("0");
+    expect(formatCompact(500)).toBe("500");
+    expect(formatCompact(1234)).toBe("1.2K");
   });
 
   it("splits single-modifier and combined hotkeys", () => {

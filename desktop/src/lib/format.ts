@@ -58,7 +58,7 @@ export function formatLanguages(model: { englishOnly: boolean; languages: string
 }
 
 export function formatModelSize(mb: number) {
-  return mb >= 1000 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`;
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`;
 }
 
 export function formatBytes(bytes: number) {

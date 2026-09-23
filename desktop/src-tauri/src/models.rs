@@ -475,15 +475,7 @@ impl ModelStore {
             .map_err(|e| format!("Download failed: {e}"))?;
         let mut sizes = Vec::with_capacity(missing.len());
         for asset in &missing {
-            let size = client
-                .head(&asset.url)
-                .send()
-                .await
-                .and_then(|r| r.error_for_status())
-                .map_err(|e| format!("Download failed: {e}"))?
-                .content_length()
-                .unwrap_or(0);
-            sizes.push(size);
+            sizes.push(download_size(&client, &asset.url).await?);
         }
         let total: u64 = sizes.iter().sum();
 
@@ -509,6 +501,21 @@ impl ModelStore {
         report(total);
         Ok(())
     }
+}
+
+async fn download_size(client: &reqwest::Client, url: &str) -> Result<u64, String> {
+    let response = client
+        .head(url)
+        .send()
+        .await
+        .and_then(|r| r.error_for_status())
+        .map_err(|e| format!("Download failed: {e}"))?;
+    // HEAD has an empty body, so reqwest's content_length() returns zero.
+    Ok(response
+        .headers()
+        .get(reqwest::header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok()?.parse().ok())
+        .unwrap_or(0))
 }
 
 /// Removes a model from `ModelStore::active` when dropped.
@@ -660,6 +667,28 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn head_uses_content_length_header_not_empty_body() {
+        use std::io::{BufRead, BufReader, Write};
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            for line in BufReader::new(&mut stream).lines() {
+                if line.unwrap().is_empty() {
+                    break;
+                }
+            }
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 1234\r\nConnection: close\r\n\r\n")
+                .unwrap();
+        });
+        let size = tauri::async_runtime::block_on(download_size(&reqwest::Client::new(), &url));
+        server.join().unwrap();
+        assert_eq!(size.unwrap(), 1234);
+    }
 
     #[test]
     fn catalog_ids_are_unique() {

@@ -79,13 +79,39 @@ export function AudioPlayer({ itemId }: { itemId: string }) {
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
         aria-valuenow={Math.round(time)}
+        aria-valuetext={`${formatClock(time)} of ${formatClock(duration)}`}
+        tabIndex={peaks ? 0 : -1}
         onClick={(e) => {
           if (!audio.current || !duration) return;
           const rect = e.currentTarget.getBoundingClientRect();
           audio.current.currentTime = ((e.clientX - rect.left) / rect.width) * duration;
           setTime(audio.current.currentTime);
         }}
-        className="flex h-10 flex-1 items-center gap-[2px]"
+        onKeyDown={(e) => {
+          if (!audio.current || !duration) return;
+          const STEP = 5;
+          if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            audio.current.currentTime = Math.max(0, audio.current.currentTime - STEP);
+            setTime(audio.current.currentTime);
+          } else if (e.key === "ArrowRight") {
+            e.preventDefault();
+            audio.current.currentTime = Math.min(duration, audio.current.currentTime + STEP);
+            setTime(audio.current.currentTime);
+          } else if (e.key === "Home") {
+            e.preventDefault();
+            audio.current.currentTime = 0;
+            setTime(0);
+          } else if (e.key === "End") {
+            e.preventDefault();
+            audio.current.currentTime = duration;
+            setTime(duration);
+          } else if (e.key === " " || e.key === "Enter") {
+            e.preventDefault();
+            audio.current.paused ? audio.current.play() : audio.current.pause();
+          }
+        }}
+        className="flex h-10 flex-1 items-center gap-[2px] rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
       >
         {(peaks ?? new Array(BAR_COUNT).fill(0.08)).map((peak, i) => (
           <span

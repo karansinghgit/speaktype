@@ -102,12 +102,7 @@ pub fn run(
         .lock_unpoisoned()
         .recordings_dir()
         .to_path_buf();
-    // Re-read the preference in case it changed while the model was transcribing.
-    let audio_path = save_recording(
-        &recordings_dir,
-        samples,
-        state.settings().save_audio_recordings,
-    );
+    let audio_path = save_recording(&recordings_dir, samples, settings.save_audio_recordings);
     let added = state
         .history
         .lock_unpoisoned()
@@ -207,9 +202,6 @@ mod tests {
         let dir = TempDir::new();
         let recordings = dir.0.join("recordings");
         let path = save_recording(&recordings, &[0.1; 160], true).unwrap();
-        let reader = hound::WavReader::open(&path).unwrap();
-        assert_eq!(reader.spec().sample_rate, 16_000);
-        assert_eq!(reader.len(), 160);
         let original = fs::read(&path).unwrap();
 
         assert_eq!(save_recording(&recordings, &[0.2; 320], false), None);

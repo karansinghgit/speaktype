@@ -174,10 +174,12 @@ function GeneralTab() {
           icon={Shield}
           tone="neutral"
           label="Save audio recordings"
-          description="Keep audio for playback in History. When off, new transcriptions save only text and statistics. Existing recordings are kept."
+          description={settings.saveAudioRecordings
+            ? "New transcriptions keep audio for playback in History. Turn off to save only text and statistics. Existing recordings are kept."
+            : "New transcriptions save only text and statistics. Existing recordings are kept."
+          }
         >
           <Switch
-            label="Save audio recordings"
             checked={settings.saveAudioRecordings}
             onChange={(saveAudioRecordings) => save({ saveAudioRecordings })}
           />

@@ -54,8 +54,8 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-/// Transcribes 16 kHz mono audio with the selected model, saves the recording
-/// and the result to history, and returns the history item.
+/// Transcribes 16 kHz mono audio with the selected model, saves the result to
+/// history (with audio when enabled), and returns the history item.
 ///
 /// `on_warming` is called with `true` before the model starts loading and
 /// `false` once it is done, whether or not loading succeeded.
@@ -102,7 +102,7 @@ pub fn run(
         .lock_unpoisoned()
         .recordings_dir()
         .to_path_buf();
-    let audio_path = save_recording(&recordings_dir, samples);
+    let audio_path = save_recording(&recordings_dir, samples, settings.save_audio_recordings);
     let added = state
         .history
         .lock_unpoisoned()
@@ -139,7 +139,10 @@ fn lock_engine<'a>(state: &'a AppState, on_warming: &impl Fn(bool)) -> MutexGuar
     engine
 }
 
-fn save_recording(dir: &Path, samples: &[f32]) -> Option<PathBuf> {
+fn save_recording(dir: &Path, samples: &[f32], enabled: bool) -> Option<PathBuf> {
+    if !enabled {
+        return None;
+    }
     let path = dir.join(format!("recording-{}.wav", history::now_ms()));
     match media::write_wav(&path, samples) {
         Ok(()) => Some(path),
@@ -152,7 +155,76 @@ fn save_recording(dir: &Path, samples: &[f32]) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::Error;
+    use super::{Error, save_recording};
+    use crate::history::History;
+    use std::{fs, path::PathBuf};
+
+    struct TempDir(PathBuf);
+
+    impl TempDir {
+        fn new() -> Self {
+            let dir = std::env::temp_dir().join(format!("speaktype-test-{}", uuid::Uuid::new_v4()));
+            fs::create_dir_all(&dir).unwrap();
+            Self(dir)
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn disabled_audio_saving_keeps_transcript_and_stats_without_creating_recordings() {
+        let dir = TempDir::new();
+        let mut history = History::load(&dir.0);
+        let audio_path = save_recording(history.recordings_dir(), &[0.1; 160], false);
+        assert_eq!(audio_path, None);
+        assert!(!history.recordings_dir().exists());
+
+        let item = history
+            .add("hello world", 0.01, "Tiny", audio_path)
+            .unwrap()
+            .unwrap();
+        let reloaded = History::load(&dir.0);
+        assert_eq!(reloaded.items()[0].id, item.id);
+        assert_eq!(reloaded.items()[0].transcript, "hello world");
+        assert_eq!(reloaded.items()[0].audio_path, None);
+        assert_eq!(reloaded.stats().len(), 1);
+        let stats = serde_json::to_value(reloaded.stats()).unwrap();
+        assert_eq!(stats[0]["wordCount"], 2);
+        assert!(!history.recordings_dir().exists());
+    }
+
+    #[test]
+    fn disabling_audio_saving_preserves_existing_recordings() {
+        let dir = TempDir::new();
+        let recordings = dir.0.join("recordings");
+        let path = save_recording(&recordings, &[0.1; 160], true).unwrap();
+        let original = fs::read(&path).unwrap();
+
+        assert_eq!(save_recording(&recordings, &[0.2; 320], false), None);
+        assert_eq!(fs::read(&path).unwrap(), original);
+        assert_eq!(fs::read_dir(&recordings).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn failed_audio_write_still_allows_transcript_history() {
+        let dir = TempDir::new();
+        let mut history = History::load(&dir.0);
+        // A file where the directory should be forces a write failure on every OS.
+        fs::write(history.recordings_dir(), b"not a directory").unwrap();
+        let audio_path = save_recording(history.recordings_dir(), &[0.1; 160], true);
+        assert_eq!(audio_path, None);
+        history
+            .add("keep this text", 0.01, "Tiny", audio_path)
+            .unwrap();
+        let reloaded = History::load(&dir.0);
+        assert_eq!(reloaded.items()[0].transcript, "keep this text");
+        assert_eq!(reloaded.items()[0].audio_path, None);
+        assert_eq!(reloaded.stats().len(), 1);
+    }
 
     #[test]
     fn errors_show_their_detail_when_they_have_one() {

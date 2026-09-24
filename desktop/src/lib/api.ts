@@ -35,6 +35,7 @@ export interface Settings {
   autoEdit: boolean;
   smartTrailingPunctuation: boolean;
   restoreClipboard: boolean;
+  saveAudioRecordings: boolean;
   alwaysShowPill: boolean;
   pillPosition: PillPosition;
   showTrayIcon: boolean;

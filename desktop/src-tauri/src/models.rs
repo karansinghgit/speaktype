@@ -16,6 +16,7 @@ use std::{
 
 use futures_util::StreamExt;
 use serde::Serialize;
+use sysinfo::{DiskRefreshKind, Disks};
 use tokio::io::AsyncWriteExt;
 
 use crate::{LockExt, platform};
@@ -276,6 +277,21 @@ struct Asset {
     zipped: bool,
 }
 
+impl Asset {
+    /// Where the download is written until it's complete. Named for the model, so
+    /// models sharing an asset (the Turbo encoder) can download at the same time
+    /// without writing to the same file.
+    fn part(&self, model_id: &str) -> PathBuf {
+        let ext = if self.zipped { ".zip.part" } else { ".part" };
+        with_suffix(&self.dest, &format!(".{model_id}{ext}"))
+    }
+
+    /// Where a zip is extracted before the result is moved into place.
+    fn staging(&self, model_id: &str) -> PathBuf {
+        with_suffix(&self.dest, &format!(".{model_id}.extracting"))
+    }
+}
+
 /// Gives up on a connection that stops sending data, instead of showing the
 /// download as in progress forever.
 const READ_TIMEOUT: Duration = Duration::from_secs(30);
@@ -487,6 +503,13 @@ impl ModelStore {
         }
         let total: u64 = sizes.iter().sum();
 
+        // Checked before writing anything, so a full disk is reported up front
+        // rather than as a write error minutes in.
+        remove_leftovers(&missing, model.id).await;
+        if let Some(available) = available_space(&self.dir) {
+            check_space(space_needed(model, &missing, &sizes), available)?;
+        }
+
         let mut done = 0;
         let report = |downloaded: u64| {
             on_progress(DownloadProgress {
@@ -526,8 +549,7 @@ impl Drop for ActiveDownload<'_> {
 /// What every asset of one model's download shares.
 struct Download<'a> {
     client: &'a reqwest::Client,
-    /// Names the temporary files, so models sharing an asset (the Turbo encoder)
-    /// can download at the same time without writing to the same file.
+    /// Names the temporary files (see `Asset::part`).
     model_id: &'a str,
     cancelled: &'a AtomicBool,
 }
@@ -546,14 +568,7 @@ impl Download<'_> {
         tokio::fs::create_dir_all(dir)
             .await
             .map_err(|e| e.to_string())?;
-        let part = with_suffix(
-            &asset.dest,
-            &format!(
-                ".{}{}",
-                self.model_id,
-                if asset.zipped { ".zip.part" } else { ".part" }
-            ),
-        );
+        let part = asset.part(self.model_id);
 
         if let Err(e) = self.fetch_to(&asset.url, &part, expected, on_bytes).await {
             let _ = tokio::fs::remove_file(&part).await;
@@ -564,7 +579,7 @@ impl Download<'_> {
             // Extract into a temporary folder, then move the result into place, so a
             // half-extracted folder never looks installed. Unzipping takes a while,
             // so it runs off the async runtime.
-            let staging = with_suffix(&asset.dest, &format!(".{}.extracting", self.model_id));
+            let staging = asset.staging(self.model_id);
             let (zip, dest) = (part.clone(), asset.dest.clone());
             let installed = tauri::async_runtime::spawn_blocking(move || {
                 let result = install_zip(&zip, &staging, &dest);
@@ -641,6 +656,100 @@ fn install_zip(zip: &Path, staging: &Path, dest: &Path) -> Result<(), String> {
         // Another model sharing these files finished first.
         Err(_) if dest.is_dir() => Ok(()),
         Err(e) => Err(e.to_string()),
+    }
+}
+
+/// Decimal, as the catalog and the model cards count sizes.
+const MB: u64 = 1_000_000;
+/// Left free after a download, so it never fills the disk to the last byte.
+const SPACE_MARGIN: u64 = 100 * MB;
+
+/// Deletes what an interrupted earlier download of this model left behind, so
+/// it doesn't count against the free space. Other models' files are untouched,
+/// and this model can't be downloading twice.
+async fn remove_leftovers(missing: &[Asset], model_id: &str) {
+    for asset in missing {
+        let _ = tokio::fs::remove_file(asset.part(model_id)).await;
+        let _ = tokio::fs::remove_dir_all(asset.staging(model_id)).await;
+    }
+}
+
+/// Disk space the download takes at its peak, given each missing asset's size
+/// (0 when the server didn't say). A zip and the folder it extracts to exist
+/// together until the zip is removed. Unknown sizes fall back to the catalog.
+fn space_needed(model: &ModelInfo, missing: &[Asset], sizes: &[u64]) -> u64 {
+    let known = missing
+        .iter()
+        .zip(sizes)
+        .map(|(asset, &size)| if asset.zipped { 2 * size } else { size })
+        .sum();
+    if !sizes.contains(&0) {
+        return known;
+    }
+    let mut estimate_mb = 0;
+    if missing.iter().any(|a| !a.zipped) {
+        estimate_mb += u64::from(model.size_mb);
+    }
+    if missing.iter().any(|a| a.zipped) {
+        estimate_mb += 2 * u64::from(model.accelerator_mb);
+    }
+    known.max(estimate_mb * MB)
+}
+
+/// Refuses a download that won't fit with `SPACE_MARGIN` to spare.
+fn check_space(needed: u64, available: u64) -> Result<(), String> {
+    let needed = needed + SPACE_MARGIN;
+    if available >= needed {
+        return Ok(());
+    }
+    Err(format!(
+        "Not enough disk space: this download needs {} and only {} is free",
+        format_size(needed),
+        format_size(available)
+    ))
+}
+
+/// Free space on the disk holding `dir`, or `None` when it can't be told, in
+/// which case the download goes ahead unchecked.
+fn available_space(dir: &Path) -> Option<u64> {
+    // The models folder doesn't exist before the first download.
+    let dir = dir.ancestors().find(|p| p.exists())?;
+    let disks = Disks::new_with_refreshed_list_specifics(DiskRefreshKind::nothing().with_storage());
+    let mount = mount_point_of(dir, disks.list().iter().map(|d| d.mount_point()))?;
+    let disk = disks.list().iter().find(|d| d.mount_point() == mount)?;
+    same_device(dir, mount).then(|| disk.available_space())
+}
+
+/// The mount point `path` is under: the longest one containing it.
+fn mount_point_of<'a>(path: &Path, mounts: impl Iterator<Item = &'a Path>) -> Option<&'a Path> {
+    mounts
+        .filter(|mount| path.starts_with(mount))
+        .max_by_key(|mount| mount.as_os_str().len())
+}
+
+/// Guards against reading the wrong disk: `sysinfo` doesn't list some mounts
+/// (tmpfs, network drives), which would otherwise match a parent like `/`.
+#[cfg(unix)]
+fn same_device(a: &Path, b: &Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    match (std::fs::metadata(a), std::fs::metadata(b)) {
+        (Ok(a), Ok(b)) => a.dev() == b.dev(),
+        _ => false,
+    }
+}
+
+#[cfg(not(unix))]
+fn same_device(_: &Path, _: &Path) -> bool {
+    true
+}
+
+/// Sizes as the model cards show them (`formatModelSize`), so the two compare.
+fn format_size(bytes: u64) -> String {
+    let mb = (bytes as f64 / MB as f64).round();
+    if mb >= 1000.0 {
+        format!("{:.1} GB", mb / 1024.0)
+    } else {
+        format!("{mb:.0} MB")
     }
 }
 
@@ -879,5 +988,89 @@ mod tests {
             with_suffix(Path::new("/m/enc.mlmodelc"), ".tiny.extracting"),
             PathBuf::from("/m/enc.mlmodelc.tiny.extracting")
         );
+    }
+
+    fn asset(dest: &str, zipped: bool) -> Asset {
+        Asset {
+            url: String::new(),
+            dest: PathBuf::from(dest),
+            zipped,
+        }
+    }
+
+    #[test]
+    fn a_download_that_wont_fit_is_refused_with_the_sizes() {
+        assert_eq!(check_space(1000 * MB, 2000 * MB), Ok(()));
+        // Fits, but not with the margin to spare.
+        assert!(check_space(1000 * MB, 1050 * MB).is_err());
+        // In the model cards' units: Whisper Small's card says 621 MB (466 + 155).
+        assert_eq!(
+            check_space(776 * MB, 298 * MB),
+            Err("Not enough disk space: this download needs 876 MB and only 298 MB is free".into())
+        );
+        // Over 1000 MB it switches to GB, dividing by 1024 as the cards do.
+        assert_eq!(
+            check_space(1624 * MB, 500 * MB),
+            Err("Not enough disk space: this download needs 1.7 GB and only 500 MB is free".into())
+        );
+    }
+
+    #[test]
+    fn space_needed_counts_zips_twice_and_falls_back_to_the_catalog() {
+        let model = find("small-en").unwrap();
+        let files = [
+            asset("/m/ggml-small.en.bin", false),
+            asset("/m/ggml-small.en-encoder.mlmodelc", true),
+        ];
+        assert_eq!(space_needed(model, &files, &[500, 100]), 700);
+        // Sizes the server didn't report come from the catalog: 466 MB + 2 × 155 MB.
+        assert_eq!(space_needed(model, &files, &[0, 100]), 776 * MB);
+        assert_eq!(
+            space_needed(model, &files[1..], &[0]),
+            2 * 155 * MB,
+            "only the missing encoder"
+        );
+    }
+
+    #[test]
+    fn a_path_is_on_the_longest_mount_point_containing_it() {
+        let mounts = [
+            Path::new("/"),
+            Path::new("/home"),
+            Path::new("/home/me/media"),
+        ];
+        let mount = |path| mount_point_of(Path::new(path), mounts.into_iter());
+        assert_eq!(mount("/home/me/.local/share"), Some(Path::new("/home")));
+        assert_eq!(
+            mount("/home/me/media/models"),
+            Some(Path::new("/home/me/media"))
+        );
+        // Whole components only: /home2 isn't under /home.
+        assert_eq!(mount("/home2/models"), Some(Path::new("/")));
+        assert_eq!(
+            mount_point_of(Path::new("/models"), std::iter::empty()),
+            None
+        );
+    }
+
+    #[test]
+    fn leftovers_of_an_interrupted_download_are_removed() {
+        let temp = TempStore::new();
+        let model = find("base").unwrap();
+        let missing = temp.store.assets(model, true);
+        for asset in &missing {
+            std::fs::write(asset.part(model.id), b"partial").unwrap();
+            std::fs::create_dir_all(asset.staging(model.id)).unwrap();
+        }
+        // Another model downloading the same file keeps its own.
+        let other = missing[0].part("base-en");
+        std::fs::write(&other, b"partial").unwrap();
+
+        tauri::async_runtime::block_on(remove_leftovers(&missing, model.id));
+        for asset in &missing {
+            assert!(!asset.part(model.id).exists());
+            assert!(!asset.staging(model.id).exists());
+        }
+        assert!(other.exists());
     }
 }

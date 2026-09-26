@@ -659,11 +659,10 @@ fn install_zip(zip: &Path, staging: &Path, dest: &Path) -> Result<(), String> {
     }
 }
 
+/// Decimal, as the catalog and the model cards count sizes.
+const MB: u64 = 1_000_000;
 /// Left free after a download, so it never fills the disk to the last byte.
-const SPACE_MARGIN: u64 = 100 * MIB;
-const MIB: u64 = 1024 * 1024;
-/// The catalog's sizes are in decimal megabytes, as the files are published.
-const CATALOG_MB: u64 = 1_000_000;
+const SPACE_MARGIN: u64 = 100 * MB;
 
 /// Deletes what an interrupted earlier download of this model left behind, so
 /// it doesn't count against the free space. Other models' files are untouched,
@@ -694,7 +693,7 @@ fn space_needed(model: &ModelInfo, missing: &[Asset], sizes: &[u64]) -> u64 {
     if missing.iter().any(|a| a.zipped) {
         estimate_mb += 2 * u64::from(model.accelerator_mb);
     }
-    known.max(estimate_mb * CATALOG_MB)
+    known.max(estimate_mb * MB)
 }
 
 /// Refuses a download that won't fit with `SPACE_MARGIN` to spare.
@@ -744,10 +743,10 @@ fn same_device(_: &Path, _: &Path) -> bool {
     true
 }
 
-/// Sizes as the app shows download progress: binary units.
+/// Sizes as the model cards show them (`formatModelSize`), so the two compare.
 fn format_size(bytes: u64) -> String {
-    let mb = bytes as f64 / MIB as f64;
-    if mb >= 1024.0 {
+    let mb = (bytes as f64 / MB as f64).round();
+    if mb >= 1000.0 {
         format!("{:.1} GB", mb / 1024.0)
     } else {
         format!("{mb:.0} MB")
@@ -1001,13 +1000,18 @@ mod tests {
 
     #[test]
     fn a_download_that_wont_fit_is_refused_with_the_sizes() {
-        let gb = 1024 * MIB;
-        assert_eq!(check_space(gb, 2 * gb), Ok(()));
+        assert_eq!(check_space(1000 * MB, 2000 * MB), Ok(()));
         // Fits, but not with the margin to spare.
-        assert!(check_space(gb, gb + SPACE_MARGIN / 2).is_err());
+        assert!(check_space(1000 * MB, 1050 * MB).is_err());
+        // In the model cards' units: Whisper Small's card says 621 MB (466 + 155).
         assert_eq!(
-            check_space(3 * gb / 2, 400 * MIB),
-            Err("Not enough disk space: this download needs 1.6 GB and only 400 MB is free".into())
+            check_space(776 * MB, 298 * MB),
+            Err("Not enough disk space: this download needs 876 MB and only 298 MB is free".into())
+        );
+        // Over 1000 MB it switches to GB, dividing by 1024 as the cards do.
+        assert_eq!(
+            check_space(1624 * MB, 500 * MB),
+            Err("Not enough disk space: this download needs 1.7 GB and only 500 MB is free".into())
         );
     }
 
@@ -1020,10 +1024,10 @@ mod tests {
         ];
         assert_eq!(space_needed(model, &files, &[500, 100]), 700);
         // Sizes the server didn't report come from the catalog: 466 MB + 2 × 155 MB.
-        assert_eq!(space_needed(model, &files, &[0, 100]), 776 * CATALOG_MB);
+        assert_eq!(space_needed(model, &files, &[0, 100]), 776 * MB);
         assert_eq!(
             space_needed(model, &files[1..], &[0]),
-            2 * 155 * CATALOG_MB,
+            2 * 155 * MB,
             "only the missing encoder"
         );
     }

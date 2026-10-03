@@ -1,13 +1,16 @@
+import { Power } from "lucide-react";
 import { LogoMark } from "@/components/brand/LogoMark";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { useStore } from "@/lib/store";
 import { NAV, type Route } from "./routes";
 
 /** Black in both themes; the one place neon green sits on a large dark surface. */
 export function Sidebar({ route, onNavigate }: { route: Route; onNavigate: (route: Route) => void }) {
-  const { status } = useStore();
+  const { status, settings } = useStore();
   // On macOS the window's traffic lights sit over the top of the sidebar.
   const macChrome = status.os === "macos";
+  const isDebug = Boolean(status.debug ?? import.meta.env.DEV);
 
   return (
     <nav className="flex h-full w-[232px] shrink-0 flex-col bg-sidebar text-white">
@@ -44,6 +47,36 @@ export function Sidebar({ route, onNavigate }: { route: Route; onNavigate: (rout
       </div>
 
       <div className="flex-1" />
+
+      {isDebug && (
+        <div className="flex flex-col gap-1.5 px-3 pb-2">
+          <div className="flex items-center justify-between px-3 py-1 type-caption text-white/50">
+            <span>Telemetry</span>
+            <span
+              className={cn(
+                "inline-flex h-4 items-center rounded-full px-2 text-[10px] font-medium transition-colors",
+                settings.telemetryEnabled
+                  ? "bg-accent/20 text-accent"
+                  : "bg-white/10 text-white/40",
+              )}
+            >
+              {settings.telemetryEnabled ? "Enabled" : "Disabled"}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => api.quitApp()}
+            className="group flex h-9 w-full items-center gap-3 rounded-control px-3 text-left type-label text-white/50 transition-colors duration-150 hover:bg-white/5 hover:text-white"
+          >
+            <Power
+              size={17}
+              strokeWidth={2}
+              className="shrink-0 text-white/45 transition-colors group-hover:text-red-400"
+            />
+            Quit SpeakType
+          </button>
+        </div>
+      )}
 
       {/* Studio wordmark, letters spread across the sidebar's width. */}
       <a

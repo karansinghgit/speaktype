@@ -45,10 +45,17 @@ Every push and pull request that touches `desktop/` runs `.github/workflows/desk
 - a dependency audit
 - installers for all three systems, uploaded as workflow artifacts
 
-Pushing a `v2.*` tag builds the installers straight away, since the tagged commit has already been checked, and publishes them as a GitHub pre-release. SpeakType 1 stays the "Latest" release, so its update check and download links are unaffected. Every tag is a rollback point.
+## Privacy & Telemetry
+
+SpeakType includes an optional, privacy-focused telemetry system that is **disabled by default**:
+- **Strictly opt-in:** No diagnostics or metrics leave your computer unless you explicitly turn on **Anonymous telemetry** in **Settings → Privacy & Diagnostics**.
+- **No speech or text:** Audio recordings, transcripts, and personal data are never collected. The payload contains only high-level system information (OS, architecture, kernel, desktop environment), model name, and dictation success/error counters.
+- **Anonymous identifier:** Reports are associated with a random UUID v4 that has no connection to your hardware or identity. You can rotate/reset this identifier at any time with one click in Settings.
+- **Full transparency:** You can click **View current payload** in Settings to inspect the live JSON payload, or enable **Show telemetry payload in UI** to review it before exit.
+- **Endpoint configuration:** Telemetry is sent via HTTP POST to `https://telemetry.speaktype.com/api/v1/telemetry`. This can be redirected using the `SPEAKTYPE_TELEMETRY_ENDPOINT` or `SPEAKTYPE_TELEMETRY_URL` environment variables.
 
 ## Layout
 
 - `src/` UI. Colors, radii, shadows and type styles all come from `src/styles/globals.css`.
-- `src-tauri/src/` app core: audio, transcription engines, dictation, paste, history, models.
+- `src-tauri/src/` app core: audio, transcription engines, dictation, paste, history, models, telemetry.
 - `src-tauri/src/platform/{macos,windows,linux}/` everything OS-specific, one folder per OS with the same functions.

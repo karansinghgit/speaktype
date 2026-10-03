@@ -44,6 +44,9 @@ export interface Settings {
   hasShownModelPrompt: boolean;
   /** Set once SpeakType 1's data has been brought over. */
   hasImportedV1: boolean;
+  telemetryEnabled: boolean;
+  showTelemetryPayload: boolean;
+  anonymousId: string;
 }
 
 export type OS = "macos" | "windows" | "linux";
@@ -55,6 +58,7 @@ export interface Status {
   hotkeyError: string | null;
   /** Single-modifier hotkeys this OS supports, e.g. "Fn". */
   modifierHotkeys: string[];
+  debug?: boolean;
 }
 
 export interface InputDevice {
@@ -165,6 +169,23 @@ export interface UpdateInfo {
   url: string;
 }
 
+export interface TelemetryPayload {
+  anonymous_id: string;
+  os_name: string;
+  os_version: string;
+  arch: string;
+  kernel_version?: string;
+  distribution_id?: string;
+  desktop_env?: string;
+  app_version: string;
+  model: string;
+  stats: {
+    success_count: number;
+    fail_count: number;
+    errors: Record<string, number>;
+  };
+}
+
 export const api = {
   getStatus: () => invoke<Status>("get_status"),
   getSettings: () => invoke<Settings>("get_settings"),
@@ -198,7 +219,10 @@ export const api = {
 
   openMainWindow: (route?: string) => invoke<void>("open_main_window", { route }),
   hideTrayPanel: () => invoke<void>("hide_tray_panel"),
-  quitApp: () => invoke<void>("quit_app"),
+  quitApp: (force?: boolean) => invoke<void>("quit_app", { force }),
+  getTelemetryPayload: () => invoke<TelemetryPayload>("get_telemetry_payload"),
+  resetAnonymousId: () => invoke<string>("reset_anonymous_id"),
+  sendTelemetry: () => invoke<void>("send_telemetry"),
 };
 
 /** Turns a rejected invoke into a readable message. */

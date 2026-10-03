@@ -10,11 +10,7 @@
 //! tested without a microphone or windows.
 
 use std::{
-    mem,
-    panic::{self, AssertUnwindSafe},
-    sync::mpsc::{self, Sender},
-    thread,
-    time::Duration,
+    collections::HashMap, mem, panic::{self, AssertUnwindSafe}, sync::mpsc::{self, Sender}, thread, time::Duration,
 };
 
 use serde::Serialize;
@@ -278,6 +274,32 @@ impl Controller {
     }
 }
 
+#[derive(Debug,Clone,Serialize)]
+pub struct TelemetryStats {
+    pub success_count: u64,
+    pub fail_count: u64,
+    pub errors: HashMap<String, u64>,
+}
+
+impl TelemetryStats{
+    pub fn new() -> Self{
+        Self{
+            success_count:0,
+            fail_count:0,
+            errors:HashMap::new()
+        }
+    }
+
+    pub fn record_success(&mut self){
+        self.success_count+=1;
+    }
+
+    pub fn record_error(&mut self, error: impl Into<String>) {
+        self.fail_count += 1;
+        *self.errors.entry(error.into()).or_insert(0) += 1;
+    }
+}
+
 struct Session {
     app: AppHandle,
     controller: Controller,
@@ -293,6 +315,7 @@ impl Session {
     fn state(&self) -> tauri::State<'_, AppState> {
         self.app.state::<AppState>()
     }
+
 
     fn handle(&mut self, event: Event) {
         match event {
@@ -331,9 +354,15 @@ impl Session {
     fn start(&mut self, by_hotkey: bool) {
         let settings = self.state().settings();
         if settings.selected_model.is_empty() {
+            if settings.telemetry_enabled {
+                self.state().telemetry.lock_unpoisoned().record_error("no_model_selected");
+            }
             return self.flash("No model selected", ERROR_MESSAGE);
         }
         if !self.state().models.is_downloaded(&settings.selected_model) {
+            if settings.telemetry_enabled {
+                self.state().telemetry.lock_unpoisoned().record_error("model_not_downloaded");
+            }
             return self.flash("Model not downloaded", ERROR_MESSAGE);
         }
 
@@ -356,6 +385,9 @@ impl Session {
             }
             Err(e) => {
                 eprintln!("[dictation] {e}");
+                if self.state().settings().telemetry_enabled {
+                    self.state().telemetry.lock_unpoisoned().record_error("microphone_unavailable");
+                }
                 self.flash("Microphone unavailable", ERROR_MESSAGE);
             }
         }
@@ -369,6 +401,9 @@ impl Session {
             Ok(captured) => captured,
             Err(e) => {
                 eprintln!("[dictation] {e}");
+                if self.state().settings().telemetry_enabled {
+                    self.state().telemetry.lock_unpoisoned().record_error("recording_failed");
+                }
                 return self.flash("Recording failed", ERROR_MESSAGE);
             }
         };
@@ -428,13 +463,25 @@ impl Session {
 
         match outcome {
             Ok(text) => {
-                self.go_idle();
                 if !cancelled {
+                    if self.state().settings().telemetry_enabled {
+                        self.state().telemetry.lock_unpoisoned().record_success();
+                    }
                     let restore = self.state().settings().restore_clipboard;
                     self.paster.paste(text, restore);
                 }
+                self.go_idle();
             }
             Err(e) => {
+                let error_key = match &e {
+                    pipeline::Error::NoSpeech => "no_speech",
+                    pipeline::Error::NoModel => "no_model",
+                    pipeline::Error::ModelLoad(_) => "model_load_failed",
+                    pipeline::Error::Transcribe(_) => "transcription_failed",
+                };
+                if self.state().settings().telemetry_enabled {
+                    self.state().telemetry.lock_unpoisoned().record_error(error_key);
+                }
                 if let Some(detail) = e.detail() {
                     eprintln!("[dictation] {detail}");
                 }
@@ -675,5 +722,20 @@ mod tests {
             run(Activity::Idle, mode, &[Input::Escape]),
             [Action::Nothing]
         );
+    }
+
+    #[test]
+    fn telemetry_stats_tracks_success_and_errors() {
+        let mut stats = TelemetryStats::new();
+        stats.record_success();
+        stats.record_success();
+        stats.record_error("no_speech");
+        stats.record_error("transcription_failed");
+        stats.record_error("no_speech");
+
+        assert_eq!(stats.success_count, 2);
+        assert_eq!(stats.fail_count, 3);
+        assert_eq!(stats.errors.get("no_speech"), Some(&2));
+        assert_eq!(stats.errors.get("transcription_failed"), Some(&1));
     }
 }

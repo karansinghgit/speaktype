@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { TelemetryDialog } from "@/components/TelemetryDialog";
 import { UpdateDialog } from "@/components/UpdateDialog";
-import { api, type UpdateInfo } from "@/lib/api";
+import { api, type TelemetryPayload, type UpdateInfo } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import { useTauriEvent } from "@/lib/useTauriEvent";
 import { NAV } from "./routes";
@@ -44,9 +45,14 @@ function useDailyUpdateCheck(enabled: boolean) {
 export function App() {
   const { settings, models, updateSettings } = useStore();
   const [route, setRoute] = useState<Route>("dashboard");
+  const [telemetryPayload, setTelemetryPayload] = useState<TelemetryPayload | null>(null);
+
   // The menu bar panel can open a specific screen.
   useTauriEvent<string>("navigate", ({ payload }) => {
     if (NAV.some((item) => item.route === payload)) setRoute(payload as Route);
+  });
+  useTauriEvent<TelemetryPayload>("show-telemetry-payload", ({ payload }) => {
+    setTelemetryPayload(payload);
   });
   useApplyTheme(settings.theme);
 
@@ -67,6 +73,11 @@ export function App() {
   return (
     <div className="flex h-full">
       <UpdateDialog update={update.info} onClose={update.dismiss} />
+      <TelemetryDialog
+        payload={telemetryPayload}
+        isExit
+        onClose={() => setTelemetryPayload(null)}
+      />
       <Sidebar route={route} onNavigate={setRoute} />
       <main key={route} className="h-full min-w-0 flex-1 animate-fade-in bg-app">
         {route === "dashboard" && <DashboardScreen onNavigate={setRoute} />}

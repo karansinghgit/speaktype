@@ -60,7 +60,15 @@ pub fn build(app: &AppHandle, visible: bool) -> tauri::Result<()> {
             "open" => open_main_window(app, None),
             "settings" => open_main_window(app, Some("settings")),
             "dictate" => app.state::<AppState>().controller.send(Event::Toggle),
-            "quit" => app.exit(0),
+            "quit" => {
+                let state = app.state::<AppState>();
+                let settings = state.settings();
+                if settings.telemetry_enabled && settings.show_telemetry_payload {
+                    crate::telemetry::prompt_exit_telemetry(app);
+                } else {
+                    crate::clean_exit(app);
+                }
+            }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {

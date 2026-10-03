@@ -85,3 +85,61 @@ pub const ORT_ACCELERATOR: transcribe_rs::OrtAccelerator = transcribe_rs::OrtAcc
 pub fn extract_zip(_zip: &Path, _dest: &Path) -> Result<(), String> {
     Err("Zipped model files aren't used on this system".into())
 }
+
+pub fn desktop_environment() -> Option<String> {
+    let session = if wayland::is_session() {
+        Some("Wayland")
+    } else if x11::is_session() {
+        Some("X11")
+    } else {
+        None
+    };
+
+    let desktop = std::env::var("XDG_CURRENT_DESKTOP")
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            std::env::var("DESKTOP_SESSION")
+                .ok()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+        });
+
+    format_desktop_env(desktop, session)
+}
+
+fn format_desktop_env(desktop: Option<String>, session: Option<&str>) -> Option<String> {
+    match (desktop, session) {
+        (Some(de), Some(srv)) => Some(format!("{de} ({srv})")),
+        (Some(de), None) => Some(de),
+        (None, Some(srv)) => Some(srv.to_string()),
+        (None, None) => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn formats_desktop_environment_combinations() {
+        assert_eq!(
+            format_desktop_env(Some("GNOME".into()), Some("Wayland")),
+            Some("GNOME (Wayland)".into())
+        );
+        assert_eq!(
+            format_desktop_env(Some("KDE".into()), Some("X11")),
+            Some("KDE (X11)".into())
+        );
+        assert_eq!(
+            format_desktop_env(Some("sway".into()), None),
+            Some("sway".into())
+        );
+        assert_eq!(
+            format_desktop_env(None, Some("Wayland")),
+            Some("Wayland".into())
+        );
+        assert_eq!(format_desktop_env(None, None), None);
+    }
+}

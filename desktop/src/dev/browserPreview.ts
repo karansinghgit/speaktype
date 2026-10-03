@@ -34,6 +34,9 @@ export function installBrowserPreview() {
     hasCompletedOnboarding: params.get("onboarding") !== "1",
     hasShownModelPrompt: true,
     hasImportedV1: false,
+    telemetryEnabled: false,
+    showTelemetryPayload: false,
+    anonymousId: "c3d98765-4321-4def-a123-456789abcdef",
   };
 
   const transcripts = [
@@ -142,6 +145,27 @@ export function installBrowserPreview() {
           return { transcripts: 21, dictionary: 3, settings: false };
         case "check_for_update":
           return { available: false, currentVersion: "2.0.0", latestVersion: "2.0.0", notes: "", url: "" };
+        case "reset_anonymous_id": {
+          const newId = "d4e09876-5432-4def-b234-567890abcdef";
+          settings.anonymousId = newId;
+          return newId;
+        }
+        case "get_telemetry_payload":
+          return {
+            anonymous_id: settings.anonymousId,
+            os_name: "macOS",
+            os_version: "15.1",
+            arch: "aarch64",
+            app_version: "2.0.0",
+            model: "small-en",
+            stats: {
+              success_count: 42,
+              fail_count: 1,
+              errors: {},
+            },
+          };
+        case "send_telemetry":
+          return null;
         default:
           return null;
       }

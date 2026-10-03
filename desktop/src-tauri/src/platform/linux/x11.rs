@@ -46,6 +46,11 @@ pub fn active_window_is_terminal() -> bool {
     })
 }
 
+pub fn is_session() -> bool {
+    std::env::var("XDG_SESSION_TYPE").is_ok_and(|t| t.eq_ignore_ascii_case("x11"))
+        || (!super::wayland::is_session() && std::env::var_os("DISPLAY").is_some())
+}
+
 /// Reads WM_CLASS ("instance\0class\0") of the window in _NET_ACTIVE_WINDOW.
 fn active_window_classes() -> Option<Vec<String>> {
     let (conn, screen) = x11rb::connect(None).ok()?;

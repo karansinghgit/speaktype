@@ -61,3 +61,7 @@ pub const ORT_ACCELERATOR: transcribe_rs::OrtAccelerator = transcribe_rs::OrtAcc
 pub fn extract_zip(_zip: &Path, _dest: &Path) -> Result<(), String> {
     Err("Zipped model files aren't used on this system".into())
 }
+
+pub fn desktop_environment() -> Option<String> {
+    None
+}

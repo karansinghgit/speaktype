@@ -489,7 +489,60 @@ pub async fn hide_tray_panel(app: AppHandle) -> CommandResult<()> {
 }
 
 #[tauri::command]
-pub async fn quit_app(app: AppHandle) -> CommandResult<()> {
-    app.exit(0);
-    Ok(())
+pub async fn quit_app(app: AppHandle, force: Option<bool>) -> CommandResult<()> {
+    if force.unwrap_or(false) {
+        crate::clean_exit(&app);
+        return Ok(());
+    }
+    let state = app.state::<AppState>();
+    let settings = state.settings();
+    if settings.telemetry_enabled && settings.show_telemetry_payload {
+        crate::telemetry::prompt_exit_telemetry(&app);
+        Ok(())
+    } else {
+        crate::clean_exit(&app);
+        Ok(())
+    }
 }
+
+#[tauri::command]
+pub async fn get_telemetry_payload(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> CommandResult<crate::telemetry::TelemetryPayload> {
+    let settings = state.settings();
+    let model = settings.selected_model;
+    let anonymous_id = settings.anonymous_id;
+    let stats = state.telemetry.lock_unpoisoned().clone();
+    Ok(crate::telemetry::create_payload(app, model, anonymous_id, stats))
+}
+
+#[tauri::command]
+pub async fn reset_anonymous_id(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> CommandResult<String> {
+    let mut settings = state.settings();
+    let new_id = uuid::Uuid::new_v4().to_string();
+    settings.anonymous_id = new_id.clone();
+    state.replace_settings(settings)?;
+    let _ = app.emit("settings-changed", ());
+    Ok(new_id)
+}
+
+#[tauri::command]
+pub async fn send_telemetry(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> CommandResult<()> {
+    let settings = state.settings();
+    if !settings.telemetry_enabled {
+        return Err("Telemetry is disabled in settings".to_string());
+    }
+    let model = settings.selected_model;
+    let anonymous_id = settings.anonymous_id;
+    let stats = state.telemetry.lock_unpoisoned().clone();
+    let payload = crate::telemetry::create_payload(app, model, anonymous_id, stats);
+    crate::telemetry::send_telemetry(&payload).await
+}
+

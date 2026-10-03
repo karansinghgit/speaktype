@@ -87,7 +87,14 @@ Yes. There's no trial, no word limit and no paid plan. SpeakType is open source 
 <details>
 <summary><b>Does anything get sent over the internet?</b></summary>
 
-No. Your voice is turned into text on your computer. SpeakType only goes online to download speech models when you ask it to, and to check for new versions, which you can turn off in Settings. There's no account, and nothing is collected about how you use it.
+No speech or transcripts ever leave your computer. Your voice is turned into text entirely on your own device.
+
+SpeakType only connects to the internet to:
+1. **Download speech models** when you choose to install one.
+2. **Check for new versions**, which you can turn off in Settings.
+3. **Optional anonymous telemetry**, which is **disabled by default**. If you opt in under **Settings → Privacy & Diagnostics**, SpeakType sends anonymous diagnostics (OS, architecture, model name, dictation success/error counts) on exit with a random anonymous ID you can reset at any time. You can inspect the exact JSON payload in the app before anything is sent.
+
+There is no account, and nothing personal is ever tracked.
 
 </details>
 

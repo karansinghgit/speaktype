@@ -15,6 +15,7 @@ interface AppStore {
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
   refreshModels: () => Promise<void>;
   refreshStatus: () => Promise<void>;
+  refreshSettings: () => Promise<void>;
 }
 
 /** How long the first load keeps retrying while the app's core starts: 20 × 150ms. */
@@ -123,9 +124,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             updateSettings,
             refreshModels,
             refreshStatus,
+            refreshSettings,
           }
         : null,
-    [settings, status, models, progress, downloadErrors, downloadModel, updateSettings, refreshModels, refreshStatus],
+    [settings, status, models, progress, downloadErrors, downloadModel, updateSettings, refreshModels, refreshStatus, refreshSettings],
   );
 
   if (!value) return <StartupScreen error={startupError} onRetry={start} />;

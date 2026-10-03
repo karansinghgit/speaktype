@@ -1,7 +1,10 @@
 import {
+  Activity,
   BookA,
   ClipboardCheck,
   Command,
+  Eye,
+  Fingerprint,
   Globe,
   Hand,
   Import,
@@ -23,6 +26,7 @@ import { useCallback, useEffect, useState } from "react";
 import { HotkeyPicker } from "@/components/settings/HotkeyPicker";
 import { PillPositionPicker } from "@/components/settings/PillPositionPicker";
 import { PermissionList } from "@/components/PermissionList";
+import { TelemetryDialog } from "@/components/TelemetryDialog";
 import { UpdateDialog } from "@/components/UpdateDialog";
 import {
   Badge,
@@ -39,7 +43,7 @@ import {
   useToast,
   type SelectOption,
 } from "@/components/ui";
-import { api, errorMessage, type InputDevice, type LegacyStatus, type Settings, type UpdateInfo } from "@/lib/api";
+import { api, errorMessage, type InputDevice, type LegacyStatus, type Settings, type TelemetryPayload, type UpdateInfo } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { describeImport } from "@/lib/format";
 
@@ -198,6 +202,7 @@ function GeneralTab() {
       </Section>
 
       <LanguageSection />
+      <TelemetrySection />
       <UpdatesSection />
       <ImportSection />
     </>
@@ -243,6 +248,121 @@ function LanguageSection() {
       <div className="px-5 py-3.5 type-small text-ink-muted">
         For languages other than English, use a multilingual model. English-only models can only write English.
       </div>
+    </Section>
+  );
+}
+
+function TelemetrySection() {
+  const { settings, refreshSettings } = useStore();
+  const save = useSave();
+  const toast = useToast();
+  const [previewPayload, setPreviewPayload] = useState<TelemetryPayload | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [resettingId, setResettingId] = useState(false);
+
+  const inspect = async () => {
+    setLoading(true);
+    try {
+      const payload = await api.getTelemetryPayload();
+      setPreviewPayload(payload);
+    } catch (e) {
+      toast(errorMessage(e), "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetId = async () => {
+    setResettingId(true);
+    try {
+      await api.resetAnonymousId();
+      await refreshSettings();
+      toast("Anonymous identifier reset", "success");
+    } catch (e) {
+      toast(errorMessage(e), "error");
+    } finally {
+      setResettingId(false);
+    }
+  };
+
+  return (
+    <Section title="Privacy & Diagnostics" description="Help improve SpeakType with anonymous statistics.">
+      <SettingRow
+        icon={Activity}
+        tone="neutral"
+        label="Anonymous telemetry"
+        description={
+          settings.telemetryEnabled
+            ? "Sends anonymous crash and dictation success/failure statistics on exit. No speech or transcripts are ever sent."
+            : "Telemetry is disabled. No usage data or exit statistics are collected."
+        }
+      >
+        <div className="flex items-center gap-3">
+          <Badge tone={settings.telemetryEnabled ? "success" : "neutral"}>
+            {settings.telemetryEnabled ? "Enabled" : "Disabled"}
+          </Badge>
+          <Switch
+            checked={settings.telemetryEnabled}
+            onChange={(telemetryEnabled) => save({ telemetryEnabled })}
+          />
+        </div>
+      </SettingRow>
+
+      <SettingRow
+        icon={Fingerprint}
+        tone="neutral"
+        label="Anonymous identifier"
+        description="A random identifier included with telemetry to distinguish installations without identifying you."
+      >
+        <div className="flex items-center gap-2">
+          <code
+            title={settings.anonymousId}
+            className="rounded border border-line-subtle bg-surface-sunken px-2 py-1 font-mono text-xs text-ink-secondary"
+          >
+            {settings.anonymousId ? `${settings.anonymousId.slice(0, 8)}…` : "Not set"}
+          </code>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={RotateCw}
+            loading={resettingId}
+            onClick={resetId}
+            title="Generate a new anonymous identifier"
+          >
+            Reset
+          </Button>
+        </div>
+      </SettingRow>
+
+      <SettingRow
+        icon={Eye}
+        tone="neutral"
+        label="Show telemetry payload in UI"
+        description="Shows a dialog with the raw JSON payload in the UI whenever telemetry is being sent."
+      >
+        <Switch
+          checked={settings.showTelemetryPayload}
+          disabled={!settings.telemetryEnabled}
+          onChange={(showTelemetryPayload) => save({ showTelemetryPayload })}
+        />
+      </SettingRow>
+
+      <div className="px-5 py-3">
+        <Button
+          variant="secondary"
+          icon={Eye}
+          loading={loading}
+          disabled={!settings.telemetryEnabled}
+          onClick={inspect}
+        >
+          View current payload
+        </Button>
+      </div>
+
+      <TelemetryDialog
+        payload={previewPayload}
+        onClose={() => setPreviewPayload(null)}
+      />
     </Section>
   );
 }

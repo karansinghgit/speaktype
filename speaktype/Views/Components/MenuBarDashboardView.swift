@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MenuBarDashboardView: View {
     @StateObject private var historyService = HistoryService.shared
+    @StateObject private var audioRecorder = AudioRecordingService.shared
 
     let openDashboard: () -> Void
     let quit: () -> Void
@@ -36,11 +37,15 @@ struct MenuBarDashboardView: View {
         VStack(alignment: .leading, spacing: 16) {
             header
             statsGrid
+            microphoneSwitcherSection
             recentTranscriptsSection
             actionRow
         }
         .padding(16)
         .frame(width: 388)
+        .onAppear {
+            audioRecorder.fetchAvailableDevices()
+        }
     }
 
     private var header: some View {
@@ -111,6 +116,60 @@ struct MenuBarDashboardView: View {
                 icon: "timer",
                 tint: Color.accentWarning
             )
+        }
+    }
+
+    private var microphoneSwitcherSection: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "mic.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.accentPrimary)
+                .frame(width: 28, height: 28)
+                .background(Color.accentPrimary.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Microphone")
+                    .font(Typography.captionSmall)
+                    .foregroundStyle(Color.textSecondary)
+
+                Text(audioRecorder.selectedDeviceName)
+                    .font(Typography.bodySmall)
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+
+            Spacer(minLength: 8)
+
+            if audioRecorder.availableDevices.count > 1 {
+                Button(action: { audioRecorder.cycleDevice(step: 1) }) {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.textPrimary)
+                        .frame(width: 32, height: 28)
+                        .background(Color.bgHover)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+                .help("Switch Microphone")
+            } else {
+                Text("\(audioRecorder.availableDevices.count) connected")
+                    .font(Typography.captionSmall)
+                    .foregroundStyle(Color.textMuted)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.bgHover)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.border, lineWidth: 1)
         }
     }
 

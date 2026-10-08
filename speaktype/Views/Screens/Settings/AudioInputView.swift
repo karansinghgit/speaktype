@@ -54,7 +54,7 @@ struct AudioInputView: View {
                         .buttonStyle(.plain)
                     }
                     
-                    Text("Note: SpeakType will use the selected device for all recordings.")
+                    Text("Note: SpeakType uses the selected device for all recordings and automatically switches to newly connected microphones.")
                         .font(Typography.bodySmall)
                         .foregroundStyle(Color.textSecondary)
                     

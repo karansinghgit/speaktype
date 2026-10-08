@@ -20,6 +20,7 @@ class AudioRecordingService: NSObject, ObservableObject {
     @Published var availableDevices: [AVCaptureDevice] = []
     @Published var selectedDeviceId: String? {
         didSet {
+            guard selectedDeviceId != oldValue else { return }
             setupSession()
             // Persist so the selection survives app restarts.
             if let selectedDeviceId {
@@ -145,12 +146,30 @@ class AudioRecordingService: NSObject, ObservableObject {
         )
     }
 
-    @objc private func handleDeviceChange(_ notification: Notification) {
-        print("Audio device change detected")
-        fetchAvailableDevices()
+    /// Human-readable name of the currently selected microphone
+    var selectedDeviceName: String {
+        if let selectedDeviceId,
+            let device = availableDevices.first(where: { $0.uniqueID == selectedDeviceId })
+        {
+            return device.localizedName
+        }
+        return availableDevices.first?.localizedName ?? "No microphone"
     }
 
-    func fetchAvailableDevices() {
+    @objc private func handleDeviceChange(_ notification: Notification) {
+        print("Audio device change detected: \(notification.name.rawValue)")
+        if notification.name == AVCaptureDevice.wasConnectedNotification,
+            let connectedDevice = notification.object as? AVCaptureDevice,
+            connectedDevice.hasMediaType(.audio),
+            !connectedDevice.localizedName.localizedCaseInsensitiveContains("Microsoft Teams")
+        {
+            fetchAvailableDevices(autoSwitchToDeviceId: connectedDevice.uniqueID)
+        } else {
+            fetchAvailableDevices()
+        }
+    }
+
+    func fetchAvailableDevices(autoSwitchToDeviceId: String? = nil) {
         let discoverySession = AVCaptureDevice.DiscoverySession(
             deviceTypes: [.microphone],
             mediaType: .audio,
@@ -160,6 +179,16 @@ class AudioRecordingService: NSObject, ObservableObject {
             self.availableDevices = discoverySession.devices.filter { device in
                 !device.localizedName.localizedCaseInsensitiveContains("Microsoft Teams")
             }
+
+            // If a new microphone was just connected, automatically switch to it.
+            if let newDeviceId = autoSwitchToDeviceId,
+                let newDevice = self.availableDevices.first(where: { $0.uniqueID == newDeviceId })
+            {
+                print("🎤 Auto-switching to newly connected microphone: \(newDevice.localizedName)")
+                self.selectedDeviceId = newDevice.uniqueID
+                return
+            }
+
             // Keep the current (possibly persisted) selection if it is still
             // connected; otherwise fall back to the first available device, or
             // clear it when no inputs remain.
@@ -177,10 +206,38 @@ class AudioRecordingService: NSObject, ObservableObject {
         }
     }
 
-    func setupSession() {
-        captureSession?.stopRunning()
-        captureSession = AVCaptureSession()
+    /// Pure helper for computing the next cycled device ID from an ordered list of IDs.
+    static func nextCycledDeviceId(
+        from deviceIds: [String],
+        currentDeviceId: String?,
+        step: Int = 1
+    ) -> String? {
+        guard deviceIds.count > 1 else { return currentDeviceId ?? deviceIds.first }
+        let currentIndex = deviceIds.firstIndex(where: { $0 == currentDeviceId }) ?? 0
+        let count = deviceIds.count
+        let nextIndex = ((currentIndex + step) % count + count) % count
+        return deviceIds[nextIndex]
+    }
 
+    /// Cycle through available microphones by step (+1 for next, -1 for previous).
+    func cycleDevice(step: Int = 1) {
+        let deviceIds = availableDevices.map(\.uniqueID)
+        guard
+            let nextId = Self.nextCycledDeviceId(
+                from: deviceIds,
+                currentDeviceId: selectedDeviceId,
+                step: step
+            ),
+            nextId != selectedDeviceId
+        else { return }
+
+        if let nextDevice = availableDevices.first(where: { $0.uniqueID == nextId }) {
+            print("🎤 Switched microphone to: \(nextDevice.localizedName)")
+        }
+        selectedDeviceId = nextId
+    }
+
+    func setupSession() {
         guard let deviceId = selectedDeviceId,
             let device = AVCaptureDevice(uniqueID: deviceId),
             let input = try? AVCaptureDeviceInput(device: device)
@@ -189,11 +246,29 @@ class AudioRecordingService: NSObject, ObservableObject {
             return
         }
 
-        if captureSession?.canAddInput(input) == true {
-            captureSession?.addInput(input)
+        // If a session already exists (including when pre-warmed or mid-recording),
+        // swap its input in-place on audioQueue so running state and session clock
+        // remain uninterrupted.
+        if let existingSession = captureSession {
+            audioQueue.async {
+                existingSession.beginConfiguration()
+                for oldInput in existingSession.inputs {
+                    existingSession.removeInput(oldInput)
+                }
+                if existingSession.canAddInput(input) {
+                    existingSession.addInput(input)
+                }
+                existingSession.commitConfiguration()
+            }
+            return
         }
 
-        audioOutput = AVCaptureAudioDataOutput()
+        let session = AVCaptureSession()
+        if session.canAddInput(input) {
+            session.addInput(input)
+        }
+
+        let output = AVCaptureAudioDataOutput()
         // Pin a fixed Linear PCM output format so the live level meter always sees a
         // known sample layout. Without this, AVCaptureAudioDataOutput delivers the
         // device's *native* format, which a communication app (Zoom/FaceTime/Meet)
@@ -201,17 +276,20 @@ class AudioRecordingService: NSObject, ObservableObject {
         // writer keeps working (it appends buffers as-is, so transcription is fine),
         // but the waveform flatlines to 0 — text works, no waveform. Forcing 16-bit
         // interleaved PCM keeps the meter fed regardless of what else holds the mic.
-        audioOutput?.audioSettings = [
+        output.audioSettings = [
             AVFormatIDKey: kAudioFormatLinearPCM,
             AVLinearPCMBitDepthKey: 16,
             AVLinearPCMIsFloatKey: false,
             AVLinearPCMIsBigEndianKey: false,
             AVLinearPCMIsNonInterleaved: false,
         ]
-        if captureSession?.canAddOutput(audioOutput!) == true {
-            captureSession?.addOutput(audioOutput!)
-            audioOutput?.setSampleBufferDelegate(self, queue: audioQueue)
+        if session.canAddOutput(output) {
+            session.addOutput(output)
+            output.setSampleBufferDelegate(self, queue: audioQueue)
         }
+
+        captureSession = session
+        audioOutput = output
 
         // Don't start session here - only start when recording begins
         // This prevents continuous CPU usage when idle

@@ -72,7 +72,6 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
-  destructive = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -80,7 +79,6 @@ export function ConfirmDialog({
   title: string;
   description?: ReactNode;
   confirmLabel: string;
-  destructive?: boolean;
 }) {
   return (
     <Dialog
@@ -94,7 +92,6 @@ export function ConfirmDialog({
           <Button
             data-autofocus
             variant="primary"
-            className={destructive ? "bg-danger text-white hover:bg-danger hover:opacity-90 dark:text-white" : undefined}
             onClick={() => {
               onConfirm();
               onClose();

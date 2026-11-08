@@ -29,7 +29,14 @@ export function useStore() {
   return store;
 }
 
-export function StoreProvider({ children }: { children: ReactNode }) {
+export function StoreProvider({
+  children,
+  revealWindow = false,
+}: {
+  children: ReactNode;
+  /** Reveals the main window (closing the splash) once the first screen is ready. */
+  revealWindow?: boolean;
+}) {
   const [settings, setSettings] = useState<Settings>();
   const [status, setStatus] = useState<Status>();
   const [models, setModels] = useState<ModelStatus[]>([]);
@@ -127,6 +134,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         : null,
     [settings, status, models, progress, downloadErrors, downloadModel, updateSettings, refreshModels, refreshStatus],
   );
+
+  // Reveal the window once the first screen is rendered (or has failed), so the
+  // splash covers the load and the window appears already themed.
+  const ready = Boolean(value) || Boolean(startupError);
+  useEffect(() => {
+    if (revealWindow && ready) api.showMain();
+  }, [revealWindow, ready]);
 
   if (!value) return <StartupScreen error={startupError} onRetry={start} />;
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

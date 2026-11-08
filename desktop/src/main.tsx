@@ -15,7 +15,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary>
       <ToastProvider>
-        <StoreProvider>
+        <StoreProvider revealWindow>
           <App />
         </StoreProvider>
       </ToastProvider>

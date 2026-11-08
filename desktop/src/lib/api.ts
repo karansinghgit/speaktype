@@ -197,6 +197,7 @@ export const api = {
   importLegacy: () => invoke<ImportSummary>("import_legacy"),
 
   openMainWindow: (route?: string) => invoke<void>("open_main_window", { route }),
+  showMain: () => invoke<void>("show_main"),
   hideTrayPanel: () => invoke<void>("hide_tray_panel"),
   quitApp: () => invoke<void>("quit_app"),
 };

@@ -246,7 +246,26 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
+        // Show the splash only after its page has loaded, so the window never
+        // appears as a white rectangle while WebView2 starts up.
+        .on_page_load(|webview, payload| {
+            if webview.label() == "splashscreen"
+                && payload.event() == tauri::webview::PageLoadEvent::Finished
+            {
+                let window = webview.window();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        })
         .setup(|app| {
+            // The main window stays hidden behind a splash until the UI is
+            // rendered and themed. If the frontend never signals ready, reveal
+            // it anyway so a broken bundle can't leave the splash up forever.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(10));
+                commands::reveal(&handle);
+            });
             engine::silence_logs();
             for dir in [app.path().app_config_dir()?, app.path().app_data_dir()?] {
                 match legacy::move_early_build_folder(&dir) {
@@ -353,6 +372,7 @@ pub fn run() {
             commands::open_permission_settings,
             commands::check_for_update,
             commands::open_main_window,
+            commands::show_main,
             commands::hide_tray_panel,
             commands::quit_app,
         ])

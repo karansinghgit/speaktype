@@ -473,7 +473,7 @@ mod tests {
     }
 }
 
-// ---- Windows ----
+// ---- Window management ----
 
 /// Closes the splash and reveals the main window, already rendered and themed.
 pub(crate) fn reveal(app: &AppHandle) {

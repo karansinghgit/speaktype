@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>SpeakType</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        background: light-dark(#f2f2f3, #0a0a0a);
+      }
+      #splash {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+      }
+      #splash::after {
+        content: "";
+        width: 22px;
+        height: 22px;
+        border: 3px solid light-dark(#75757d, #8a8a93);
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: splash-spin 0.85s linear infinite;
+      }
+      @keyframes splash-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="splash" role="status" aria-label="Loading SpeakType"></div>
+  </body>
+</html>

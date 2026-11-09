@@ -20,6 +20,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(import.meta.dirname, "index.html"),
+        splashscreen: resolve(import.meta.dirname, "splashscreen.html"),
         pill: resolve(import.meta.dirname, "pill.html"),
         tray: resolve(import.meta.dirname, "tray.html"),
       },

@@ -473,7 +473,24 @@ mod tests {
     }
 }
 
-// ---- Windows ----
+// ---- Window management ----
+
+/// Closes the splash and reveals the main window, already rendered and themed.
+pub(crate) fn reveal(app: &AppHandle) {
+    if let Some(splash) = app.get_webview_window("splashscreen") {
+        let _ = splash.close();
+    }
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
+}
+
+#[tauri::command]
+pub async fn show_main(app: AppHandle) -> CommandResult<()> {
+    reveal(&app);
+    Ok(())
+}
 
 /// Opens the main window, optionally on a screen such as "settings" or "history".
 #[tauri::command]

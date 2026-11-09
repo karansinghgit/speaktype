@@ -19,7 +19,22 @@
         "width": 1200,
         "height": 800,
         "minWidth": 960,
-        "minHeight": 640
+        "minHeight": 640,
+        "visible": false,
+        "backgroundThrottling": "disabled"
+      },
+      {
+        "label": "splashscreen",
+        "title": "SpeakType",
+        "url": "splashscreen.html",
+        "width": 420,
+        "height": 260,
+        "center": true,
+        "decorations": false,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false
       },
       {
         "label": "pill",

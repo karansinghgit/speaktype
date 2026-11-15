@@ -66,6 +66,9 @@ pub fn permission_settings_url(_kind: PermissionKind) -> Option<&'static str> {
 
 pub fn style_main_window(_window: &WebviewWindow) {}
 
+/// Only macOS needs this: other systems already draw always-on-top windows over full-screen apps.
+pub fn float_over_fullscreen(_window: &WebviewWindow) {}
+
 /// Single-modifier hotkeys aren't supported here yet.
 pub const MODIFIER_HOTKEYS: &[&str] = &[];
 

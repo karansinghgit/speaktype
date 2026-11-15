@@ -9,6 +9,7 @@
 //! - `permissions`, `request_permission`, `permission_settings_url`: the OS
 //!   permissions dictation needs, for onboarding and Settings.
 //! - `style_main_window`: native window chrome tweaks.
+//! - `float_over_fullscreen`: lets a window show over full-screen apps.
 //! - `NEURAL_ENGINE`, `extract_zip`, `ORT_ACCELERATOR`: speech model acceleration.
 
 use enigo::{Direction, Enigo, Key, Keyboard};

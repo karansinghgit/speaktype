@@ -38,6 +38,8 @@ pub fn update(app: &AppHandle, state: PillState, position: PillPosition, always_
     if !window.is_visible().unwrap_or(false) {
         place(app, position);
         let _ = window.show();
+        let target = window.clone();
+        let _ = app.run_on_main_thread(move || crate::platform::float_over_fullscreen(&target));
     }
 }
 
